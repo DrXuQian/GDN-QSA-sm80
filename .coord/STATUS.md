@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-20 23:05:19 UTC
-working-on: ACU capture/bundle ready; final local verification and push
+updated-at: 2026-09-20 23:06:44 UTC
+working-on: ACU capture/bundle complete; awaiting user's uploaded report tar
 blocked-on: no local PPU; native profiler capture will run on user's box
-last-commit: 14569f7 (CUDA13.0 FLA compatibility handoff)
+last-commit: ba05c9f (same-input ACU capture, source/binary evidence and tar)
 
 User-reported same-input full-API timing: g=-0.1 ours 925.020 us vs FLA
 726.992 us (FLA-WINS); g=-1 ours 457.340 us vs FLA 746.904 us
