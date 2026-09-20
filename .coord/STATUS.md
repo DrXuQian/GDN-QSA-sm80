@@ -1,9 +1,21 @@
 # PPU original-structure port
 
-updated-at: 2026-09-20 13:30:24 UTC
-working-on: same-input FLA comparison ready; WITH_FLA=1 handoff
-blocked-on: no local PPU; actual A/B timings require the user's installed PPU FLA
-last-commit: 44772bf (same-input PPU GDN/FLA comparison; kernels unchanged)
+updated-at: 2026-09-20 14:29:08 UTC
+working-on: CUDA13.0 parser compatibility fix ready; rerun WITH_FLA=1
+blocked-on: no local PPU; complete FLA execution/timing awaits box rerun
+last-commit: 539bc58 (process-local CUDA13.0/PTX9.0 parser backport)
+
+Box FLA compilation failed in Triton ptx_get_version("13.0"). Reproduced
+locally: the old function handles only CUDA 10/11/12, then emits its misleading
+"only support CUDA 10.0 or higher" error. Process-local backport uses Triton
+v3.5.0's 13.0 -> 90 entry. Does not replace packages, fake a CUDA12 version,
+change assembler/backend selection, override accepted vendor mappings, or
+swallow other errors. Compatibility decision and compiler hash are recorded.
+Actual local parser passes 13.0 after the fix; 12.9 remains 88, LLVM +ptx86
+cap unchanged. PPU SDK 2.1.1 ptxas reports release13.0 and compiles a minimal
+PTX9.0 kernel; hgobjdump identifies PPU1.0 output. Compile-only, not device PASS.
+Eight CPU contract tests and existing host/codegen suite PASS:
+/workspace/gdn-triton-cuda13-compat/local.log. GDN/FLA kernels unchanged.
 
 Device follow-up, 2026-09-20: user reports "pass" in response to the PERF=0
 handoff. Correctness is now USER-REPORTED/PASS, not inferred from local tests.
@@ -21,7 +33,7 @@ Both decay cases independently pass correctness and repeat gates before
 their timing. JIT/autotune excluded; sequential AB/BA samples, no overlap.
 Saves fla-comparison.log/json beside source and binary identities. No
 ours-only fallback on FLA error; overlapping sample envelopes UNRESOLVED.
-Local verification: 5 CPU benchmark contract tests PASS (including missing
+Original comparison-handoff verification: 5 CPU contract tests PASS (including missing
 FLA, missing/wrong state, wrong/nonfinite output and both winner directions),
 full existing host/codegen suite PASS. Log:
 /workspace/gdn-qsa-retile-fix/fla-local.log. No new PPU timing is claimed.
