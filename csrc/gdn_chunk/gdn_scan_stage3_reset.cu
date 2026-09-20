@@ -8,15 +8,14 @@
 // This kernel computes, per (bh,g), the max absolute value of A_g into
 // `out_max` [B*H*G] f32, plus a global count of groups exceeding `eps`.
 
-#include <cuda_runtime.h>
-#include <cuda_fp16.h>
+#include "gdn_target.cuh"
 #include <cstdio>
 #include <cutlass/bfloat16.h>
 
 using BF16 = cutlass::bfloat16_t;
 
 __device__ __forceinline__ float bf16_to_f32(cutlass::bfloat16_t x) {
-    float r; asm("cvt.f32.bf16 %0, %1;\n" : "=f"(r) : "h"(x.storage)); return r;
+    return gdn_arch::bf16_to_float(x);
 }
 
 __global__ void gdn_reset_check_kernel(
@@ -59,7 +58,7 @@ extern "C" void gdn_reset_check(
     float* out_count,
     float eps,
     int total_groups,
-    cudaStream_t stream) {
+    gdn_arch::Stream stream) {
     constexpr int BLOCK = 256;
     gdn_reset_check_kernel<<<total_groups, BLOCK, 0, stream>>>(
         A_g, out_max, out_count, eps, total_groups);

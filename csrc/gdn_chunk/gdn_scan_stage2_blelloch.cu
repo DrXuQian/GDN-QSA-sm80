@@ -34,8 +34,7 @@
 // stage2 (index = bh*G + node). grid = (B*H, G/step); block (bh, j) handles
 // parent node j*step + step - 1 of sequence bh.
 
-#include <cuda_runtime.h>
-#include <cuda_fp16.h>
+#include "gdn_target.cuh"
 
 #include <cstdio>
 #include <cassert>
@@ -45,12 +44,10 @@
 #include <cute/tensor.hpp>
 #include <cute/algorithm/cooperative_gemm.hpp>
 #include <cute/arch/copy.hpp>
-#include <cute/arch/mma_sm80.hpp>
 #include <cute/stride.hpp>
 #include <cutlass/arch/barrier.h>
 #include <cutlass/bfloat16.h>
 
-#include "cute/arch/copy_sm75.hpp"
 #include "cute/layout.hpp"
 #include "cute/numeric/integral_constant.hpp"
 #include "cute/tensor_impl.hpp"
@@ -59,22 +56,16 @@ using namespace cute;
 using BF16 = cutlass::bfloat16_t;
 
 __device__ __forceinline__ float bf16_to_f32(cutlass::bfloat16_t x) {
-    float r; asm("cvt.f32.bf16 %0, %1;\n" : "=f"(r) : "h"(x.storage)); return r;
+    return gdn_arch::bf16_to_float(x);
 }
 
 // [D,D] K_INTER swizzle
 template <int D>
-using StateSmemLayout = decltype(tile_to_shape(
-    GMMA::Layout_K_INTER_Atom<cute::bfloat16_t>{},
-    make_shape(Int<D>{}, Int<D>{}),
-    LayoutLeft{}));
+using StateSmemLayout = gdn_arch::RowLayout<D, D>;
 
 // [D,2D] K_INTER swizzle for the packed [A|B] operand
 template <int D>
-using PackedSmemLayout = decltype(tile_to_shape(
-    GMMA::Layout_K_INTER_Atom<cute::bfloat16_t>{},
-    make_shape(Int<D>{}, Int<2 * D>{}),
-    LayoutLeft{}));
+using PackedSmemLayout = gdn_arch::RowLayout<D, 2 * D>;
 
 // per-warp [16,16] staging, stacked as [D,16] row-major (8 warps * 16 rows)
 template <int D>
@@ -153,15 +144,15 @@ __global__ void __launch_bounds__(NumThreads) gdn_scan_stage2_blelloch_up_kernel
     __syncthreads();
 
     auto mma = make_tiled_mma(
-        MMA_Atom<SM80_16x8x16_F32BF16BF16F32_TN>{},
+        MMA_Atom<gdn_arch::MmaBf16>{},
         Layout<Shape<_1,_1>>{}, Tile<_16,_16,_16>{});
     ThrMMA thr_mma = mma.get_slice(lane);
 
-    auto smem_tiled_copy_A   = make_tiled_copy_A(Copy_Atom<SM75_U32x4_LDSM_N, BF16>{}, mma);
+    auto smem_tiled_copy_A   = gdn_arch::copy_a<BF16>(mma);
     auto smem_thr_copy_A     = smem_tiled_copy_A.get_thread_slice(lane);
-    auto smem_tiled_load_C   = make_tiled_copy_C(Copy_Atom<SM75_U32x4_LDSM_N, BF16>{}, mma);
+    auto smem_tiled_load_C   = gdn_arch::load_c<BF16>(mma);
     auto smem_thr_load_C     = smem_tiled_load_C.get_slice(lane);
-    auto smem_tiled_store_C  = make_tiled_copy_C(Copy_Atom<AutoVectorizingCopy, BF16>{}, mma);
+    auto smem_tiled_store_C  = gdn_arch::store_c<BF16>(mma);
     auto smem_thr_store_C    = smem_tiled_store_C.get_slice(lane);
 
     Tensor Sref = local_tile(X_t, make_shape(Int<16>{}, Int<16>{}), make_coord(0, 0));
@@ -174,10 +165,7 @@ __global__ void __launch_bounds__(NumThreads) gdn_scan_stage2_blelloch_up_kernel
         BFragT b = thr_mma.partition_fragment_B(Sref);
         uint32_t reg[4];
         uint32_t const* uc = reinterpret_cast<uint32_t const*>(&c_frag(0));
-        SM75_U32x1_MOVM_T::copy(uc[0], reg[0]);
-        SM75_U32x1_MOVM_T::copy(uc[1], reg[1]);
-        SM75_U32x1_MOVM_T::copy(uc[2], reg[2]);
-        SM75_U32x1_MOVM_T::copy(uc[3], reg[3]);
+        gdn_arch::result_to_b_words(uc, reg);
         uint32_t* bd = reinterpret_cast<uint32_t*>(&b(0));
         bd[0] = reg[0]; bd[1] = reg[1]; bd[2] = reg[2]; bd[3] = reg[3];
         return b;
@@ -311,15 +299,15 @@ __global__ void __launch_bounds__(NumThreads) gdn_scan_stage2_blelloch_down_kern
     //  the GEMM are already staged in smem, independent of X_t / dst writes)
 
     auto mma = make_tiled_mma(
-        MMA_Atom<SM80_16x8x16_F32BF16BF16F32_TN>{},
+        MMA_Atom<gdn_arch::MmaBf16>{},
         Layout<Shape<_1,_1>>{}, Tile<_16,_16,_16>{});
     ThrMMA thr_mma = mma.get_slice(lane);
 
-    auto smem_tiled_copy_A   = make_tiled_copy_A(Copy_Atom<SM75_U32x4_LDSM_N, BF16>{}, mma);
+    auto smem_tiled_copy_A   = gdn_arch::copy_a<BF16>(mma);
     auto smem_thr_copy_A     = smem_tiled_copy_A.get_thread_slice(lane);
-    auto smem_tiled_load_C   = make_tiled_copy_C(Copy_Atom<SM75_U32x4_LDSM_N, BF16>{}, mma);
+    auto smem_tiled_load_C   = gdn_arch::load_c<BF16>(mma);
     auto smem_thr_load_C     = smem_tiled_load_C.get_slice(lane);
-    auto smem_tiled_store_C  = make_tiled_copy_C(Copy_Atom<AutoVectorizingCopy, BF16>{}, mma);
+    auto smem_tiled_store_C  = gdn_arch::store_c<BF16>(mma);
     auto smem_thr_store_C    = smem_tiled_store_C.get_slice(lane);
 
     Tensor Sref = local_tile(X_t, make_shape(Int<16>{}, Int<16>{}), make_coord(0, 0));
@@ -332,10 +320,7 @@ __global__ void __launch_bounds__(NumThreads) gdn_scan_stage2_blelloch_down_kern
         BFragT b = thr_mma.partition_fragment_B(Sref);
         uint32_t reg[4];
         uint32_t const* uc = reinterpret_cast<uint32_t const*>(&c_frag(0));
-        SM75_U32x1_MOVM_T::copy(uc[0], reg[0]);
-        SM75_U32x1_MOVM_T::copy(uc[1], reg[1]);
-        SM75_U32x1_MOVM_T::copy(uc[2], reg[2]);
-        SM75_U32x1_MOVM_T::copy(uc[3], reg[3]);
+        gdn_arch::result_to_b_words(uc, reg);
         uint32_t* bd = reinterpret_cast<uint32_t*>(&b(0));
         bd[0] = reg[0]; bd[1] = reg[1]; bd[2] = reg[2]; bd[3] = reg[3];
         return b;
@@ -433,12 +418,11 @@ extern "C" void gdn_scan_stage2_blelloch_up(
     cutlass::bfloat16_t* dstA,
     cutlass::bfloat16_t* dstB,
     int step, int G, int B, int H,
-    cudaStream_t stream) {
+    gdn_arch::Stream stream) {
     constexpr int D = GDN_SCAN_D;
     constexpr int NUM_THREADS = GDN_SCAN_NUM_THREADS;
     const size_t smem = stage2_blelloch_smem_bytes();
-    cudaFuncSetAttribute(gdn_scan_stage2_blelloch_up_kernel<D, NUM_THREADS>,
-                         cudaFuncAttributeMaxDynamicSharedMemorySize, (int)smem);
+    gdn_arch::set_smem(gdn_scan_stage2_blelloch_up_kernel<D, NUM_THREADS>, smem);
     dim3 grid(B * H, G);
     dim3 block(NUM_THREADS);
     gdn_scan_stage2_blelloch_up_kernel<D, NUM_THREADS><<<grid, block, smem, stream>>>(
@@ -452,12 +436,11 @@ extern "C" void gdn_scan_stage2_blelloch_down(
     cutlass::bfloat16_t* dstA,
     cutlass::bfloat16_t* dstB,
     int step, int G, int B, int H,
-    cudaStream_t stream) {
+    gdn_arch::Stream stream) {
     constexpr int D = GDN_SCAN_D;
     constexpr int NUM_THREADS = GDN_SCAN_NUM_THREADS;
     const size_t smem = stage2_blelloch_smem_bytes();
-    cudaFuncSetAttribute(gdn_scan_stage2_blelloch_down_kernel<D, NUM_THREADS>,
-                         cudaFuncAttributeMaxDynamicSharedMemorySize, (int)smem);
+    gdn_arch::set_smem(gdn_scan_stage2_blelloch_down_kernel<D, NUM_THREADS>, smem);
     dim3 grid(B * H, G / step);
     dim3 block(NUM_THREADS);
     gdn_scan_stage2_blelloch_down_kernel<D, NUM_THREADS><<<grid, block, smem, stream>>>(
@@ -469,7 +452,7 @@ extern "C" void gdn_scan_stage2_blelloch_setroot(
     cutlass::bfloat16_t* dstA,
     cutlass::bfloat16_t* dstB,
     int G, int B, int H,
-    cudaStream_t stream) {
+    gdn_arch::Stream stream) {
     constexpr int D = GDN_SCAN_D;
     constexpr int NUM_THREADS = GDN_SCAN_NUM_THREADS;
     dim3 grid(B * H);
@@ -490,7 +473,7 @@ extern "C" void gdn_scan_stage2_blelloch(
     cutlass::bfloat16_t* dstA,
     cutlass::bfloat16_t* dstB,
     int G, int B, int H,
-    cudaStream_t stream) {
+    gdn_arch::Stream stream) {
     // internal ping-pong: A/BI = current source buffer, A/BO = current sink.
     const cutlass::bfloat16_t* AI = srcA; const cutlass::bfloat16_t* BI = srcB;
     cutlass::bfloat16_t* AO = dstA;     cutlass::bfloat16_t* BO = dstB;
@@ -514,9 +497,7 @@ extern "C" void gdn_scan_stage2_blelloch(
     // result is in AI/BI; ensure it lands in dst (the documented output buffer)
     if (AI != dstA) {
         const size_t n = (size_t)B * H * G * GDN_SCAN_D * GDN_SCAN_D;
-        cudaMemcpyAsync(dstA, AI, n * sizeof(cutlass::bfloat16_t),
-                        cudaMemcpyDeviceToDevice, stream);
-        cudaMemcpyAsync(dstB, BI, n * sizeof(cutlass::bfloat16_t),
-                        cudaMemcpyDeviceToDevice, stream);
+        gdn_arch::copy_device(dstA, AI, n * sizeof(cutlass::bfloat16_t), stream);
+        gdn_arch::copy_device(dstB, BI, n * sizeof(cutlass::bfloat16_t), stream);
     }
 }

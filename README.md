@@ -17,9 +17,11 @@ core attention, and the gated output projection) — written from scratch for
 A800 (compute capability 8.0), with tensor-core `mma.sync` + `cp.async`
 kernels and reproducible benchmarks against public baselines.
 
-An experimental **PPU forward backend for `gdn_chunk`** is also present.  It
-ports this repository's superchunk affine-transfer/scan/replay algorithm to
-PPU0010 with actlize/CuTe BF16 MMA, rather than falling back to the older
+An experimental **PPU forward backend for `gdn_chunk`** is also present. It
+compiles this repository's original optimized kernels and host dispatch for
+PPU0010 with actlize/CuTe BF16/F16 MMA, preserving reset fast-path,
+register-resident replay and asynchronous double buffering, rather than using
+the superseded simplified PPU port or the older
 one-CTA-per-head serial recurrence.  Its deliberately narrow v1 contract and
 admission evidence are documented in [`docs/PPU_BACKEND.md`](docs/PPU_BACKEND.md).
 

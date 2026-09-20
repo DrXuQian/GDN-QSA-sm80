@@ -26,13 +26,12 @@
 // v and beta are the raw inputs (not in the workspace) and are read row-major
 // / head-major exactly like the recurrence kernel.
 //
-// Tensor cores: SM80 bf16 mma.sync via cute (SM80_16x8x16_F32BF16BF16F32_TN),
+// Tensor cores: SM80 bf16 mma.sync via cute (gdn_arch::MmaBf16),
 // Tile 16x16, one warp per 16x16 output tile. 8 warps.
 //
 // This is Stage 1 ONLY: no scan kernel, no replay kernel.
 
-#include <cuda_runtime.h>
-#include <cuda_fp16.h>
+#include "gdn_target.cuh"
 
 #include <cstdio>
 #include <cassert>
@@ -42,12 +41,10 @@
 #include <cute/tensor.hpp>
 #include <cute/algorithm/cooperative_gemm.hpp>
 #include <cute/arch/copy.hpp>
-#include <cute/arch/mma_sm80.hpp>
 #include <cute/stride.hpp>
 #include <cutlass/arch/barrier.h>
 #include <cutlass/bfloat16.h>
 
-#include "cute/arch/copy_sm75.hpp"
 #include "cute/layout.hpp"
 #include "cute/numeric/integral_constant.hpp"
 #include "cute/tensor_impl.hpp"
@@ -57,9 +54,7 @@ using namespace cute;
 using BF16 = cutlass::bfloat16_t;
 
 __device__ __forceinline__ float bf16_to_f32(cutlass::bfloat16_t x) {
-    float result;
-    asm("cvt.f32.bf16 %0, %1;\n" : "=f"(result) : "h"(x.storage));
-    return result;
+    return gdn_arch::bf16_to_float(x);
 }
 
 // ---------------- Layouts (same swizzle scheme as gdn_kernel.cu) ----------------
@@ -67,33 +62,13 @@ template <int D, int CHUNK = 16>
 struct GDNLayouts {
     using QKLayout = decltype(make_layout(make_shape(Int<CHUNK>{}, Int<D>{}), LayoutRight{}));
     using GLayout = decltype(make_layout(make_shape(Int<CHUNK>{}, Int<D>{}), LayoutRight{}));
-    using MMALayout = decltype(tile_to_shape(
-        GMMA::Layout_K_INTER_Atom<cute::bfloat16_t>{},
-        make_shape(Int<CHUNK>{}, Int<D>{}),
-        LayoutLeft{}
-    ));
+    using MMALayout = gdn_arch::RowLayout<CHUNK, D>;
     using BetaSmemLayout = Layout<Shape<Int<40>>, Stride<Int<1>>>;
     using GTotalLayout = Layout<Shape<Int<D>>, Stride<Int<1>>>;
-    using LMLayout = decltype(tile_to_shape(
-        GMMA::Layout_K_INTER_Atom<cute::bfloat16_t>{},
-        make_shape(Int<CHUNK>{}, Int<CHUNK>{}),
-        LayoutLeft{}
-    ));
-    using TransposedMMALayout = decltype(tile_to_shape(
-        GMMA::Layout_MN_INTER_Atom<cute::bfloat16_t>{},
-        make_shape(Int<D>{}, Int<CHUNK>{}),
-        LayoutRight{}
-    ));
-    using StateSmemLayout = decltype(tile_to_shape(
-        GMMA::Layout_K_INTER_Atom<cute::bfloat16_t>{},
-        make_shape(Int<D>{}, Int<D>{}),
-        LayoutLeft{}
-    ));
-    using TransposedStateSmemLayout = decltype(tile_to_shape(
-        GMMA::Layout_MN_INTER_Atom<cute::bfloat16_t>{},
-        make_shape(Int<D>{}, Int<D>{}),
-        LayoutRight{}
-    ));
+    using LMLayout = gdn_arch::RowLayout<CHUNK, CHUNK>;
+    using TransposedMMALayout = gdn_arch::ColumnLayout<D, CHUNK>;
+    using StateSmemLayout = gdn_arch::RowLayout<D, D>;
+    using TransposedStateSmemLayout = gdn_arch::ColumnLayout<D, D>;
 };
 
 // ---------------- Shared memory for the stage-1 kernel ----------------
@@ -205,25 +180,25 @@ __global__ void __launch_bounds__(NumThreads) gdn_scan_stage1_kernel(
 
     // mma objects
     auto mma = make_tiled_mma(
-        MMA_Atom<SM80_16x8x16_F32BF16BF16F32_TN>{},
+        MMA_Atom<gdn_arch::MmaBf16>{},
         Layout<Shape<_1,_1>>{},
         Tile<_16,_16,_16>{}
     );
     ThrMMA thr_mma = mma.get_slice(lane);
 
-    auto smem_tiled_copy_A   = make_tiled_copy_A(Copy_Atom<SM75_U32x4_LDSM_N, BF16>{}, mma);
+    auto smem_tiled_copy_A   = gdn_arch::copy_a<BF16>(mma);
     auto smem_thr_copy_A     = smem_tiled_copy_A.get_thread_slice(lane);
-    auto smem_tiled_copy_A_T = make_tiled_copy_A(Copy_Atom<SM75_U16x8_LDSM_T, BF16>{}, mma);
+    auto smem_tiled_copy_A_T = gdn_arch::copy_at<BF16>(mma);
     auto smem_thr_copy_A_T   = smem_tiled_copy_A_T.get_thread_slice(lane);
-    auto smem_tiled_copy_B   = make_tiled_copy_B(Copy_Atom<SM75_U32x4_LDSM_N, BF16>{}, mma);
+    auto smem_tiled_copy_B   = gdn_arch::copy_b<BF16>(mma);
     auto smem_thr_copy_B     = smem_tiled_copy_B.get_thread_slice(lane);
-    auto smem_tiled_store_C   = make_tiled_copy_C(Copy_Atom<AutoVectorizingCopy, BF16>{}, mma);
+    auto smem_tiled_store_C   = gdn_arch::store_c<BF16>(mma);
     auto smem_thr_store_C     = smem_tiled_store_C.get_slice(lane);
-    auto smem_tiled_load_C    = make_tiled_copy_C(Copy_Atom<SM75_U32x4_LDSM_N, BF16>{}, mma);
+    auto smem_tiled_load_C    = gdn_arch::load_c<BF16>(mma);
     auto smem_thr_load_C      = smem_tiled_load_C.get_slice(lane);
-    auto smem_tiled_load_C_T  = make_tiled_copy_C(Copy_Atom<SM75_U16x8_LDSM_T, BF16>{}, mma);
+    auto smem_tiled_load_C_T  = gdn_arch::load_ct<BF16>(mma);
     auto smem_thr_load_C_T    = smem_tiled_load_C_T.get_slice(lane);
-    auto smem_tiled_store_C_T = make_tiled_copy_C(Copy_Atom<AutoVectorizingCopy, BF16>{}, mma);
+    auto smem_tiled_store_C_T = gdn_arch::store_c<BF16>(mma);
     auto smem_thr_store_C_T   = smem_tiled_store_C_T.get_slice(lane);
 
     // Reference 16x16 tiles for fragment partitioning
@@ -247,10 +222,7 @@ __global__ void __launch_bounds__(NumThreads) gdn_scan_stage1_kernel(
         BFragT b = thr_mma.partition_fragment_B(B16);
         uint32_t reg[4];
         uint32_t const* uc = reinterpret_cast<uint32_t const*>(&c_frag(0));
-        SM75_U32x1_MOVM_T::copy(uc[0], reg[0]);
-        SM75_U32x1_MOVM_T::copy(uc[1], reg[1]);
-        SM75_U32x1_MOVM_T::copy(uc[2], reg[2]);
-        SM75_U32x1_MOVM_T::copy(uc[3], reg[3]);
+        gdn_arch::result_to_b_words(uc, reg);
         uint32_t* bd = reinterpret_cast<uint32_t*>(&b(0));
         bd[0] = reg[0]; bd[1] = reg[1]; bd[2] = reg[2]; bd[3] = reg[3];
         return b;
@@ -447,10 +419,7 @@ __global__ void __launch_bounds__(NumThreads) gdn_scan_stage1_kernel(
                 BFragT b = thr_mma.partition_fragment_B(B16);
                 uint32_t reg[4];
                 uint32_t const* uc = reinterpret_cast<uint32_t const*>(&c_frag(0));
-                SM75_U32x1_MOVM_T::copy(uc[0], reg[0]);
-                SM75_U32x1_MOVM_T::copy(uc[1], reg[1]);
-                SM75_U32x1_MOVM_T::copy(uc[2], reg[2]);
-                SM75_U32x1_MOVM_T::copy(uc[3], reg[3]);
+                gdn_arch::result_to_b_words(uc, reg);
                 uint32_t* bd = reinterpret_cast<uint32_t*>(&b(0));
                 bd[0] = reg[0]; bd[1] = reg[1]; bd[2] = reg[2]; bd[3] = reg[3];
                 return b;
@@ -506,8 +475,8 @@ __global__ void __launch_bounds__(NumThreads) gdn_scan_stage1_kernel(
                 for (int a = 0; a < 2; ++a) {
                     #pragma unroll
                     for (int d = 0; d < 2; ++d) {
-                        auto c0 = make_coord(make_coord(a, 0), 0, d);
-                        auto c1 = make_coord(make_coord(a, 1), 0, d);
+                        auto c0 = gdn_arch::row_coordinate(a, d, 0);
+                        auto c1 = gdn_arch::row_coordinate(a, d, 1);
                         Anew(c0) = BF16(bf16_to_f32(Aold(c0)) * g0 - accA(c0));
                         Anew(c1) = BF16(bf16_to_f32(Aold(c1)) * g1 - accA(c1));
                         Bnew(c0) = BF16(bf16_to_f32(Bold(c0)) * g0 - accB2(c0) + accBt(c0));
@@ -572,15 +541,14 @@ extern "C" void gdn_scan_stage1(
     float* diag_full,
     int ws_tile_elems, int ws_tile_lm, int ws_gt_elems,
     int T_seq, int H, int B, int chunks_per_seq,
-    int GROUP_CHUNKS, cudaStream_t stream) {
+    int GROUP_CHUNKS, gdn_arch::Stream stream) {
     constexpr int CHUNK = GDN_SCAN_CHUNK;
     constexpr int D = GDN_SCAN_D;
     constexpr int NUM_THREADS = GDN_SCAN_NUM_THREADS;
 
     using Layouts = GDNLayouts<D, CHUNK>;
     const size_t smem = sizeof(GDNStage1Storage<CHUNK, D, Layouts>);
-    cudaFuncSetAttribute(gdn_scan_stage1_kernel<CHUNK, D, NUM_THREADS>,
-                         cudaFuncAttributeMaxDynamicSharedMemorySize, (int)smem);
+    gdn_arch::set_smem(gdn_scan_stage1_kernel<CHUNK, D, NUM_THREADS>, smem);
 
     int num_groups = (chunks_per_seq + GROUP_CHUNKS - 1) / GROUP_CHUNKS;
     dim3 grid(B, H, num_groups);

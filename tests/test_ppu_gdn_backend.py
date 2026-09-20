@@ -1,178 +1,179 @@
 #!/usr/bin/env python3
+"""Device admission for the ORIGINAL kernels and dispatch, with fixed criteria.
+
+The 2% max/max tolerance is the repository's existing test_gdn_chunk.py
+criterion. Reset is approximate; do not label it RAW-BIT vs the reference.
+Repeated runs and GVA vs explicit head expansion must be bit-identical.
+"""
 import argparse
-import ctypes
-from dataclasses import dataclass
+import hashlib
+import os
+from pathlib import Path
+import statistics
 
 import torch
 
+from gdn_qsa_sm80.gdn_chunk_interface import gdn_chunk, gdn_chunk_twolevel
 from gdn_qsa_sm80.reference.gdn_chunk_ref import torch_recurrent_gated_delta_rule
 
-
-class Problem(ctypes.Structure):
-    _fields_ = [
-        ("schema_version", ctypes.c_uint32),
-        ("batch", ctypes.c_int32),
-        ("sequence", ctypes.c_int32),
-        ("qk_heads", ctypes.c_int32),
-        ("value_heads", ctypes.c_int32),
-        ("head_dim", ctypes.c_int32),
-        ("chunk", ctypes.c_int32),
-        ("group_chunks", ctypes.c_int32),
-    ]
+MAX_RELATIVE_ERROR = 2e-2
 
 
-@dataclass
-class Metrics:
-    output_rel_l1: float
-    state_rel_l1: float
-    output_max_abs: float
-    state_max_abs: float
+def fixture(batch, sequence, q_heads, value_heads, gate, seed=0x6A09E667):
+    # CPU-generated fixture makes the input independent of vendor RNG kernels.
+    gen = torch.Generator().manual_seed(seed)
+    def rand(shape):
+        return (torch.randn(shape, generator=gen) * 0.05).to(torch.bfloat16)
+    q = rand((batch, sequence, q_heads, 128))
+    k = rand(q.shape)
+    v = rand((batch, sequence, value_heads, 128))
+    g = torch.full((batch, sequence, value_heads), gate, dtype=torch.bfloat16)
+    beta = torch.rand(g.shape, generator=gen).sigmoid().to(torch.bfloat16)
+    return q, k, v, g, beta
 
 
-def relative_l1(got: torch.Tensor, want: torch.Tensor) -> float:
-    numerator = (got.float() - want.float()).abs().sum()
-    denominator = want.float().abs().sum().clamp_min(1.0e-12)
-    return float((numerator / denominator).item())
+def digest(tensors):
+    h = hashlib.sha256()
+    for t in tensors:
+        h.update(t.detach().cpu().contiguous().view(torch.uint8).numpy().tobytes())
+    return h.hexdigest()[:16]
 
 
-def load_api(path: str):
-    library = ctypes.CDLL(path)
-    size = library.gdn_qsa_ppu_workspace_size_v1
-    size.argtypes = [ctypes.POINTER(Problem)]
-    size.restype = ctypes.c_uint64
-    forward = library.gdn_qsa_ppu_forward_bf16_v1
-    forward.argtypes = [
-        ctypes.c_void_p,
-        ctypes.c_void_p,
-        ctypes.c_void_p,
-        ctypes.c_void_p,
-        ctypes.c_void_p,
-        ctypes.c_void_p,
-        ctypes.c_void_p,
-        ctypes.c_void_p,
-        ctypes.c_uint64,
-        ctypes.POINTER(Problem),
-        ctypes.c_void_p,
-    ]
-    forward.restype = ctypes.c_int
-    return size, forward
+def error(got, want):
+    got, want = got.float().cpu(), want.float().cpu()
+    if not torch.isfinite(got).all():
+        return float("inf")
+    return ((got - want).abs().max() / (want.abs().max() + 1e-9)).item()
 
 
-def run_once(forward, problem, workspace, q, k, v, g, beta):
-    output = torch.empty_like(v)
-    final_state = torch.empty(
-        (problem.batch, problem.value_heads, 128, 128),
-        dtype=torch.bfloat16,
-        device=q.device,
-    )
-    stream = torch.cuda.current_stream(q.device).cuda_stream
-    rc = forward(
-        q.data_ptr(),
-        k.data_ptr(),
-        v.data_ptr(),
-        g.data_ptr(),
-        beta.data_ptr(),
-        output.data_ptr(),
-        final_state.data_ptr(),
-        workspace.data_ptr(),
-        workspace.numel(),
-        ctypes.byref(problem),
-        stream,
-    )
-    if rc != 0:
-        raise RuntimeError(f"PPU GDN returned status {rc}")
-    torch.cuda.synchronize(q.device)
-    return output, final_state
+def assert_pair(got, want):
+    errs = [error(a, b) for a, b in zip(got, want)]
+    if max(errs) >= MAX_RELATIVE_ERROR:
+        raise AssertionError(f"original 2% criterion failed: output/state={errs}")
+    return errs
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--library", required=True)
-    parser.add_argument("--device", type=int, default=0)
-    args = parser.parse_args()
+def reference(inputs):
+    q, k, v, g, beta = inputs
+    ratio = v.shape[2] // q.shape[2]
+    return torch_recurrent_gated_delta_rule(
+        q.repeat_interleave(ratio, 2), k.repeat_interleave(ratio, 2),
+        v, g, beta, output_final_state=True)
+
+
+def run_case(label, shape, gate, group_chunks, expected_route, device):
+    cpu = fixture(*shape, gate)
+    want = reference(cpu)
+    inputs = tuple(x.to(device) for x in cpu)
+    def launch():
+        if group_chunks is None:
+            return gdn_chunk(*inputs)
+        return gdn_chunk_twolevel(*inputs, group_chunks=group_chunks)
+    got = launch()
+    torch.cuda.synchronize()
+    if group_chunks is not None:
+        info = got[2].cpu().tolist()
+        use_shift, exclusive, count, groups, metric = info
+        route = "reset" if use_shift else ("blelloch" if exclusive else "hillis-steele")
+        if route != expected_route:
+            raise AssertionError(f"{label}: expected {expected_route}, got {route}: {info}")
+        print(f"[PPU GDN route] case={label} route={route} "
+              f"groups={int(groups)} nonreset_groups={int(count)} metric={metric:g}")
+    errs = assert_pair(got[:2], want)
+    initial_hash = digest(got[:2])
+    for _ in range(3):
+        again = launch()
+        if not all(torch.equal(a.view(torch.int16), b.view(torch.int16))
+                   for a, b in zip(got[:2], again[:2])):
+            raise AssertionError(f"{label}: replay not bit-stable")
+    # A correct numerical oracle must reject a genuinely wrong output.
+    try:
+        assert_pair((torch.zeros_like(got[0]), got[1]), want)
+    except AssertionError:
+        negative = "EXPECTED-RED/PASS"
+    else:
+        raise AssertionError("zero-output negative control escaped")
+    # Metamorphic GVA check: the same logical input through the expanded path.
+    if shape[2] != shape[3]:
+        q, k, v, g, beta = inputs
+        ratio = shape[3] // shape[2]
+        expanded = q.repeat_interleave(ratio, 2), k.repeat_interleave(ratio, 2), v, g, beta
+        equivalent = (gdn_chunk(*expanded) if group_chunks is None else
+                      gdn_chunk_twolevel(*expanded, group_chunks=group_chunks))
+        if not all(torch.equal(a.view(torch.int16), b.view(torch.int16))
+                   for a, b in zip(got[:2], equivalent[:2])):
+            raise AssertionError(f"{label}: fused GVA differs from explicit expansion")
+    print(f"[PPU GDN original] case={label} B,S,Hk,Hv={shape} g={gate} "
+          f"input_sha={digest(cpu)} max_relative_output={errs[0]:.8f} "
+          f"max_relative_state={errs[1]:.8f} limit={MAX_RELATIVE_ERROR} "
+          f"output_sha={initial_hash} repeat=4/4 RAW-BIT/STABLE "
+          f"zero-output={negative} NUMERIC/PASS")
+
+
+def perf(device, samples, launches, warmup):
+    # The target Qwen-like shape; include both decay domains because reset is
+    # data-dependent. This measures the complete original public dispatch,
+    # INCLUDING its allocations, head/gate preprocessing and host decision sync.
+    for gate, expected in ((-1.0, "reset-GC8"), (-0.1, "serial")):
+        cpu = fixture(1, 2048, 16, 32, gate)
+        inputs = tuple(x.to(device) for x in cpu)
+        call = lambda: gdn_chunk(*inputs)
+        first = call()
+        assert_pair(first, reference(cpu))
+        for _ in range(warmup):
+            call()
+        times = []
+        for _ in range(samples):
+            start, end = (torch.cuda.Event(enable_timing=True) for _ in range(2))
+            torch.cuda.synchronize()
+            start.record()
+            for _ in range(launches):
+                out = call()
+            end.record()
+            end.synchronize()
+            times.append(start.elapsed_time(end) * 1000 / launches)
+        if digest(out) != digest(first):
+            raise AssertionError("performance replay changed output")
+        print(f"[PPU GDN original perf] shape=B1,S2048,Hk16,Hv32,D128 g={gate} "
+              f"expected_route={expected} protocol=full-public-api-event-span "
+              f"includes_host_dispatch_sync=1 warmup={warmup} samples={samples} "
+              f"launches_per_sample={launches} median_us={statistics.median(times):.3f} "
+              f"range=[{min(times):.3f},{max(times):.3f}] output_sha={digest(out)}",
+              flush=True)
+
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument("--extension", type=Path, required=True)
+    p.add_argument("--device", type=int, default=0)
+    p.add_argument("--perf", action="store_true")
+    p.add_argument("--samples", type=int, default=7)
+    p.add_argument("--launches", type=int, default=5)
+    p.add_argument("--warmup", type=int, default=2)
+    args = p.parse_args()
+    if not args.extension.is_file():
+        p.error("PPU binding not found")
+    if min(args.samples, args.launches) < 1 or args.warmup < 0:
+        p.error("samples/launches must be positive and warmup nonnegative")
+    os.environ["GDN_QSA_PPU_EXTENSION"] = str(args.extension.resolve())
+    torch.set_num_threads(1)
     torch.cuda.set_device(args.device)
+    props = torch.cuda.get_device_properties(args.device)
+    if "PPU" not in props.name.upper():
+        raise RuntimeError(f"not a PPU device: {props.name}")
+    print(f"[PPU GDN original device] name={props.name} cu={props.multi_processor_count} "
+          f"torch={torch.__version__} extension={args.extension}", flush=True)
     device = torch.device("cuda", args.device)
-    size, forward = load_api(args.library)
-
-    # B2 catches batch/head flattening, Hq1:Hv2 catches GVA ownership, S65
-    # catches both a one-token tail and a three-group/two-round affine scan.
-    problem = Problem(1, 2, 65, 1, 2, 128, 16, 2)
-    workspace_bytes = int(size(ctypes.byref(problem)))
-    if workspace_bytes <= 0:
-        raise AssertionError("valid problem returned zero workspace")
-    workspace = torch.empty(workspace_bytes, dtype=torch.uint8, device=device)
-
-    generator = torch.Generator(device=device).manual_seed(0x6A09E667)
-    q = (torch.randn((2, 65, 1, 128), generator=generator, device=device) / 16).to(torch.bfloat16)
-    k = (torch.randn((2, 65, 1, 128), generator=generator, device=device) / 16).to(torch.bfloat16)
-    v = (torch.randn((2, 65, 2, 128), generator=generator, device=device) / 8).to(torch.bfloat16)
-    g = (-torch.rand((2, 65, 2), generator=generator, device=device) / 16).to(torch.bfloat16)
-    beta = torch.sigmoid(
-        torch.randn((2, 65, 2), generator=generator, device=device)
-    ).to(torch.bfloat16)
-
-    expanded_q = q.repeat_interleave(2, dim=2)
-    expanded_k = k.repeat_interleave(2, dim=2)
-    want_output, want_state = torch_recurrent_gated_delta_rule(
-        expanded_q,
-        expanded_k,
-        v,
-        g,
-        beta,
-        output_final_state=True,
-    )
-    got_output, got_state = run_once(
-        forward, problem, workspace, q, k, v, g, beta
-    )
-    replay_output, replay_state = run_once(
-        forward, problem, workspace, q, k, v, g, beta
-    )
-
-    metrics = Metrics(
-        relative_l1(got_output, want_output),
-        relative_l1(got_state, want_state),
-        float((got_output.float() - want_output.float()).abs().max().item()),
-        float((got_state.float() - want_state.float()).abs().max().item()),
-    )
-    output_replay_bad = int((got_output.view(torch.int16) != replay_output.view(torch.int16)).sum().item())
-    state_replay_bad = int((got_state.view(torch.int16) != replay_state.view(torch.int16)).sum().item())
-    finite = bool(torch.isfinite(got_output.float()).all() and torch.isfinite(got_state.float()).all())
-
-    bad_schema = Problem(2, 1, 65, 1, 2, 128, 16, 2)
-    bad_heads = Problem(1, 1, 65, 3, 4, 128, 16, 2)
-    negative_schema = int(size(ctypes.byref(bad_schema))) == 0
-    negative_heads = int(size(ctypes.byref(bad_heads))) == 0
-    insufficient = forward(
-        q.data_ptr(), k.data_ptr(), v.data_ptr(), g.data_ptr(), beta.data_ptr(),
-        got_output.data_ptr(), got_state.data_ptr(), workspace.data_ptr(),
-        workspace_bytes - 1, ctypes.byref(problem),
-        torch.cuda.current_stream(device).cuda_stream,
-    ) == 2
-
-    passed = (
-        finite
-        and metrics.output_rel_l1 < 0.03
-        and metrics.state_rel_l1 < 0.03
-        and output_replay_bad == 0
-        and state_replay_bad == 0
-        and negative_schema
-        and negative_heads
-        and insufficient
-    )
-    print(
-        "[PPU GDN backend] "
-        f"{'PASS' if passed else 'FAIL'} shape=B2,S65,Hq1,Hv2,D128,C16,GC2 "
-        f"workspace={workspace_bytes} output_rel_l1={metrics.output_rel_l1:.8f} "
-        f"state_rel_l1={metrics.state_rel_l1:.8f} "
-        f"output_max_abs={metrics.output_max_abs:.8f} "
-        f"state_max_abs={metrics.state_max_abs:.8f} "
-        f"replay_bad={output_replay_bad}/{state_replay_bad} "
-        f"schema_negative={'PASS' if negative_schema else 'FAIL'} "
-        f"head_negative={'PASS' if negative_heads else 'FAIL'} "
-        f"workspace_negative={'PASS' if insufficient else 'FAIL'}"
-    )
-    return 0 if passed else 1
+    run_case("tail-gva-hillis", (2, 65, 1, 2), 0.0, 2, "hillis-steele", device)
+    run_case("blelloch", (1, 64, 1, 2), 0.0, 2, "blelloch", device)
+    run_case("reset-register-replay", (1, 64, 1, 2), -1.0, 2, "reset", device)
+    run_case("serial-tail", (1, 65, 16, 32), -0.1, None, "serial", device)
+    run_case("target-reset", (1, 2048, 16, 32), -1.0, 8, "reset", device)
+    run_case("target-auto", (1, 2048, 16, 32), -1.0, None, "auto", device)
+    if args.perf:
+        perf(device, args.samples, args.launches, args.warmup)
+    print("[PPU GDN original] PASS: original reset/scan/register-replay + serial + GVA/tail")
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()

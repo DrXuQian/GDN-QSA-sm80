@@ -1,13 +1,17 @@
-// Host wrapper for the GDN chunked delta-rule kernels (SM80).
+// Shared host wrapper for the GDN chunked delta-rule kernels (SM80 / PPU).
 // Pure torch wrapper: converts tensors to raw pointers and calls the extern
 // "C" launcher `gdn_chunk_forward` defined in gdn_kernel.cu (cute-only TU).
 
 #include <torch/extension.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <cuda_runtime.h>
-#include <cutlass/bfloat16.h>
 #include <vector>
 #include <cmath>
+
+// Launchers only transport BF16 pointers; no host-side BF16 arithmetic is
+// performed here. Avoid importing a second vendor's half/bfloat definitions
+// into PyTorch's host headers. The complete type belongs to the device TUs.
+namespace cutlass { struct bfloat16_t; }
 
 #define CHUNK 16
 #define D 128

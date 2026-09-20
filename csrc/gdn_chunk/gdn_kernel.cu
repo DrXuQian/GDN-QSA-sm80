@@ -21,8 +21,7 @@
 //
 // D = 128, CHUNK = 16.
 
-#include <cuda_runtime.h>
-#include <cuda_fp16.h>
+#include "gdn_target.cuh"
 
 #include <cstdio>
 #include <cassert>
@@ -33,14 +32,12 @@
 #include <cute/algorithm/cooperative_copy.hpp>
 #include <cute/algorithm/cooperative_gemm.hpp>
 #include <cute/arch/copy.hpp>
-#include <cute/arch/mma_sm80.hpp>
 #include <cute/pointer_flagged.hpp>
 #include <cute/stride.hpp>
 #include <cutlass/arch/barrier.h>
 #include <cutlass/bfloat16.h>
 #include <cutlass/tfloat32.h>
 
-#include "cute/arch/copy_sm75.hpp"
 #include "cute/layout.hpp"
 #include "cute/numeric/integral_constant.hpp"
 #include "cute/tensor_impl.hpp"
@@ -48,15 +45,11 @@
 using namespace cute;
 
 __device__ __forceinline__ float ex2_approx_ftz_f32(float x) {
-    float result;
-    asm("ex2.approx.ftz.f32 %0, %1;" : "=f"(result) : "f"(x));
-    return result;
+    return exp2f(x);
 }
 
 __device__ __forceinline__ float bf16_to_f32(cutlass::bfloat16_t x) {
-    float result;
-    asm("cvt.f32.bf16 %0, %1;\n" : "=f"(result) : "h"(x.storage));
-    return result;
+    return gdn_arch::bf16_to_float(x);
 }
 
 using BF16 = cutlass::bfloat16_t;
@@ -68,10 +61,7 @@ template <class SFrag, class BFrag>
 __device__ __forceinline__ void movm_state_to_b(SFrag const& s, BFrag& b) {
     uint32_t const* s32 = reinterpret_cast<uint32_t const*>(&s(0));
     uint32_t* b32 = reinterpret_cast<uint32_t*>(&b(0));
-    SM75_U32x1_MOVM_T::copy(s32[0], b32[0]);
-    SM75_U32x1_MOVM_T::copy(s32[1], b32[1]);
-    SM75_U32x1_MOVM_T::copy(s32[2], b32[2]);
-    SM75_U32x1_MOVM_T::copy(s32[3], b32[3]);
+    gdn_arch::result_to_b_words(s32, b32);
 }
 
 // ---------------- Cooperative copy helpers ----------------
@@ -124,10 +114,7 @@ __device__ __forceinline__ void coop_copy_1d_vec4(
 }
 
 __device__ __forceinline__ void cp_async_16b_zfill(void* smem_dst, void const* gmem_src, bool pred) {
-    uint32_t smem_addr = cute::cast_smem_ptr_to_uint(smem_dst);
-    int src_size = pred ? 16 : 0;
-    asm volatile("cp.async.cg.shared.global [%0], [%1], 16, %2;\n"
-                 :: "r"(smem_addr), "l"(gmem_src), "r"(src_size));
+    gdn_arch::async_copy16(smem_dst, gmem_src, pred);
 }
 
 // ---------------- MMA wrappers ----------------
@@ -136,13 +123,13 @@ CUTLASS_DEVICE void mma_m16n16_bf16bf16bf16_1warp(
     TensorA const& A, TensorB const& B, TensorC& C, int mma_tid
 ) {
     auto mma = make_tiled_mma(
-        SM80_16x8x16_F32BF16BF16F32_TN{},
+        gdn_arch::MmaBf16{},
         Layout<Shape<_1,_1>>{},
         Tile<_16,_16,_16>{}
     );
     if (mma_tid >= int(size(mma))) return;
     auto sC_store_op = [] __device__ (float x) { return BF16(x); };
-    cooperative_gemm(mma_tid, mma, 1.0f, A, B, 0.0f, C, cute::identity{}, cute::identity{}, cute::identity{}, sC_store_op, SM75_U32x4_LDSM_N{}, SM75_U32x4_LDSM_N{}, SM75_U32x4_LDSM_N{}, AutoVectorizingCopy{});
+    gdn_arch::dot_16x16(A, B, C, mma_tid, sC_store_op);
 }
 
 template <class TensorA, class TensorB, class TensorC>
@@ -150,13 +137,13 @@ CUTLASS_DEVICE void mma_m16n16_bf16bf16fp16_1warp(
     TensorA const& A, TensorB const& B, TensorC& C, int mma_tid
 ) {
     auto mma = make_tiled_mma(
-        SM80_16x8x16_F32BF16BF16F32_TN{},
+        gdn_arch::MmaBf16{},
         Layout<Shape<_1,_1>>{},
         Tile<_16,_16,_16>{}
     );
     if (mma_tid >= int(size(mma))) return;
     auto sC_store_op = [] __device__ (float x) { return FP16(x); };
-    cooperative_gemm(mma_tid, mma, 1.0f, A, B, 0.0f, C, cute::identity{}, cute::identity{}, cute::identity{}, sC_store_op, SM75_U32x4_LDSM_N{}, SM75_U32x4_LDSM_N{}, SM75_U32x4_LDSM_N{}, AutoVectorizingCopy{});
+    gdn_arch::dot_16x16(A, B, C, mma_tid, sC_store_op);
 }
 
 // Neumann inverse fused 1 warp: INV = (I-L)^{-1} via L^2 + L^4 + L^8 series.
@@ -165,13 +152,13 @@ CUTLASS_DEVICE void neumann_inv_fused_1warp(
     TensorL const& L_fp16, TensorINV_fp16 const& INV_fp16, TensorINV_bf16& INV_bf16_out, int tid
 ) {
     auto mma = make_tiled_mma(
-        SM80_16x8x16_F16F16F16F16_TN{},
+        gdn_arch::MmaF16{},
         Layout<Shape<_1,_1>>{},
         Tile<_16,_16,_16>{}
     );
     if (tid >= int(size(mma))) return;
     auto thr_mma = mma.get_slice(tid);
-    auto smem_copy_A = make_tiled_copy_A(Copy_Atom<SM75_U32x4_LDSM_N, FP16>{}, mma);
+    auto smem_copy_A = gdn_arch::copy_a<FP16>(mma);
     auto thr_copy_A = smem_copy_A.get_thread_slice(tid);
 
     Tensor tCrL = thr_mma.partition_fragment_A(L_fp16);
@@ -205,17 +192,13 @@ CUTLASS_DEVICE void neumann_inv_fused_1warp(
         dst[0] = a.u; dst[1] = a1.u; dst[2] = a2.u; dst[3] = a3.u;
     };
     auto transpose_u32x4 = [](uint32_t const* src, uint32_t* dst) {
-        SM75_U32x1_MOVM_T::copy(src[0], dst[0]);
-        SM75_U32x1_MOVM_T::copy(src[1], dst[1]);
-        SM75_U32x1_MOVM_T::copy(src[2], dst[2]);
-        SM75_U32x1_MOVM_T::copy(src[3], dst[3]);
+        gdn_arch::transpose_a_words(src, dst);
     };
     auto copy_u32x4 = [](uint32_t const* src, uint32_t* dst) {
         dst[0] = src[0]; dst[1] = src[1]; dst[2] = src[2]; dst[3] = src[3];
     };
     auto mma_16x16 = [](uint32_t* d, uint32_t const* a, uint32_t const* b, uint32_t const* c) {
-        SM80_16x8x16_F16F16F16F16_TN::fma(d[0], d[1], a[0], a[1], a[2], a[3], b[0], b[1], c[0], c[1]);
-        SM80_16x8x16_F16F16F16F16_TN::fma(d[2], d[3], a[0], a[1], a[2], a[3], b[2], b[3], c[2], c[3]);
+        gdn_arch::mma_f16_16x16(d, a, b, c);
     };
 
     transpose_u32x4(L_a, Lpow_b);
@@ -251,14 +234,14 @@ CUTLASS_DEVICE void neumann_inv_fused_1warp(
     Tensor tCsC_mma = thr_mma.partition_C(INV_fp16);
     Tensor tCrC = thr_mma.make_fragment_C(tCsC_mma);
     uint32_t* C_regs = reinterpret_cast<uint32_t*>(&tCrC(0));
-    C_regs[0] = INV_c[0]; C_regs[1] = INV_c[1]; C_regs[2] = INV_c[2]; C_regs[3] = INV_c[3];
+    gdn_arch::operand_to_result_words(INV_c, C_regs);
 
     Tensor tCrC_bf16 = make_fragment_like<BF16>(tCrC);
     cute::transform(tCrC, tCrC_bf16, [] __device__ (FP16 x) -> BF16 { return BF16(x); });
 
-    auto smem_tiled_store = make_tiled_copy_C(Copy_Atom<AutoVectorizingCopy, BF16>{}, mma);
+    auto smem_tiled_store = gdn_arch::store_c<BF16>(mma);
     auto smem_thr_store = smem_tiled_store.get_slice(tid);
-    Tensor tCsC_st = smem_thr_store.partition_D(INV_bf16_out);
+    auto tCsC_st = smem_thr_store.partition_D(INV_bf16_out);
     Tensor tCrC_st_view = smem_thr_store.retile_S(tCrC_bf16);
     copy(smem_tiled_store, tCrC_st_view, tCsC_st);
 }
@@ -268,33 +251,13 @@ template <int D, int CHUNK = 16>
 struct GDNLayouts {
     using QKLayout = decltype(make_layout(make_shape(Int<CHUNK>{}, Int<D>{}), LayoutRight{}));
     using GLayout = decltype(make_layout(make_shape(Int<CHUNK>{}, Int<D>{}), LayoutRight{}));
-    using MMALayout = decltype(tile_to_shape(
-        GMMA::Layout_K_INTER_Atom<cute::bfloat16_t>{},
-        make_shape(Int<CHUNK>{}, Int<D>{}),
-        LayoutLeft{}
-    ));
+    using MMALayout = gdn_arch::RowLayout<CHUNK, D>;
     using BetaSmemLayout = Layout<Shape<Int<40>>, Stride<Int<1>>>;
     using GTotalLayout = Layout<Shape<Int<D>>, Stride<Int<1>>>;
-    using LMLayout = decltype(tile_to_shape(
-        GMMA::Layout_K_INTER_Atom<cute::bfloat16_t>{},
-        make_shape(Int<CHUNK>{}, Int<CHUNK>{}),
-        LayoutLeft{}
-    ));
-    using TransposedMMALayout = decltype(tile_to_shape(
-        GMMA::Layout_MN_INTER_Atom<cute::bfloat16_t>{},
-        make_shape(Int<D>{}, Int<CHUNK>{}),
-        LayoutRight{}
-    ));
-    using StateSmemLayout = decltype(tile_to_shape(
-        GMMA::Layout_K_INTER_Atom<cute::bfloat16_t>{},
-        make_shape(Int<D>{}, Int<D>{}),
-        LayoutLeft{}
-    ));
-    using TransposedStateSmemLayout = decltype(tile_to_shape(
-        GMMA::Layout_MN_INTER_Atom<cute::bfloat16_t>{},
-        make_shape(Int<D>{}, Int<D>{}),
-        LayoutRight{}
-    ));
+    using LMLayout = gdn_arch::RowLayout<CHUNK, CHUNK>;
+    using TransposedMMALayout = gdn_arch::ColumnLayout<D, CHUNK>;
+    using StateSmemLayout = gdn_arch::RowLayout<D, D>;
+    using TransposedStateSmemLayout = gdn_arch::ColumnLayout<D, D>;
     // Workspace tiles (k_decayed/q_decayed/k_restored, v, out) are moved
     // gmem<->smem through the SAME MMA swizzle layout that later reads them.
     // (K2: VOLayout = MMALayout.) Loading with plain row-major while
@@ -760,18 +723,9 @@ struct GDNRecurrenceColsplitStorage {
     using GTotalLayout = typename Layouts::GTotalLayout;
     using LMLayout = typename Layouts::LMLayout;
 
-    using VOLayoutSplit = decltype(tile_to_shape(
-        GMMA::Layout_K_INTER_Atom<cute::bfloat16_t>{},
-        make_shape(Int<Layouts::kChunk>{}, Int<COLS_PER_SPLIT>{}),
-        LayoutLeft{}));
-    using StateSmemLayoutSplit = decltype(tile_to_shape(
-        GMMA::Layout_K_INTER_Atom<cute::bfloat16_t>{},
-        make_shape(Int<COLS_PER_SPLIT>{}, Int<Layouts::kD>{}),
-        LayoutLeft{}));
-    using TransposedStateSmemLayoutSplit = decltype(tile_to_shape(
-        GMMA::Layout_MN_INTER_Atom<cute::bfloat16_t>{},
-        make_shape(Int<Layouts::kD>{}, Int<COLS_PER_SPLIT>{}),
-        LayoutRight{}));
+    using VOLayoutSplit = gdn_arch::RowLayout<Layouts::kChunk, COLS_PER_SPLIT>;
+    using StateSmemLayoutSplit = gdn_arch::RowLayout<COLS_PER_SPLIT, Layouts::kD>;
+    using TransposedStateSmemLayoutSplit = gdn_arch::ColumnLayout<Layouts::kD, COLS_PER_SPLIT>;
 
     alignas(128) cute::ArrayEngine<BF16, cute::cosize_v<StateSmemLayoutSplit>> state_acc;
 
@@ -969,7 +923,7 @@ __global__ void __launch_bounds__(NumThreads) gdn_recurrence_kernel(
             constexpr int PREFETCH = 1;
 
             auto mma = make_tiled_mma(
-                MMA_Atom<SM80_16x8x16_F32BF16BF16F32_TN>{},
+                MMA_Atom<gdn_arch::MmaBf16>{},
                 Layout<Shape<_1,_1>>{},
                 Tile<_16,_16,_16>{}
             );
@@ -980,19 +934,19 @@ __global__ void __launch_bounds__(NumThreads) gdn_recurrence_kernel(
 
             ThrMMA thr_mma = mma.get_slice(lane_id);
 
-            auto smem_tiled_copy_A = make_tiled_copy_A(Copy_Atom<SM75_U32x4_LDSM_N, BF16>{}, mma);
+            auto smem_tiled_copy_A = gdn_arch::copy_a<BF16>(mma);
             auto smem_thr_copy_A   = smem_tiled_copy_A.get_thread_slice(lane_id);
-            auto smem_tiled_copy_A_T = make_tiled_copy_A(Copy_Atom<SM75_U16x8_LDSM_T, BF16>{}, mma);
+            auto smem_tiled_copy_A_T = gdn_arch::copy_at<BF16>(mma);
             auto smem_thr_copy_A_T   = smem_tiled_copy_A_T.get_thread_slice(lane_id);
-            auto smem_tiled_copy_B = make_tiled_copy_B(Copy_Atom<SM75_U32x4_LDSM_N, BF16>{}, mma);
+            auto smem_tiled_copy_B = gdn_arch::copy_b<BF16>(mma);
             auto smem_thr_copy_B   = smem_tiled_copy_B.get_thread_slice(lane_id);
-            auto smem_tiled_load_C  = make_tiled_copy_C(Copy_Atom<SM75_U32x4_LDSM_N, BF16>{}, mma);
+            auto smem_tiled_load_C  = gdn_arch::load_c<BF16>(mma);
             auto smem_thr_load_C    = smem_tiled_load_C.get_slice(lane_id);
-            auto smem_tiled_store_C = make_tiled_copy_C(Copy_Atom<AutoVectorizingCopy, BF16>{}, mma);
+            auto smem_tiled_store_C = gdn_arch::store_c<BF16>(mma);
             auto smem_thr_store_C   = smem_tiled_store_C.get_slice(lane_id);
-            auto smem_tiled_load_C_T  = make_tiled_copy_C(Copy_Atom<SM75_U16x8_LDSM_T, BF16>{}, mma);
+            auto smem_tiled_load_C_T  = gdn_arch::load_ct<BF16>(mma);
             auto smem_thr_load_C_T    = smem_tiled_load_C_T.get_slice(lane_id);
-            auto smem_tiled_store_C_T = make_tiled_copy_C(Copy_Atom<AutoVectorizingCopy, BF16>{}, mma);
+            auto smem_tiled_store_C_T = gdn_arch::store_c<BF16>(mma);
             auto smem_thr_store_C_T   = smem_tiled_store_C_T.get_slice(lane_id);
 
             Tensor A_ref = local_tile(k_decayed, make_shape(Int<16>{}, Int<16>{}), make_coord(0, 0));
@@ -1062,7 +1016,7 @@ __global__ void __launch_bounds__(NumThreads) gdn_recurrence_kernel(
             }
 
             // ======== Phase 2 ========
-            asm volatile("bar.sync 8, 128;" ::: "memory");
+            gdn_arch::compute_barrier<128>();
             SFragT out_bf16[2];
             #pragma unroll
             for (int i = 0; i < 2; ++i)
@@ -1094,18 +1048,15 @@ __global__ void __launch_bounds__(NumThreads) gdn_recurrence_kernel(
                 for (int a = 0; a < 2; ++a) {
                     #pragma unroll
                     for (int d = 0; d < 2; ++d) {
-                        auto c0 = make_coord(make_coord(a, 0), 0, d);
-                        auto c1 = make_coord(make_coord(a, 1), 0, d);
+                        auto c0 = gdn_arch::row_coordinate(a, d, 0);
+                        auto c1 = gdn_arch::row_coordinate(a, d, 1);
                         u_bf16[i](c0) = (v_bf16[i](c0) - u_bf16[i](c0)) * beta0;
                         u_bf16[i](c1) = (v_bf16[i](c1) - u_bf16[i](c1)) * beta1;
                     }
                 }
 
                 uint32_t* u_c = reinterpret_cast<uint32_t*>(&u_bf16[i](0));
-                SM75_U32x1_MOVM_T::copy(u_c[0], u_b_regs[0]);
-                SM75_U32x1_MOVM_T::copy(u_c[1], u_b_regs[1]);
-                SM75_U32x1_MOVM_T::copy(u_c[2], u_b_regs[2]);
-                SM75_U32x1_MOVM_T::copy(u_c[3], u_b_regs[3]);
+                gdn_arch::result_to_b_words(u_c, u_b_regs);
 
                 auto tCrB_u_tmp = thr_mma.partition_fragment_B(B_ref);
                 uint32_t* b_dst = reinterpret_cast<uint32_t*>(&tCrB_u_tmp(0));
@@ -1127,10 +1078,7 @@ __global__ void __launch_bounds__(NumThreads) gdn_recurrence_kernel(
             #pragma unroll
             for (int i = 0; i < 2; ++i) {
                 uint32_t* u_c = reinterpret_cast<uint32_t*>(&u_bf16[i](0));
-                SM75_U32x1_MOVM_T::copy(u_c[0], u_b_regs[0]);
-                SM75_U32x1_MOVM_T::copy(u_c[1], u_b_regs[1]);
-                SM75_U32x1_MOVM_T::copy(u_c[2], u_b_regs[2]);
-                SM75_U32x1_MOVM_T::copy(u_c[3], u_b_regs[3]);
+                gdn_arch::result_to_b_words(u_c, u_b_regs);
 
                 tCrB_u_arr[i] = thr_mma.partition_fragment_B(B_ref);
                 uint32_t* b_dst = reinterpret_cast<uint32_t*>(&tCrB_u_arr[i](0));
@@ -1206,8 +1154,8 @@ __global__ void __launch_bounds__(NumThreads) gdn_recurrence_kernel(
                     for (int a = 0; a < 2; ++a) {
                         #pragma unroll
                         for (int d = 0; d < 2; ++d) {
-                            auto c0 = make_coord(make_coord(a, 0), 0, d);
-                            auto c1 = make_coord(make_coord(a, 1), 0, d);
+                            auto c0 = gdn_arch::row_coordinate(a, d, 0);
+                            auto c1 = gdn_arch::row_coordinate(a, d, 1);
                             ring_S_acc[bi][slot](c0) = BF16(bf16_to_f32(ring_S_acc[bi][slot](c0)) * g0 + u_acc[bi](c0));
                             ring_S_acc[bi][slot](c1) = BF16(bf16_to_f32(ring_S_acc[bi][slot](c1)) * g1 + u_acc[bi](c1));
                         }
@@ -1557,7 +1505,7 @@ __global__ void __launch_bounds__(NumThreads, 2) gdn_recurrence_fused_kernel(
     constexpr int K_BLOCKS_TOTAL = D / 16;
 
     auto mma = make_tiled_mma(
-        MMA_Atom<SM80_16x8x16_F32BF16BF16F32_TN>{},
+        MMA_Atom<gdn_arch::MmaBf16>{},
         Layout<Shape<_1,_1>>{},
         Tile<_16,_16,_16>{}
     );
@@ -1565,17 +1513,17 @@ __global__ void __launch_bounds__(NumThreads, 2) gdn_recurrence_fused_kernel(
     const int group_id = (lane_id / 4) % 8;
     ThrMMA thr_mma = mma.get_slice(lane_id);
 
-    auto smem_tiled_copy_A = make_tiled_copy_A(Copy_Atom<SM75_U32x4_LDSM_N, BF16>{}, mma);
+    auto smem_tiled_copy_A = gdn_arch::copy_a<BF16>(mma);
     auto smem_thr_copy_A   = smem_tiled_copy_A.get_thread_slice(lane_id);
-    auto smem_tiled_copy_A_T = make_tiled_copy_A(Copy_Atom<SM75_U16x8_LDSM_T, BF16>{}, mma);
+    auto smem_tiled_copy_A_T = gdn_arch::copy_at<BF16>(mma);
     auto smem_thr_copy_A_T   = smem_tiled_copy_A_T.get_thread_slice(lane_id);
-    auto smem_tiled_load_C  = make_tiled_copy_C(Copy_Atom<SM75_U32x4_LDSM_N, BF16>{}, mma);
+    auto smem_tiled_load_C  = gdn_arch::load_c<BF16>(mma);
     auto smem_thr_load_C    = smem_tiled_load_C.get_slice(lane_id);
-    auto smem_tiled_store_C = make_tiled_copy_C(Copy_Atom<AutoVectorizingCopy, BF16>{}, mma);
+    auto smem_tiled_store_C = gdn_arch::store_c<BF16>(mma);
     auto smem_thr_store_C   = smem_tiled_store_C.get_slice(lane_id);
-    auto smem_tiled_load_C_T  = make_tiled_copy_C(Copy_Atom<SM75_U16x8_LDSM_T, BF16>{}, mma);
+    auto smem_tiled_load_C_T  = gdn_arch::load_ct<BF16>(mma);
     auto smem_thr_load_C_T    = smem_tiled_load_C_T.get_slice(lane_id);
-    auto smem_tiled_store_C_T = make_tiled_copy_C(Copy_Atom<AutoVectorizingCopy, BF16>{}, mma);
+    auto smem_tiled_store_C_T = gdn_arch::store_c<BF16>(mma);
     auto smem_thr_store_C_T   = smem_tiled_store_C_T.get_slice(lane_id);
 
     // persistent state: kCPW 16-col strips x K_BLOCKS_TOTAL 16-row blocks per
@@ -1727,7 +1675,7 @@ __global__ void __launch_bounds__(NumThreads, 2) gdn_recurrence_fused_kernel(
             }
 
             // ======== Phase 2 ========
-            asm volatile("bar.sync 8, %0;" :: "n"(NumThreads) : "memory");
+            gdn_arch::compute_barrier<NumThreads>();
             SFragT out_bf16[kCPW];
             #pragma unroll
             for (int i = 0; i < kCPW; ++i)
@@ -1758,18 +1706,15 @@ __global__ void __launch_bounds__(NumThreads, 2) gdn_recurrence_fused_kernel(
                 for (int a = 0; a < 2; ++a) {
                     #pragma unroll
                     for (int d = 0; d < 2; ++d) {
-                        auto c0 = make_coord(make_coord(a, 0), 0, d);
-                        auto c1 = make_coord(make_coord(a, 1), 0, d);
+                        auto c0 = gdn_arch::row_coordinate(a, d, 0);
+                        auto c1 = gdn_arch::row_coordinate(a, d, 1);
                         u_bf16[i](c0) = (v_bf16[i](c0) - u_bf16[i](c0)) * beta0;
                         u_bf16[i](c1) = (v_bf16[i](c1) - u_bf16[i](c1)) * beta1;
                     }
                 }
 
                 uint32_t* u_c = reinterpret_cast<uint32_t*>(&u_bf16[i](0));
-                SM75_U32x1_MOVM_T::copy(u_c[0], u_b_regs[0]);
-                SM75_U32x1_MOVM_T::copy(u_c[1], u_b_regs[1]);
-                SM75_U32x1_MOVM_T::copy(u_c[2], u_b_regs[2]);
-                SM75_U32x1_MOVM_T::copy(u_c[3], u_b_regs[3]);
+                gdn_arch::result_to_b_words(u_c, u_b_regs);
 
                 auto tCrB_u_tmp = thr_mma.partition_fragment_B(B_ref);
                 uint32_t* b_dst = reinterpret_cast<uint32_t*>(&tCrB_u_tmp(0));
@@ -1791,10 +1736,7 @@ __global__ void __launch_bounds__(NumThreads, 2) gdn_recurrence_fused_kernel(
             #pragma unroll
             for (int i = 0; i < kCPW; ++i) {
                 uint32_t* u_c = reinterpret_cast<uint32_t*>(&u_bf16[i](0));
-                SM75_U32x1_MOVM_T::copy(u_c[0], u_b_regs[0]);
-                SM75_U32x1_MOVM_T::copy(u_c[1], u_b_regs[1]);
-                SM75_U32x1_MOVM_T::copy(u_c[2], u_b_regs[2]);
-                SM75_U32x1_MOVM_T::copy(u_c[3], u_b_regs[3]);
+                gdn_arch::result_to_b_words(u_c, u_b_regs);
 
                 tCrB_u_arr[i] = thr_mma.partition_fragment_B(B_ref);
                 uint32_t* b_dst = reinterpret_cast<uint32_t*>(&tCrB_u_arr[i](0));
@@ -1865,8 +1807,8 @@ __global__ void __launch_bounds__(NumThreads, 2) gdn_recurrence_fused_kernel(
                     for (int a = 0; a < 2; ++a) {
                         #pragma unroll
                         for (int d = 0; d < 2; ++d) {
-                            auto c0 = make_coord(make_coord(a, 0), 0, d);
-                            auto c1 = make_coord(make_coord(a, 1), 0, d);
+                            auto c0 = gdn_arch::row_coordinate(a, d, 0);
+                            auto c1 = gdn_arch::row_coordinate(a, d, 1);
                             s_reg[bi][m](c0) = BF16(bf16_to_f32(s_reg[bi][m](c0)) * g0 + u_acc[bi](c0));
                             s_reg[bi][m](c1) = BF16(bf16_to_f32(s_reg[bi][m](c1)) * g1 + u_acc[bi](c1));
                         }
@@ -2074,7 +2016,7 @@ __global__ void __launch_bounds__(NumThreads) gdn_recurrence_kernel32(
             Tensor u_stage = make_tensor(make_smem_ptr(shared_storage.u_stage.begin()), MMALayout{});
 
             auto mma = make_tiled_mma(
-                MMA_Atom<SM80_16x8x16_F32BF16BF16F32_TN>{},
+                MMA_Atom<gdn_arch::MmaBf16>{},
                 Layout<Shape<_1,_1>>{},
                 Tile<_16,_16,_16>{}
             );
@@ -2085,19 +2027,19 @@ __global__ void __launch_bounds__(NumThreads) gdn_recurrence_kernel32(
 
             ThrMMA thr_mma = mma.get_slice(lane_id);
 
-            auto smem_tiled_copy_A = make_tiled_copy_A(Copy_Atom<SM75_U32x4_LDSM_N, BF16>{}, mma);
+            auto smem_tiled_copy_A = gdn_arch::copy_a<BF16>(mma);
             auto smem_thr_copy_A   = smem_tiled_copy_A.get_thread_slice(lane_id);
-            auto smem_tiled_copy_A_T = make_tiled_copy_A(Copy_Atom<SM75_U16x8_LDSM_T, BF16>{}, mma);
+            auto smem_tiled_copy_A_T = gdn_arch::copy_at<BF16>(mma);
             auto smem_thr_copy_A_T   = smem_tiled_copy_A_T.get_thread_slice(lane_id);
-            auto smem_tiled_copy_B = make_tiled_copy_B(Copy_Atom<SM75_U32x4_LDSM_N, BF16>{}, mma);
+            auto smem_tiled_copy_B = gdn_arch::copy_b<BF16>(mma);
             auto smem_thr_copy_B   = smem_tiled_copy_B.get_thread_slice(lane_id);
-            auto smem_tiled_load_C  = make_tiled_copy_C(Copy_Atom<SM75_U32x4_LDSM_N, BF16>{}, mma);
+            auto smem_tiled_load_C  = gdn_arch::load_c<BF16>(mma);
             auto smem_thr_load_C    = smem_tiled_load_C.get_slice(lane_id);
-            auto smem_tiled_store_C = make_tiled_copy_C(Copy_Atom<AutoVectorizingCopy, BF16>{}, mma);
+            auto smem_tiled_store_C = gdn_arch::store_c<BF16>(mma);
             auto smem_thr_store_C   = smem_tiled_store_C.get_slice(lane_id);
-            auto smem_tiled_load_C_T  = make_tiled_copy_C(Copy_Atom<SM75_U16x8_LDSM_T, BF16>{}, mma);
+            auto smem_tiled_load_C_T  = gdn_arch::load_ct<BF16>(mma);
             auto smem_thr_load_C_T    = smem_tiled_load_C_T.get_slice(lane_id);
-            auto smem_tiled_store_C_T = make_tiled_copy_C(Copy_Atom<AutoVectorizingCopy, BF16>{}, mma);
+            auto smem_tiled_store_C_T = gdn_arch::store_c<BF16>(mma);
             auto smem_thr_store_C_T   = smem_tiled_store_C_T.get_slice(lane_id);
 
             Tensor A_ref = local_tile(k_decayed, make_shape(Int<16>{}, Int<16>{}), make_coord(0, 0));
@@ -2182,8 +2124,8 @@ __global__ void __launch_bounds__(NumThreads) gdn_recurrence_kernel32(
                 for (int a = 0; a < 2; ++a) {
                     #pragma unroll
                     for (int d = 0; d < 2; ++d) {
-                        auto c0 = make_coord(make_coord(a, 0), 0, d);
-                        auto c1 = make_coord(make_coord(a, 1), 0, d);
+                        auto c0 = gdn_arch::row_coordinate(a, d, 0);
+                        auto c1 = gdn_arch::row_coordinate(a, d, 1);
                         u_bf16[i](c0) = (v_bf16[i](c0) - u_bf16[i](c0)) * beta0;
                         u_bf16[i](c1) = (v_bf16[i](c1) - u_bf16[i](c1)) * beta1;
                     }
@@ -2202,10 +2144,7 @@ __global__ void __launch_bounds__(NumThreads) gdn_recurrence_kernel32(
                 BFragT_u b = thr_mma.partition_fragment_B(B_ref);
                 uint32_t reg[4];
                 uint32_t const* uc = reinterpret_cast<uint32_t const*>(&c_frag(0));
-                SM75_U32x1_MOVM_T::copy(uc[0], reg[0]);
-                SM75_U32x1_MOVM_T::copy(uc[1], reg[1]);
-                SM75_U32x1_MOVM_T::copy(uc[2], reg[2]);
-                SM75_U32x1_MOVM_T::copy(uc[3], reg[3]);
+                gdn_arch::result_to_b_words(uc, reg);
                 uint32_t* bd = reinterpret_cast<uint32_t*>(&b(0));
                 bd[0] = reg[0]; bd[1] = reg[1]; bd[2] = reg[2]; bd[3] = reg[3];
                 return b;
@@ -2339,8 +2278,8 @@ __global__ void __launch_bounds__(NumThreads) gdn_recurrence_kernel32(
                 for (int a = 0; a < 2; ++a) {
                     #pragma unroll
                     for (int d = 0; d < 2; ++d) {
-                        auto c0 = make_coord(make_coord(a, 0), 0, d);
-                        auto c1 = make_coord(make_coord(a, 1), 0, d);
+                        auto c0 = gdn_arch::row_coordinate(a, d, 0);
+                        auto c1 = gdn_arch::row_coordinate(a, d, 1);
                         S_frag(c0) = BF16(bf16_to_f32(S_frag(c0)) * g0 + u_acc[0](c0));
                         S_frag(c1) = BF16(bf16_to_f32(S_frag(c1)) * g1 + u_acc[0](c1));
                     }
@@ -2432,18 +2371,9 @@ __global__ void __launch_bounds__(NumThreads) gdn_recurrence_colsplit_kernel(
 
     // Split-width smem layouts: state is [N=COLS_PER_SPLIT, K=D] (S^T) when read
     // as the MMA B-operand; the transposed write view is [K=D, N=COLS_PER_SPLIT].
-    using StateSmemLayoutSplit = decltype(tile_to_shape(
-        GMMA::Layout_K_INTER_Atom<cute::bfloat16_t>{},
-        make_shape(Int<COLS_PER_SPLIT>{}, Int<D>{}),
-        LayoutLeft{}));
-    using TransposedStateSmemLayoutSplit = decltype(tile_to_shape(
-        GMMA::Layout_MN_INTER_Atom<cute::bfloat16_t>{},
-        make_shape(Int<D>{}, Int<COLS_PER_SPLIT>{}),
-        LayoutRight{}));
-    using VOLayoutSplit = decltype(tile_to_shape(
-        GMMA::Layout_K_INTER_Atom<cute::bfloat16_t>{},
-        make_shape(Int<CHUNK>{}, Int<COLS_PER_SPLIT>{}),
-        LayoutLeft{}));
+    using StateSmemLayoutSplit = gdn_arch::RowLayout<COLS_PER_SPLIT, D>;
+    using TransposedStateSmemLayoutSplit = gdn_arch::ColumnLayout<D, COLS_PER_SPLIT>;
+    using VOLayoutSplit = gdn_arch::RowLayout<CHUNK, COLS_PER_SPLIT>;
 
     extern __shared__ __align__(128) unsigned char shared_mem[];
     GDNRecurrenceColsplitStorage<Layouts, COLS_PER_SPLIT>& shared_storage =
@@ -2560,7 +2490,7 @@ __global__ void __launch_bounds__(NumThreads) gdn_recurrence_colsplit_kernel(
             constexpr int PREFETCH = 1;
 
             auto mma = make_tiled_mma(
-                MMA_Atom<SM80_16x8x16_F32BF16BF16F32_TN>{},
+                MMA_Atom<gdn_arch::MmaBf16>{},
                 Layout<Shape<_1,_1>>{},
                 Tile<_16,_16,_16>{}
             );
@@ -2571,19 +2501,19 @@ __global__ void __launch_bounds__(NumThreads) gdn_recurrence_colsplit_kernel(
 
             ThrMMA thr_mma = mma.get_slice(lane_id);
 
-            auto smem_tiled_copy_A = make_tiled_copy_A(Copy_Atom<SM75_U32x4_LDSM_N, BF16>{}, mma);
+            auto smem_tiled_copy_A = gdn_arch::copy_a<BF16>(mma);
             auto smem_thr_copy_A   = smem_tiled_copy_A.get_thread_slice(lane_id);
-            auto smem_tiled_copy_A_T = make_tiled_copy_A(Copy_Atom<SM75_U16x8_LDSM_T, BF16>{}, mma);
+            auto smem_tiled_copy_A_T = gdn_arch::copy_at<BF16>(mma);
             auto smem_thr_copy_A_T   = smem_tiled_copy_A_T.get_thread_slice(lane_id);
-            auto smem_tiled_copy_B = make_tiled_copy_B(Copy_Atom<SM75_U32x4_LDSM_N, BF16>{}, mma);
+            auto smem_tiled_copy_B = gdn_arch::copy_b<BF16>(mma);
             auto smem_thr_copy_B   = smem_tiled_copy_B.get_thread_slice(lane_id);
-            auto smem_tiled_load_C  = make_tiled_copy_C(Copy_Atom<SM75_U32x4_LDSM_N, BF16>{}, mma);
+            auto smem_tiled_load_C  = gdn_arch::load_c<BF16>(mma);
             auto smem_thr_load_C    = smem_tiled_load_C.get_slice(lane_id);
-            auto smem_tiled_store_C = make_tiled_copy_C(Copy_Atom<AutoVectorizingCopy, BF16>{}, mma);
+            auto smem_tiled_store_C = gdn_arch::store_c<BF16>(mma);
             auto smem_thr_store_C   = smem_tiled_store_C.get_slice(lane_id);
-            auto smem_tiled_load_C_T  = make_tiled_copy_C(Copy_Atom<SM75_U16x8_LDSM_T, BF16>{}, mma);
+            auto smem_tiled_load_C_T  = gdn_arch::load_ct<BF16>(mma);
             auto smem_thr_load_C_T    = smem_tiled_load_C_T.get_slice(lane_id);
-            auto smem_tiled_store_C_T = make_tiled_copy_C(Copy_Atom<AutoVectorizingCopy, BF16>{}, mma);
+            auto smem_tiled_store_C_T = gdn_arch::store_c<BF16>(mma);
             auto smem_thr_store_C_T   = smem_tiled_store_C_T.get_slice(lane_id);
 
             Tensor A_ref = local_tile(k_decayed, make_shape(Int<16>{}, Int<16>{}), make_coord(0, 0));
@@ -2645,7 +2575,7 @@ __global__ void __launch_bounds__(NumThreads) gdn_recurrence_colsplit_kernel(
 
             // ======== Phase 2 ========
             // bar.sync count must be a compile-time immediate = number of MMA threads.
-            asm volatile("bar.sync 8, %0;" :: "n"(kNBlocks * 32) : "memory");
+            gdn_arch::compute_barrier<kNBlocks * 32>();
             SFragT out_bf16;
             cute::transform(out_acc, out_bf16, [] __device__ (float x) { return BF16(x); });
 
@@ -2672,18 +2602,15 @@ __global__ void __launch_bounds__(NumThreads) gdn_recurrence_colsplit_kernel(
             for (int a = 0; a < 2; ++a) {
                 #pragma unroll
                 for (int d = 0; d < 2; ++d) {
-                    auto c0 = make_coord(make_coord(a, 0), 0, d);
-                    auto c1 = make_coord(make_coord(a, 1), 0, d);
+                    auto c0 = gdn_arch::row_coordinate(a, d, 0);
+                    auto c1 = gdn_arch::row_coordinate(a, d, 1);
                     u_bf16(c0) = (v_bf16(c0) - u_bf16(c0)) * beta0;
                     u_bf16(c1) = (v_bf16(c1) - u_bf16(c1)) * beta1;
                 }
             }
 
             uint32_t* u_c = reinterpret_cast<uint32_t*>(&u_bf16(0));
-            SM75_U32x1_MOVM_T::copy(u_c[0], u_b_regs[0]);
-            SM75_U32x1_MOVM_T::copy(u_c[1], u_b_regs[1]);
-            SM75_U32x1_MOVM_T::copy(u_c[2], u_b_regs[2]);
-            SM75_U32x1_MOVM_T::copy(u_c[3], u_b_regs[3]);
+            gdn_arch::result_to_b_words(u_c, u_b_regs);
 
             auto tCrB_u_tmp = thr_mma.partition_fragment_B(B_ref);
             uint32_t* b_dst = reinterpret_cast<uint32_t*>(&tCrB_u_tmp(0));
@@ -2702,10 +2629,7 @@ __global__ void __launch_bounds__(NumThreads) gdn_recurrence_colsplit_kernel(
             BFragT_u tCrB_u;
             {
                 uint32_t* u_c2 = reinterpret_cast<uint32_t*>(&u_bf16(0));
-                SM75_U32x1_MOVM_T::copy(u_c2[0], u_b_regs[0]);
-                SM75_U32x1_MOVM_T::copy(u_c2[1], u_b_regs[1]);
-                SM75_U32x1_MOVM_T::copy(u_c2[2], u_b_regs[2]);
-                SM75_U32x1_MOVM_T::copy(u_c2[3], u_b_regs[3]);
+                gdn_arch::result_to_b_words(u_c2, u_b_regs);
 
                 tCrB_u = thr_mma.partition_fragment_B(B_ref);
                 uint32_t* b_dst2 = reinterpret_cast<uint32_t*>(&tCrB_u(0));
@@ -2772,8 +2696,8 @@ __global__ void __launch_bounds__(NumThreads) gdn_recurrence_colsplit_kernel(
                 for (int a = 0; a < 2; ++a) {
                     #pragma unroll
                     for (int d = 0; d < 2; ++d) {
-                        auto c0 = make_coord(make_coord(a, 0), 0, d);
-                        auto c1 = make_coord(make_coord(a, 1), 0, d);
+                        auto c0 = gdn_arch::row_coordinate(a, d, 0);
+                        auto c1 = gdn_arch::row_coordinate(a, d, 1);
                         ring_S_acc[slot](c0) = BF16(bf16_to_f32(ring_S_acc[slot](c0)) * g0 + u_acc(c0));
                         ring_S_acc[slot](c1) = BF16(bf16_to_f32(ring_S_acc[slot](c1)) * g1 + u_acc(c1));
                     }
@@ -2863,17 +2787,15 @@ extern "C" void gdn_chunk_forward(
     int q_row_stride, int g_row_stride,
     int ws_tile_elems, int ws_tile_lm, int ws_gt_elems,
     float scale, int T_seq, int H, int B, int chunks_per_seq,
-    cudaStream_t stream) {
+    gdn_arch::Stream stream) {
     const int T_total = B * T_seq;
 
     // The recurrence kernel uses >48KB of dynamic shared memory on sm_80.
     // Opt into the larger dynamic-smem allocation before launching.
     const size_t rec_smem = recurrence_smem_bytes_impl();
     const size_t prep_smem = prepare_smem_bytes_impl();
-    cudaFuncSetAttribute(gdn_recurrence_kernel<GDN_CHUNK, GDN_D, GDN_NUM_THREADS>,
-                         cudaFuncAttributeMaxDynamicSharedMemorySize, (int)rec_smem);
-    cudaFuncSetAttribute(gdn_prepare_kernel<GDN_CHUNK, GDN_D, GDN_NUM_THREADS>,
-                         cudaFuncAttributeMaxDynamicSharedMemorySize, (int)prep_smem);
+    gdn_arch::set_smem(gdn_recurrence_kernel<GDN_CHUNK, GDN_D, GDN_NUM_THREADS>, rec_smem);
+    gdn_arch::set_smem(gdn_prepare_kernel<GDN_CHUNK, GDN_D, GDN_NUM_THREADS>, prep_smem);
 
     // Kernel 1: prepare
     {
@@ -2920,12 +2842,11 @@ extern "C" void gdn_chunk_replay(
     cutlass::bfloat16_t* final_state,
     int ws_tile_elems, int ws_tile_lm, int ws_gt_elems,
     int T_seq, int H, int B, int chunks_per_seq,
-    int group_chunks, int prefix_exclusive, cudaStream_t stream) {
+    int group_chunks, int prefix_exclusive, gdn_arch::Stream stream) {
     const int T_total = B * T_seq;
     const int num_groups = (chunks_per_seq + group_chunks - 1) / group_chunks;
     const size_t rec_smem = recurrence_smem_bytes_impl();
-    cudaFuncSetAttribute(gdn_recurrence_kernel<GDN_CHUNK, GDN_D, GDN_NUM_THREADS>,
-                         cudaFuncAttributeMaxDynamicSharedMemorySize, (int)rec_smem);
+    gdn_arch::set_smem(gdn_recurrence_kernel<GDN_CHUNK, GDN_D, GDN_NUM_THREADS>, rec_smem);
     dim3 grid(B, H, num_groups);
     dim3 block(GDN_NUM_THREADS);
     gdn_recurrence_kernel<GDN_CHUNK, GDN_D, GDN_NUM_THREADS>
@@ -2952,12 +2873,11 @@ extern "C" void gdn_chunk_replay_fused(
     cutlass::bfloat16_t* final_state,
     float scale,
     int T_seq, int H, int B, int chunks_per_seq,
-    int group_chunks, int head_ratio, cudaStream_t stream) {
+    int group_chunks, int head_ratio, gdn_arch::Stream stream) {
     const int T_total = B * T_seq;
     const int num_groups = (chunks_per_seq + group_chunks - 1) / group_chunks;
     const size_t smem = sizeof(GDNRecurrenceFusedStorage<GDNLayouts<GDN_D, GDN_CHUNK>>);
-    cudaFuncSetAttribute(gdn_recurrence_fused_kernel<GDN_CHUNK, GDN_D, GDN_NUM_THREADS>,
-                         cudaFuncAttributeMaxDynamicSharedMemorySize, (int)smem);
+    gdn_arch::set_smem(gdn_recurrence_fused_kernel<GDN_CHUNK, GDN_D, GDN_NUM_THREADS>, smem);
     dim3 grid(B, H, num_groups);
     dim3 block(GDN_NUM_THREADS);
     gdn_recurrence_fused_kernel<GDN_CHUNK, GDN_D, GDN_NUM_THREADS>
@@ -2981,7 +2901,7 @@ extern "C" void gdn_chunk_forward32(
     int q_row_stride, int g_row_stride,
     int ws_tile_elems, int ws_tile_lm, int ws_gt_elems,
     float scale, int T_seq, int H, int B, int chunks_per_seq,
-    cudaStream_t stream) {
+    gdn_arch::Stream stream) {
     const int T_total = B * T_seq;
     constexpr int CHUNK = 32;
     constexpr int D = 128;
@@ -2989,10 +2909,8 @@ extern "C" void gdn_chunk_forward32(
 
     const size_t rec_smem = sizeof(GDNRecurrenceStorage<GDNLayouts<D, CHUNK>>);
     const size_t prep_smem = sizeof(GDNPrepareStorage<GDNLayouts<D, CHUNK>>);
-    cudaFuncSetAttribute(gdn_recurrence_kernel32<D, NUM_THREADS>,
-                         cudaFuncAttributeMaxDynamicSharedMemorySize, (int)rec_smem);
-    cudaFuncSetAttribute(gdn_prepare_kernel<CHUNK, D, NUM_THREADS>,
-                         cudaFuncAttributeMaxDynamicSharedMemorySize, (int)prep_smem);
+    gdn_arch::set_smem(gdn_recurrence_kernel32<D, NUM_THREADS>, rec_smem);
+    gdn_arch::set_smem(gdn_prepare_kernel<CHUNK, D, NUM_THREADS>, prep_smem);
 
     // Kernel 1: prepare (CHUNK=32 block-Schur path)
     {
@@ -3030,10 +2948,9 @@ extern "C" void gdn_chunk_prepare_only(
     int qk_row_stride, int v_row_stride, int g_row_stride,
     int ws_tile_elems, int ws_tile_lm, int ws_gt_elems,
     float scale, int T_seq, int H, int B, int chunks_per_seq,
-    int head_ratio, cudaStream_t stream) {
+    int head_ratio, gdn_arch::Stream stream) {
     const size_t prep_smem = prepare_smem_bytes_impl();
-    cudaFuncSetAttribute(gdn_prepare_kernel<GDN_CHUNK, GDN_D, GDN_NUM_THREADS>,
-                         cudaFuncAttributeMaxDynamicSharedMemorySize, (int)prep_smem);
+    gdn_arch::set_smem(gdn_prepare_kernel<GDN_CHUNK, GDN_D, GDN_NUM_THREADS>, prep_smem);
     dim3 grid(chunks_per_seq, B * H);
     dim3 block(GDN_NUM_THREADS);
     gdn_prepare_kernel<GDN_CHUNK, GDN_D, GDN_NUM_THREADS>
@@ -3059,15 +2976,14 @@ extern "C" void gdn_chunk_forward_colsplit(
     int q_row_stride, int g_row_stride,
     int ws_tile_elems, int ws_tile_lm, int ws_gt_elems,
     float scale, int T_seq, int H, int B, int chunks_per_seq,
-    int split, cudaStream_t stream) {
+    int split, gdn_arch::Stream stream) {
     const int T_total = B * T_seq;
     constexpr int CHUNK = 16;
     constexpr int D = 128;
     constexpr int NUM_THREADS = 256;
 
     const size_t prep_smem = sizeof(GDNPrepareStorage<GDNLayouts<D, CHUNK>>);
-    cudaFuncSetAttribute(gdn_prepare_kernel<CHUNK, D, NUM_THREADS>,
-                         cudaFuncAttributeMaxDynamicSharedMemorySize, (int)prep_smem);
+    gdn_arch::set_smem(gdn_prepare_kernel<CHUNK, D, NUM_THREADS>, prep_smem);
 
     // Kernel 1: prepare (identical workspace as the no-split CHUNK=16 path)
     {
@@ -3087,8 +3003,7 @@ extern "C" void gdn_chunk_forward_colsplit(
         constexpr int COLS_PER_SPLIT = D / SPLIT;
         const size_t rec_smem =
             sizeof(GDNRecurrenceColsplitStorage<GDNLayouts<D, CHUNK>, COLS_PER_SPLIT>);
-        cudaFuncSetAttribute(gdn_recurrence_colsplit_kernel<CHUNK, D, NUM_THREADS, SPLIT>,
-                             cudaFuncAttributeMaxDynamicSharedMemorySize, (int)rec_smem);
+        gdn_arch::set_smem(gdn_recurrence_colsplit_kernel<CHUNK, D, NUM_THREADS, SPLIT>, rec_smem);
         dim3 grid(B, H, SPLIT);
         dim3 block(NUM_THREADS);
         gdn_recurrence_colsplit_kernel<CHUNK, D, NUM_THREADS, SPLIT>
@@ -3117,13 +3032,12 @@ extern "C" void gdn_chunk_prepare_only32(
     int qk_row_stride, int v_row_stride, int g_row_stride,
     int ws_tile_elems, int ws_tile_lm, int ws_gt_elems,
     float scale, int T_seq, int H, int B, int chunks_per_seq,
-    int head_ratio, cudaStream_t stream) {
+    int head_ratio, gdn_arch::Stream stream) {
     constexpr int CHUNK = 32;
     constexpr int D = 128;
     constexpr int NUM_THREADS = 256;
     const size_t prep_smem = sizeof(GDNPrepareStorage<GDNLayouts<D, CHUNK>>);
-    cudaFuncSetAttribute(gdn_prepare_kernel<CHUNK, D, NUM_THREADS>,
-                         cudaFuncAttributeMaxDynamicSharedMemorySize, (int)prep_smem);
+    gdn_arch::set_smem(gdn_prepare_kernel<CHUNK, D, NUM_THREADS>, prep_smem);
     dim3 grid(chunks_per_seq, B * H);
     dim3 block(NUM_THREADS);
     gdn_prepare_kernel<CHUNK, D, NUM_THREADS>

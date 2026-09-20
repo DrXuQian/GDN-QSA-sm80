@@ -17,11 +17,23 @@ BUILD_DIR="$BUILD_DIR" PPU_SDK="$PPU_SDK_ROOT" JOBS="$JOBS" \
   bash "$ROOT/scripts/build_ppu.sh" 2>&1 | tee "$OUT/build.log"
 
 LIB="$BUILD_DIR/libgdn_qsa_ppu.so"
-sha256sum "$LIB" | tee "$OUT/library.sha256"
+bindings=("$BUILD_DIR"/_gdn_chunk_ppu*.so)
+if [[ ${#bindings[@]} -ne 1 || ! -f "${bindings[0]}" ]]; then
+  echo "[PPU GDN box] FAIL: expected one original-dispatch Python binding" >&2
+  exit 1
+fi
+EXTENSION="${bindings[0]}"
+git -C "$ROOT" rev-parse HEAD | tee "$OUT/sha.txt"
+git -C "$ROOT" diff --binary > "$OUT/source.diff"
+sha256sum "$LIB" "$EXTENSION" | tee "$OUT/library.sha256"
+perf_args=()
+if [[ "${PERF:-1}" == 1 ]]; then
+  perf_args=(--perf --samples "${SAMPLES:-7}" --launches "${LAUNCHES:-5}" --warmup "${WARMUP:-2}")
+fi
 CUDA_VISIBLE_DEVICES="$DEVICE" \
 LD_LIBRARY_PATH="$PPU_SDK_ROOT/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
 PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}" \
   python "$ROOT/tests/test_ppu_gdn_backend.py" \
-    --library "$LIB" --device 0 2>&1 | tee "$OUT/correctness.log"
+    --extension "$EXTENSION" --device 0 "${perf_args[@]}" 2>&1 | tee "$OUT/device.log"
 
 echo "[PPU GDN box] PASS: artifacts=$OUT"
