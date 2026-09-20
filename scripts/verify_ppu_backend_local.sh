@@ -14,6 +14,7 @@ ctest --test-dir "$OUT" --output-on-failure
 python "$ROOT/dev/ppu/check_original_structure.py" --self-test
 python "$ROOT/dev/ppu/check_retile_failure_signature.py"
 python "$ROOT/tests/test_ppu_fla_benchmark_contract.py"
+python "$ROOT/tests/test_ppu_gdn_acu_contract.py"
 
 OUT="$OUT/l003" \
   bash "$ROOT/dev/ppu/run_l003_device_compile.sh"

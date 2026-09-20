@@ -15,6 +15,12 @@ retile-view repair below; corrected performance measurements remain pending.
 The auto API retains upstream's Hv=32 restriction on its serial path; the
 explicit two-level API supports the other positive divisible head counts.
 
+Same-input comparison update: the user reports g=-0.1 ours 925.020 us vs
+FLA 726.992 us, and g=-1 ours 457.340 us vs FLA 746.904 us. These are full
+public-API event spans, not profiled kernel durations. For the next diagnostic,
+use the [one-command ACU capture and tar handoff](PPU_GDN_ACU.md). It preserves
+both implementations, their shared fixture and the original tolerance.
+
 ## What is retained
 
 | Optimization | Actual shared source | PPU change |

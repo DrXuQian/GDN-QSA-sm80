@@ -1,9 +1,30 @@
 # PPU original-structure port
 
-updated-at: 2026-09-20 14:29:08 UTC
-working-on: CUDA13.0 parser compatibility fix ready; rerun WITH_FLA=1
-blocked-on: no local PPU; complete FLA execution/timing awaits box rerun
-last-commit: 539bc58 (process-local CUDA13.0/PTX9.0 parser backport)
+updated-at: 2026-09-20 23:05:19 UTC
+working-on: ACU capture/bundle ready; final local verification and push
+blocked-on: no local PPU; native profiler capture will run on user's box
+last-commit: 14569f7 (CUDA13.0 FLA compatibility handoff)
+
+User-reported same-input full-API timing: g=-0.1 ours 925.020 us vs FLA
+726.992 us (FLA-WINS); g=-1 ours 457.340 us vs FLA 746.904 us
+(OURS-WINS). These are API event spans, not sums of kernel durations.
+Current task: profile the weak path on both implementations, after JIT and
+warmup, then automatically archive reports, logs, source/binary identities
+and resource evidence. No changes to kernels, dispatcher or tolerances.
+
+New handoff: tools/run_ppu_gdn_fla_acu_box.sh, default weak g=-0.1.
+One warmed full API call per arm, native hggcProfilerStart/Stop from the
+already-loaded PPU runtime; no new SDK runtime injection. Preflight/JIT/
+warmup/oracle outside range. Same-input/device/binary receipts, native ACU
+reports plus automatic plain-text metrics, source snapshots and binaries,
+resource dumps and checksums go to a single /workspace tar.gz. Failures keep
+an INCOMPLETE diagnostic tar. No CSV copy-paste or manual identity variables.
+Local: 11 capture/bundle contract tests and 8 existing FLA tests; complete
+host/codegen gate passes (55 algebra cases, real CuTe alias/delivery,
+305 original control expressions, 15 linked PPU kernel images). Actual
+capture is box-unverified, not locally PASS. End-to-end missing-ACU negative
+returned rc=1 and preserved an INCOMPLETE tar under:
+/workspace/gdn-acu-missing-tool-contract-20260920T230350Z.
 
 Box FLA compilation failed in Triton ptx_get_version("13.0"). Reproduced
 locally: the old function handles only CUDA 10/11/12, then emits its misleading
