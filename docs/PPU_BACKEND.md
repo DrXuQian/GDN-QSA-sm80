@@ -198,6 +198,23 @@ keyword. `FLA_ROOT=/path/to/flash-linear-attention` is optional; by default the
 installed package is used, with no clone or installation performed by the
 runner. FLA compatibility code does not patch its math or kernels.
 
+For the CUDA-13 SDK with an older Triton, the benchmark backports the
+`13.0 -> PTX 9.0` version-parser entry from
+[Triton v3.5.0](https://github.com/triton-lang/triton/blob/v3.5.0/third_party/nvidia/backend/compiler.py).
+It applies **only inside this benchmark process**, only when the original
+parser raises the exact known unsupported-version error for `13.0`.
+Already-working vendor mappings, other CUDA versions, LLVM feature caps,
+backend/assembler selection and unrelated errors are untouched. Nothing is
+written to site-packages. The compatibility decision and original compiler
+source hash are included in the baseline identity/log/JSON; this is not a
+silent toolchain change or a claim that all CUDA-13 JIT behavior is verified.
+
+The old parser failure was reproduced with the locally installed Triton.
+After the shim, 13.0 returns 90, 12.9 still returns 88, and its LLVM feature
+cap remains `+ptx86`. The local PPU SDK 2.1.1 assembler reports release 13.0
+and accepts a minimal `.version 9.0` PTX kernel; `hgobjdump` recognizes its
+output as PPU 1.0. This is compile-only evidence, **not an FLA device result**.
+
 Default GVA is native: exactly the same device tensor objects reach both
 APIs. If an older installed FLA lacks GVA, explicitly set `FLA_HEADS=expanded`;
 that prepares Q/K head expansion once **outside timing**, prints the mode and

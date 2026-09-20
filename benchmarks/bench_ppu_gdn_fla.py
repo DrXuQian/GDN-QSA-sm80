@@ -5,6 +5,7 @@ Public-API event spans INCLUDE launch gaps and host dispatch synchronization.
 Do not compare these to a sum of profiled device-kernel durations.
 """
 import argparse
+import functools
 import hashlib
 import importlib.util
 import inspect
@@ -26,14 +27,46 @@ admission = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(admission)
 
 
+def cuda13_ptx_compat(compiler):
+    """Backport only the known CUDA 13.0 parser gap; never alter site-packages.
+
+    Authority: Triton v3.5.0 third_party/nvidia/backend/compiler.py,
+    ptx_get_version: CUDA 13.0 maps to PTX 9.0 (integer 90).
+    Keep all successful vendor mappings and all unrelated failures unchanged.
+    This does not select a backend/assembler or prove its PPU execution.
+    """
+    original = compiler.ptx_get_version
+    try:
+        version = original("13.0")
+    except RuntimeError as exc:
+        expected = "Triton only support CUDA 10.0 or higher, but got CUDA version: 13.0"
+        if str(exc) != expected:
+            raise
+    else:
+        return dict(status="native-mapping-unchanged", cuda="13.0", ptx=version)
+
+    @functools.wraps(original)
+    def mapped(cuda_version):
+        if cuda_version == "13.0":
+            return 90
+        return original(cuda_version)
+
+    compiler.ptx_get_version = mapped
+    return dict(status="process-local-upstream-backport", cuda="13.0", ptx=90,
+                authority="triton-v3.5.0", scope="version-parser-only")
+
+
 def load_fla():
     # New FLA can dispatch to FlashQLA etc. This baseline is explicitly Triton.
     if "fla" in sys.modules:
         raise RuntimeError("FLA must be imported after fixing its backend selection")
     os.environ["FLA_DISABLE_BACKEND_DISPATCH"] = "1"
     try:
-        import fla
         import triton
+        from triton.backends.nvidia import compiler
+        ptx_compat = cuda13_ptx_compat(compiler)
+        print("[PPU GDN FLA PTX compatibility] " + json.dumps(ptx_compat, sort_keys=True), flush=True)
+        import fla
         from fla.ops.gated_delta_rule import chunk_gated_delta_rule
     except Exception as exc:
         raise RuntimeError(
@@ -45,6 +78,9 @@ def load_fla():
     identity = dict(version=getattr(fla, "__version__", "UNKNOWN"),
                     triton_version=triton.__version__, source=str(source),
                     entry_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
+                    triton_compiler=str(Path(compiler.__file__).resolve()),
+                    triton_compiler_sha256=hashlib.sha256(Path(compiler.__file__).read_bytes()).hexdigest(),
+                    cuda13_ptx_compat=ptx_compat,
                     backend_dispatch="disabled-before-import")
     print("[PPU GDN FLA identity] " + json.dumps(identity, sort_keys=True), flush=True)
     return chunk_gated_delta_rule, identity

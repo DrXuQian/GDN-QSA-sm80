@@ -1,6 +1,7 @@
 """CPU-only admission for FLA A/B wiring; no PPU or FLA import needed."""
 import importlib.util
 from pathlib import Path
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -83,14 +84,55 @@ class FLAContract(unittest.TestCase):
         import builtins
         original_import = builtins.__import__
 
-        def unavailable(name, *args, **kwargs):
-            if name == "fla":
-                raise ModuleNotFoundError("planted missing FLA")
-            return original_import(name, *args, **kwargs)
+        for missing in ("fla", "triton"):
+            def unavailable(name, *args, **kwargs):
+                if name == missing:
+                    raise ModuleNotFoundError(f"planted missing {missing}")
+                if name == "triton":
+                    return SimpleNamespace(__version__="contract-stub")
+                if name == "triton.backends.nvidia":
+                    return SimpleNamespace(compiler=SimpleNamespace(ptx_get_version=lambda _: 90))
+                return original_import(name, *args, **kwargs)
 
-        with patch.object(builtins, "__import__", side_effect=unavailable):
-            with self.assertRaisesRegex(RuntimeError, "no comparison or speedup is valid"):
-                bench.load_fla()
+            with self.subTest(missing=missing):
+                with patch.object(builtins, "__import__", side_effect=unavailable):
+                    with self.assertRaisesRegex(RuntimeError, "no comparison or speedup is valid"):
+                        bench.load_fla()
+
+    def test_cuda13_parser_backport_is_narrow_and_idempotent(self):
+        def old(version):
+            if version == "12.9":
+                return 88
+            raise RuntimeError("Triton only support CUDA 10.0 or higher, but got CUDA version: " + version)
+
+        compiler = SimpleNamespace(ptx_get_version=old)
+        self.assertEqual(bench.cuda13_ptx_compat(compiler)["status"],
+                         "process-local-upstream-backport")
+        self.assertEqual(compiler.ptx_get_version("13.0"), 90)
+        self.assertEqual(compiler.ptx_get_version("12.9"), 88)
+        for unknown in ("9.0", "13.1", "14.0"):
+            with self.assertRaisesRegex(RuntimeError, "got CUDA version: " + unknown):
+                compiler.ptx_get_version(unknown)
+        patched = compiler.ptx_get_version
+        bench.cuda13_ptx_compat(compiler)
+        self.assertIs(compiler.ptx_get_version, patched)
+
+    def test_existing_vendor_mapping_is_not_overwritten(self):
+        # Even a vendor-specific PTX cap is not ours to change.
+        native = lambda version: 86
+        compiler = SimpleNamespace(ptx_get_version=native)
+        self.assertEqual(bench.cuda13_ptx_compat(compiler)["status"],
+                         "native-mapping-unchanged")
+        self.assertIs(compiler.ptx_get_version, native)
+
+    def test_unrelated_compiler_failure_is_not_swallowed(self):
+        def broken(version):
+            raise RuntimeError("planted missing assembler")
+
+        compiler = SimpleNamespace(ptx_get_version=broken)
+        with self.assertRaisesRegex(RuntimeError, "planted missing assembler"):
+            bench.cuda13_ptx_compat(compiler)
+        self.assertIs(compiler.ptx_get_version, broken)
 
 
 if __name__ == "__main__":
