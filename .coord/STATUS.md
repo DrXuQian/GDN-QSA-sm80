@@ -1,9 +1,17 @@
 # PPU original-structure port
 
-updated-at: 2026-09-20 13:11:02 UTC
-working-on: retile alias repair complete locally; ready for PERF=0 box admission
-blocked-on: corrected device closure pending; no PPU locally
-last-commit: f003fad (retile repair; failing box baseline fc8cbac)
+updated-at: 2026-09-20 13:18:46 UTC
+working-on: user reports corrected box admission PASS; next is original-path performance baseline
+blocked-on: no local PPU; corrected performance not yet reported
+last-commit: fbdbf61 (handoff containing f003fad retile repair)
+
+Device follow-up, 2026-09-20: user reports "pass" in response to the PERF=0
+handoff. Correctness is now USER-REPORTED/PASS, not inferred from local tests.
+The full new device log, binary hash and measured error values have not been
+provided; no specific numerical errors or device timings are invented here.
+Next: PERF=1, B1/S2048/Hk16/Hv32/D128, strong and weak decay reported separately.
+The protocol includes allocations/preprocessing/host dispatch synchronization,
+so it is full-public-API event span, not kernel-only latency.
 
 Device failure: B2,S65,Hk1,Hv2,C16,GC2, g=0, Hillis-Steele fallback,
 output/state error [0.9999995827674866, 1.0]. Root cause: retile_D returned
@@ -36,5 +44,6 @@ Final complete local rerun PASS: /workspace/gdn-qsa-retile-fix/final-local.log.
 and exact legacy alias negatives; six device TUs plus original host wrapper
 linked; 15 kernel images. CPU failure-signature check passes with the device
 harness's own fixture/reference/comparator, hash d25bbac598263f63.
-The pre-fix device result is FAIL. Corrected device correctness, performance,
-and runtime import remain NOT RUN; none is inferred from host/codegen PASS.
+The pre-fix device result is FAIL; corrected admission is USER-REPORTED/PASS.
+Corrected performance is pending. Local runtime import and device execution
+remain unavailable; none is inferred from host/codegen PASS.

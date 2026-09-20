@@ -9,7 +9,8 @@ described below.
 The source authority is upstream `aa04271`. This is forward-only GDN,
 BF16, D=128, C=16, zero initial state, optional final state, including GVA
 (q/k heads divide value heads). QSA and output-gate kernels are **not** PPU
-ported by this change. PPU timing and device numerical admission remain pending.
+ported by this change. The user reports PPU numerical admission PASS after the
+retile-view repair below; corrected performance measurements remain pending.
 
 The auto API retains upstream's Hv=32 restriction on its serial path; the
 explicit two-level API supports the other positive divisible head counts.
@@ -143,8 +144,12 @@ invalidate all six device objects; actlize's custom build rule did not infer
 those header dependencies. `make -n -f CMakeFiles/gdn_qsa_ppu.dir/build.make
 -W <absolute-shared_copy.cuh> CMakeFiles/gdn_qsa_ppu.dir/build` schedules all six
 compiles in the tested Makefiles build. No old object is used as fix evidence.
-**Corrected device execution and latency remain pending.** First rerun with
-`PERF=0`; no timing from the failing arm is admissible.
+On 2026-09-20 the user reported **PASS** for the `PERF=0` rerun requested
+after handoff `fbdbf61` (repair `f003fad`). This is user-reported device
+admission; the complete new log, binary hash and error measurements have not
+yet been supplied. Corrected performance remains pending. The next run uses
+`PERF=1` and reports both decay domains separately; no timing from the failing
+arm is admissible.
 
 ## Build and device handoff
 
