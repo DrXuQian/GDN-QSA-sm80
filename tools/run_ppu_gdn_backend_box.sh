@@ -26,6 +26,21 @@ EXTENSION="${bindings[0]}"
 git -C "$ROOT" rev-parse HEAD | tee "$OUT/sha.txt"
 git -C "$ROOT" diff --binary > "$OUT/source.diff"
 sha256sum "$LIB" "$EXTENSION" | tee "$OUT/library.sha256"
+if [[ "${WITH_FLA:-0}" == 1 ]]; then
+  if [[ -n "${FLA_ROOT:-}" && ! -f "$FLA_ROOT/fla/__init__.py" ]]; then
+    echo "[PPU GDN FLA] FAIL: FLA_ROOT is not an FLA checkout: $FLA_ROOT" >&2
+    exit 1
+  fi
+  CUDA_VISIBLE_DEVICES="$DEVICE" \
+  LD_LIBRARY_PATH="$PPU_SDK_ROOT/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+  PYTHONPATH="$ROOT${FLA_ROOT:+:$FLA_ROOT}${PYTHONPATH:+:$PYTHONPATH}" \
+    python "$ROOT/benchmarks/bench_ppu_gdn_fla.py" \
+      --extension "$EXTENSION" --device 0 --fla-heads "${FLA_HEADS:-native}" \
+      --samples "${SAMPLES:-7}" --launches "${LAUNCHES:-10}" --warmup "${WARMUP:-5}" \
+      --results "$OUT/fla-comparison.json" 2>&1 | tee "$OUT/fla-comparison.log"
+  echo "[PPU GDN FLA box] PASS: artifacts=$OUT"
+  exit 0
+fi
 perf_args=()
 if [[ "${PERF:-1}" == 1 ]]; then
   perf_args=(--perf --samples "${SAMPLES:-7}" --launches "${LAUNCHES:-5}" --warmup "${WARMUP:-2}")

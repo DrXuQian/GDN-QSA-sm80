@@ -169,6 +169,61 @@ serial, tails, GVA and S=2048. Any correctness/route failure stops timing.
 The default final timing is B1/S2048/Hk16/Hv32/D128 at strong and weak decay.
 Set `PERF=0` for correctness only.
 
+### Same-input FLA comparison
+
+With a working PPU-compatible FLA/Triton installation in the box's Python:
+
+```bash
+git pull --ff-only
+WITH_FLA=1 PPU_SDK=/usr/local/PPU_SDK DEVICE=0 JOBS=16 \
+  bash tools/run_ppu_gdn_backend_box.sh
+```
+
+This opt-in mode uses `benchmarks/bench_ppu_gdn_fla.py`. It checks and times
+the two target cases B1/S2048/Hk16/Hv32/D128 with g=-1 and g=-0.1, using the
+**same CPU-generated BF16 tensors and recurrent oracle** as device admission.
+Both calls start with zero state, return output **and final state**, use
+scale=1/sqrt(128), and disable QK normalization. Both output/state pairs must
+satisfy the existing 2% criterion, and each arm must repeat bit-for-bit. The
+state dtypes are reported rather than silently cast for the comparison.
+The optimized reset approximation remains in our path; passing these two
+fixtures does not establish its accuracy on arbitrary model activations.
+
+FLA is the installed public `chunk_gated_delta_rule` Triton route; backend
+auto-dispatch to other libraries is disabled before import. Its version,
+entry-source path/hash and Triton version are recorded. There is **no silent
+ours-only fallback** if FLA cannot import or execute. The wrapper supports
+both older explicit `head_first=False` APIs and newer APIs that removed that
+keyword. `FLA_ROOT=/path/to/flash-linear-attention` is optional; by default the
+installed package is used, with no clone or installation performed by the
+runner. FLA compatibility code does not patch its math or kernels.
+
+Default GVA is native: exactly the same device tensor objects reach both
+APIs. If an older installed FLA lacks GVA, explicitly set `FLA_HEADS=expanded`;
+that prepares Q/K head expansion once **outside timing**, prints the mode and
+never hides the extra layout choice. Ours remains native GVA. FLA uses chunk
+64 where its API accepts it (otherwise its installed default), ours uses
+chunk 16; equal logical inputs do not require equal internal chunking.
+
+First launch/JIT/autotune and five warmups are excluded. Seven samples of ten
+launches per arm are taken in alternating ours/FLA order, with synchronization
+between arms: the two implementations **never run concurrently**. These are
+full-public-API event spans including allocations, launch gaps and our host
+dispatch synchronization, not device-kernel-only durations. Memory reporting
+is preflight peak allocation minus the immediately preceding live allocation.
+Every timed result is checked against the oracle and its own preflight hash.
+
+The runner saves `fla-comparison.log` and `fla-comparison.json`, including raw
+samples, errors, fingerprints and `speedup = FLA median / ours median`, beside
+its ordinary source SHA/diff and binary hashes. Overlapping observed sample
+envelopes are marked `UNRESOLVED`, not a claimed winner. This is an empirical
+spread rule, not a statistical confidence interval.
+
+Local CPU contract tests cover native input identity, one-time head expansion,
+old/new FLA argument conventions, missing final state, wrong output/state,
+nonfinite output, missing FLA and both performance verdict directions. PPU FLA execution
+and A/B speed remain device-only; no local benchmark result is claimed.
+
 To use the built original host wrapper directly:
 
 ```python
