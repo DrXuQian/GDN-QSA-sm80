@@ -17,6 +17,12 @@ core attention, and the gated output projection) — written from scratch for
 A800 (compute capability 8.0), with tensor-core `mma.sync` + `cp.async`
 kernels and reproducible benchmarks against public baselines.
 
+An experimental **PPU forward backend for `gdn_chunk`** is also present.  It
+ports this repository's superchunk affine-transfer/scan/replay algorithm to
+PPU0010 with actlize/CuTe BF16 MMA, rather than falling back to the older
+one-CTA-per-head serial recurrence.  Its deliberately narrow v1 contract and
+admission evidence are documented in [`docs/PPU_BACKEND.md`](docs/PPU_BACKEND.md).
+
 > **Status**: all four operators shipped — `gdn_chunk` (M1), `qsa_indexer` + `output_gate` (M2), `qsa_core` (M3).
 >
 > **Validation**: clean-A800 build / test / benchmark record in [`docs/VALIDATION_LOG.md`](docs/VALIDATION_LOG.md) (37/37 tests PASS).
@@ -109,6 +115,16 @@ To build only a subset of operators:
 ```bash
 GDN_QSA_BUILD_OPS=gdn_chunk,qsa_core bash scripts/build.sh
 # or legacy alias: GDN_QSA_BUILD_GDN_ONLY=1 bash scripts/build.sh
+```
+
+For the PPU backend only:
+
+```bash
+git submodule update --init --recursive
+OUT=/workspace/gdn-qsa-ppu-local PPU_SDK=/usr/local/PPU_SDK \
+  bash scripts/verify_ppu_backend_local.sh
+BUILD_DIR=/workspace/gdn-qsa-ppu-build PPU_SDK=/usr/local/PPU_SDK \
+  bash scripts/build_ppu.sh
 ```
 
 ## Testing & benchmarks
