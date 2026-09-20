@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-20 13:18:46 UTC
-working-on: user reports corrected box admission PASS; next is original-path performance baseline
-blocked-on: no local PPU; corrected performance not yet reported
-last-commit: fbdbf61 (handoff containing f003fad retile repair)
+updated-at: 2026-09-20 13:30:24 UTC
+working-on: same-input FLA comparison ready; WITH_FLA=1 handoff
+blocked-on: no local PPU; actual A/B timings require the user's installed PPU FLA
+last-commit: 44772bf (same-input PPU GDN/FLA comparison; kernels unchanged)
 
 Device follow-up, 2026-09-20: user reports "pass" in response to the PERF=0
 handoff. Correctness is now USER-REPORTED/PASS, not inferred from local tests.
@@ -12,6 +12,19 @@ provided; no specific numerical errors or device timings are invented here.
 Next: PERF=1, B1/S2048/Hk16/Hv32/D128, strong and weak decay reported separately.
 The protocol includes allocations/preprocessing/host dispatch synchronization,
 so it is full-public-API event span, not kernel-only latency.
+
+FLA comparison opt-in: WITH_FLA=1 on tools/run_ppu_gdn_backend_box.sh.
+Uses installed PPU FLA (optional explicit FLA_ROOT), same BF16 tensors and
+CPU oracle, zero initial state and output+final-state on both sides. Default
+native GVA; explicit FLA_HEADS=expanded does its expansion outside timing.
+Both decay cases independently pass correctness and repeat gates before
+their timing. JIT/autotune excluded; sequential AB/BA samples, no overlap.
+Saves fla-comparison.log/json beside source and binary identities. No
+ours-only fallback on FLA error; overlapping sample envelopes UNRESOLVED.
+Local verification: 5 CPU benchmark contract tests PASS (including missing
+FLA, missing/wrong state, wrong/nonfinite output and both winner directions),
+full existing host/codegen suite PASS. Log:
+/workspace/gdn-qsa-retile-fix/fla-local.log. No new PPU timing is claimed.
 
 Device failure: B2,S65,Hk1,Hv2,C16,GC2, g=0, Hillis-Steele fallback,
 output/state error [0.9999995827674866, 1.0]. Root cause: retile_D returned
