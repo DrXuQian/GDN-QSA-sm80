@@ -12,6 +12,7 @@ ctest --test-dir "$OUT" --output-on-failure
 "$OUT/l004_ppu_affine_pipeline"
 "$OUT/l006_ppu_original_delivery"
 python "$ROOT/dev/ppu/check_original_structure.py" --self-test
+python "$ROOT/dev/ppu/check_retile_failure_signature.py"
 
 OUT="$OUT/l003" \
   bash "$ROOT/dev/ppu/run_l003_device_compile.sh"

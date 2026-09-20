@@ -78,12 +78,21 @@ silently selected.
    original TUs, launch geometries, wait/barrier cadence, and the complete
    host dispatch body remain upstream-identical. Removing a wait, a buffer,
    changing a loop bound, or moving state into the chunk loop must turn the gate red.
-5. hgcc PPU0010 compile **and link** of all six original device TUs plus the
+5. Actual CuTe register-view aliasing: 3072 cells (BF16 + FP16, all 32 lanes,
+   all six copy roles). Writes through a returned `retile_D` view must reach
+   its owning fragment; a saved `retile_S` view must observe subsequent owner
+   writes. The exact legacy reference-return implementation fails all 1536
+   BF16 cells in each direction. The CPU zero-result consequence reproduces
+   the first box failure's exact output/state error pair, using the real
+   device test's fixture and comparator.
+6. hgcc PPU0010 compile **and link** of all six original device TUs plus the
    original PyTorch host wrapper, then resource/ISA admission.
 
 Local SDK 2.1.1 emits 15 kernel symbols including both reset and full-scan
-paths. Default C16 kernels have zero stack; fused register replay uses
-182 vector registers/thread in this build. The original experimental C32
+paths. After the retile-view repair, default C16 kernels have zero stack;
+serial recurrence uses 176 vector registers/thread and fused register replay
+uses 204 (the incorrect pre-fix binary used 148 and 182 respectively).
+These are compiler resources, not a performance result. The original experimental C32
 recurrence has a 144-byte stack and is explicitly **not PPU performance
 admitted**; auto never chooses it. The resource report prints it, rather than
 hiding it or treating it as a C16 regression.
@@ -98,6 +107,44 @@ Use the matching PPU SDK/PyTorch container on the box.
 The SDK's executable named `nvcc` is its PPU compatibility driver (a trial
 `-arch=sm_80` invocation still reported `compiling for ppu001`), not independent
 NVIDIA codegen validation. NVIDIA execution/rebuild is not claimed here.
+
+## First device failure: owning Tensor copied instead of viewed
+
+At `fc8cbac`, the first box case (B2/S65/Hk1/Hv2, C16/GC2, g=0,
+Hillis-Steele) reported output/state errors `[0.9999995827674866, 1.0]`.
+This is a defect in this port's shared-copy adapter, not an upstream algorithm
+change or a reason to weaken the existing 2% criterion.
+
+The old `retile_D(T& t) -> T&` returned an **owning** CuTe register tensor.
+Original call sites use `auto view = retile_D(fragment)`. Value deduction
+copies the owning `ArrayEngine`, so the load fills a detached register array;
+the subsequent transform/MMA reads the unfilled original. `retile_S` had the
+same contract error: a retained `auto` source became a snapshot rather than a
+live view. The repair returns `make_tensor(t.data(), t.layout())` by value,
+whose non-owning engine aliases the actual operand.
+
+The scope scan found retained destination views in serial/fused/C32/column-
+split recurrence, full-transfer stage1, reset-B preparation and both scans.
+Immediate `copy(..., retile_D(tmp))` calls do not make that owning copy; this
+explains why a coordinate-only/inverse-chain test did not catch the failure.
+Both APIs are fixed at the common seam. All original kernel bodies, shapes,
+load/MMA/barrier cadence, reset policy and actlize pin are unchanged.
+
+Before the fix the expanded L006 gate found `3072/3072` detached destination
+cells and `3072/3072` stale source cells. After the fix both are `0/3072`;
+the exact old implementation remains an expected-red control. The local
+zero-result model yields precisely the reported error pair on fixture hash
+`d25bbac598263f63`. This is corroboration, **not an elementwise device replay**:
+the old log did not give nonzero counts or actual values. The device test now
+prints those on failure, plus input/reference hashes before launch.
+
+A fresh hgcc compile/link passed after this repair. Adapter headers now also
+invalidate all six device objects; actlize's custom build rule did not infer
+those header dependencies. `make -n -f CMakeFiles/gdn_qsa_ppu.dir/build.make
+-W <absolute-shared_copy.cuh> CMakeFiles/gdn_qsa_ppu.dir/build` schedules all six
+compiles in the tested Makefiles build. No old object is used as fix evidence.
+**Corrected device execution and latency remain pending.** First rerun with
+`PERF=0`; no timing from the failing arm is admissible.
 
 ## Build and device handoff
 

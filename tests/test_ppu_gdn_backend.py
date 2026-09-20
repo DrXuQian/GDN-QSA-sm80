@@ -53,6 +53,20 @@ def assert_pair(got, want):
     return errs
 
 
+def print_failure(label, got, want):
+    # Read the failing launch, never launch another variant or mutate output
+    # while diagnosing. Near-100% relative error alone does not establish zero.
+    for role, actual, expected in zip(("output", "state"), got, want):
+        a, b = actual.detach().float().cpu(), expected.detach().float().cpu()
+        worst = int((a - b).abs().reshape(-1).argmax())
+        print(f"[PPU GDN failure] case={label} role={role} "
+              f"finite={int(torch.isfinite(a).sum())}/{a.numel()} "
+              f"nonzero={int(torch.count_nonzero(a))}/{a.numel()} "
+              f"got_max={a.abs().max().item():.9g} want_max={b.abs().max().item():.9g} "
+              f"worst_flat={worst} got={a.reshape(-1)[worst].item():.9g} "
+              f"want={b.reshape(-1)[worst].item():.9g}", flush=True)
+
+
 def reference(inputs):
     q, k, v, g, beta = inputs
     ratio = v.shape[2] // q.shape[2]
@@ -64,6 +78,8 @@ def reference(inputs):
 def run_case(label, shape, gate, group_chunks, expected_route, device):
     cpu = fixture(*shape, gate)
     want = reference(cpu)
+    print(f"[PPU GDN fixture] case={label} input_sha={digest(cpu)} "
+          f"reference_sha={digest(want)} limit={MAX_RELATIVE_ERROR}", flush=True)
     inputs = tuple(x.to(device) for x in cpu)
     def launch():
         if group_chunks is None:
@@ -79,7 +95,11 @@ def run_case(label, shape, gate, group_chunks, expected_route, device):
             raise AssertionError(f"{label}: expected {expected_route}, got {route}: {info}")
         print(f"[PPU GDN route] case={label} route={route} "
               f"groups={int(groups)} nonreset_groups={int(count)} metric={metric:g}")
-    errs = assert_pair(got[:2], want)
+    try:
+        errs = assert_pair(got[:2], want)
+    except AssertionError:
+        print_failure(label, got[:2], want)
+        raise
     initial_hash = digest(got[:2])
     for _ in range(3):
         again = launch()

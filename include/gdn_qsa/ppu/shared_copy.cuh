@@ -39,8 +39,15 @@ struct SharedCopyThread {
   template <class T> CUTE_HOST_DEVICE auto partition_D(T const& t) const {
     return SharedTile<Role, T>{t, lane};
   }
-  template <class T> CUTE_HOST_DEVICE T& retile_D(T& t) const { return t; }
-  template <class T> CUTE_HOST_DEVICE T const& retile_S(T const& t) const { return t; }
+  // Match CuTe's retile contract: return a NON-OWNING tensor by value.
+  // Returning T& is not equivalent: `auto view = retile_D(fragment)` copies
+  // an owning ArrayEngine, and the subsequent load then misses the operand.
+  template <class T> CUTE_HOST_DEVICE auto retile_D(T& t) const {
+    return cute::make_tensor(t.data(), t.layout());
+  }
+  template <class T> CUTE_HOST_DEVICE auto retile_S(T const& t) const {
+    return cute::make_tensor(t.data(), t.layout());
+  }
 };
 
 template <CopyRole Role>

@@ -77,6 +77,18 @@ if(GDN_QSA_ENABLE_PPU)
     ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_scan_stage2.cu
     ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_scan_stage2_blelloch.cu
     ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_scan_stage3_reset.cu)
+  # actlize's hgcc custom rule tracks its .cu only (no header depfile).
+  # Track our target adapter explicitly: a header-only correctness repair
+  # must not leave an old device object in an otherwise rebuilt library.
+  get_target_property(_gdn_objects gdn_qsa_ppu SOURCES)
+  foreach(_object IN LISTS _gdn_objects)
+    if(_object MATCHES "[.]o$")
+      add_custom_command(OUTPUT "${_object}" APPEND DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_target.cuh
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/fragment.cuh
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/shared_copy.cuh)
+    endif()
+  endforeach()
   target_include_directories(
     gdn_qsa_ppu PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
