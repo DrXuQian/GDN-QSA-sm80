@@ -72,22 +72,40 @@ def report_file(base):
     return candidates[0]
 
 
-def acu_command(acu, report, extension, role, gate, bundle):
-    # Verified against PPU SDK 2.1.1 acu --help. Capture all kernels in ONE API
-    # call, not just the recurrence; no launch-count shortcut or kernel filter.
-    return [str(acu), "-f", "-o", str(report), "--set", "full",
-            "--profile-from-start", "no", "--replay-mode", "kernel",
-            "--cache-control", "all", "--clock-control", "none",
-            "--kill", "no", "--check-exit-code", "yes",
-            sys.executable, "-u", str(ROOT / "benchmarks/profile_ppu_gdn_fla.py"),
-            "--extension", str(extension), "--role", role, "--gate", str(gate),
-            "--receipt", str(bundle / f"{role}.json"),
+def child_command(extension, role, gate, bundle, phase):
+    receipt = f"{role}-preflight.json" if phase == "preflight" else f"{role}.json"
+    return [sys.executable, "-u", str(ROOT / "benchmarks/profile_ppu_gdn_fla.py"),
+            "--extension", str(extension), "--role", role, "--phase", phase, "--gate", str(gate),
+            "--receipt", str(bundle / receipt),
             "--sources", str(bundle / "sources/reference")]
+
+
+def acu_command(acu, report, extension, role, gate, bundle):
+    # Same direct CLI pattern as quactlize/tools/run_dense_marlin_m8_acu_box.sh:
+    # preflight is a separate process; ACU owns profiling from process start.
+    return [str(acu), "-f", "-o", str(report), "--set", "full",
+            "--check-exit-code", "yes",
+            *child_command(extension, role, gate, bundle, "subject")]
+
+
+def validate_preflight(preflight, subject):
+    if (preflight.get("status") != "PASS" or preflight.get("phase") != "preflight"
+            or preflight.get("warmup", 0) < 1
+            or preflight.get("public_api_calls") != preflight["warmup"] + 1):
+        raise ValueError("missing successful independent preflight")
+    if subject.get("phase") != "subject" or subject.get("public_api_calls") != 1 or subject.get("warmup") != 0:
+        raise ValueError("subject must contain exactly one API call and no warmup")
+    for key in ("role", "gate", "shape", "input_sha", "reference_sha", "output_sha", "device",
+                "torch", "torch_cuda", "fla", "extension_sha256", "protocol"):
+        if key not in preflight or preflight[key] != subject.get(key):
+            raise ValueError(f"subject differs from independent preflight: {key}")
 
 
 def validate_pair(ours, fla):
     for record, role in ((ours, "ours"), (fla, "fla")):
-        if record.get("status") != "PASS" or record.get("role") != role or record.get("public_api_calls") != 1:
+        if (record.get("status") != "PASS" or record.get("role") != role
+                or record.get("phase") != "subject" or record.get("warmup") != 0
+                or record.get("public_api_calls") != 1):
             raise ValueError(f"{role}: missing successful single-call capture receipt")
         for key in ("input_sha", "reference_sha", "extension_sha256"):
             if not record.get(key):
@@ -194,6 +212,8 @@ def collect(args, bundle, env):
 
         for role in ("ours", "fla"):
             try:
+                run(child_command(extension, role, args.gate, bundle, "preflight"),
+                    bundle / f"{role}-preflight.log", env)
                 base = bundle / f"{role}-g{args.gate}.report"
                 command = acu_command(args.acu, base, extension, role, args.gate, bundle)
                 run(command, bundle / f"{role}-acu.log", env)
@@ -214,6 +234,9 @@ def collect(args, bundle, env):
         if status["errors"]:
             return status
         ours, fla = (json.loads((bundle / f"{role}.json").read_text()) for role in ("ours", "fla"))
+        for subject in (ours, fla):
+            preflight = json.loads((bundle / f"{subject['role']}-preflight.json").read_text())
+            validate_preflight(preflight, subject)
         validate_pair(ours, fla)
         validate_loaded_binary(ours, extension, library)
         if ours["extension_sha256"] != status["binaries"][str(extension)]:

@@ -7,7 +7,6 @@ from pathlib import Path
 import sys
 import tarfile
 import unittest
-from unittest.mock import patch
 from uuid import uuid4
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,63 +31,88 @@ class ACUContract(unittest.TestCase):
         return directory
 
     def records(self):
-        ours = dict(status="PASS", role="ours", public_api_calls=1, gate=-0.1,
+        ours = dict(status="PASS", role="ours", phase="subject", warmup=0, public_api_calls=1, gate=-0.1,
                     shape=dict(B=1, S=2048), input_sha="input", reference_sha="ref",
                     device=dict(name="PPU", uuid="fixture", cu=72), torch="vendor",
                     torch_cuda="13.0", initial_state="zero", output_final_state=True,
                     fla_heads="native", max_relative_error_limit=0.02, protocol="single-forward",
-                    cache_control="all", extension_sha256="binary")
+                    cache_control="all", extension_sha256="binary", output_sha="output", fla={})
         fla = copy.deepcopy(ours)
         fla["role"] = "fla"
         return ours, fla
 
-    def test_one_call_and_synchronization_are_inside_range_only(self):
-        order = ["preflight", "warmup", "correctness"]
+    def test_direct_subject_calls_once_without_profiler_hooks(self):
+        order = []
         def step(name):
             return lambda: order.append(name)
-        profile.capture_one(step("call"), step("sync"), step("start"), step("stop"))
-        order.append("postcheck")
-        self.assertEqual(order, ["preflight", "warmup", "correctness", "sync",
-                                 "start", "call", "sync", "stop", "postcheck"])
+        profile.capture_one(step("call"), step("sync"))
+        self.assertEqual(order, ["sync", "call", "sync"])
 
-    def test_call_failure_stops_range_but_is_not_swallowed(self):
+    def test_subject_call_failure_is_not_swallowed(self):
         order = []
         def bad():
             raise RuntimeError("planted launch failure")
         with self.assertRaisesRegex(RuntimeError, "launch failure"):
-            profile.capture_one(bad, lambda: order.append("sync"),
-                                lambda: order.append("start"), lambda: order.append("stop"))
-        self.assertEqual(order, ["sync", "start", "stop"])
+            profile.capture_one(bad, lambda: order.append("sync"))
+        self.assertEqual(order, ["sync"])
 
-    def test_profiler_start_failure_never_runs_subject(self):
-        def fail():
-            raise RuntimeError("profiler unavailable")
-        def must_not_run():
-            self.fail("subject/stop should not run without profiler start")
-        with self.assertRaisesRegex(RuntimeError, "profiler unavailable"):
-            profile.capture_one(must_not_run, lambda: None, fail, must_not_run)
+    def test_no_profiler_library_or_api_dependency_remains(self):
+        source = (ROOT / "benchmarks/profile_ppu_gdn_fla.py").read_text()
+        for forbidden in ("PPUProfiler", "ProfilerStart", "ProfilerStop", "ctypes", "cuda.profiler"):
+            self.assertNotIn(forbidden, source)
 
-    def test_profiler_runtime_missing_ambiguous_and_error_are_red(self):
-        for paths in (set(), {Path("/one/libhggc_wrapper.so"), Path("/two/libhggc_wrapper.so")}):
-            with patch.object(profile, "loaded_library_paths", return_value=paths):
-                with self.assertRaisesRegex(RuntimeError, "need one loaded"):
-                    profile.PPUProfiler()
-        profiler = object.__new__(profile.PPUProfiler)
-        class BrokenRuntime:
-            def hggcProfilerStart(self):
-                return 7
-        profiler.lib = BrokenRuntime()
-        with self.assertRaisesRegex(RuntimeError, "status=7"):
-            profiler.start()
+    def test_only_preflight_warms_up_and_comparison_runs_on_cpu(self):
+        import torch
+        want = (torch.tensor([1.0]), torch.tensor([2.0]))
+        copies, calls = [], []
+        class DeviceResult:
+            def __init__(self, cpu):
+                self.value = cpu
+            def detach(self):
+                return self
+            def cpu(self):
+                copies.append("D2H")
+                return self.value
+            def float(self):
+                raise AssertionError("must not launch device verification casts")
+        def call():
+            calls.append("forward")
+            return tuple(DeviceResult(x) for x in want)
+        subject = profile.run_phase(call, lambda: None, want, "subject", 5)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(copies, ["D2H", "D2H"])
+        self.assertEqual((subject["public_api_calls"], subject["warmup"]), (1, 0))
+        calls.clear()
+        preflight = profile.run_phase(call, lambda: None, want, "preflight", 5)
+        self.assertEqual(len(calls), 6)
+        self.assertEqual(preflight["output_sha"], subject["output_sha"])
+        with self.assertRaises(ValueError):
+            profile.run_phase(call, lambda: None, want, "unknown", 5)
+
+    def test_preflight_and_subject_must_match(self):
+        subject, _ = self.records()
+        preflight = subject | dict(phase="preflight", warmup=5, public_api_calls=6)
+        collect.validate_preflight(preflight, subject)
+        for key, value in (("output_sha", "changed"), ("device", {}), ("input_sha", "changed"),
+                           ("warmup", 5), ("phase", "preflight"), ("public_api_calls", 6)):
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                collect.validate_preflight(preflight, subject | {key: value})
+        with self.assertRaises(ValueError):
+            collect.validate_preflight({}, subject)
 
     def test_all_kernels_profiled_not_warmup_or_truncated_subset(self):
         cmd = collect.acu_command(Path("/acu"), Path("/report"), Path("/binding.so"),
                                   "ours", -0.1, Path("/bundle"))
-        for flag, value in (("--profile-from-start", "no"), ("--set", "full"),
-                            ("--kill", "no"), ("--check-exit-code", "yes"), ("--gate", "-0.1")):
+        self.assertEqual(cmd[:6], ["/acu", "-f", "-o", "/report", "--set", "full"])
+        for flag, value in (("--set", "full"), ("--phase", "subject"),
+                            ("--check-exit-code", "yes"), ("--gate", "-0.1")):
             self.assertEqual(cmd[cmd.index(flag) + 1], value)
-        for forbidden in ("--launch-count", "--kernel-name", "--disable-profiler-start-stop", "--csv"):
+        for forbidden in ("--profile-from-start", "--launch-count", "--kernel-name",
+                          "--disable-profiler-start-stop", "--csv"):
             self.assertNotIn(forbidden, cmd)
+        preflight = collect.child_command(Path("/binding.so"), "ours", -0.1, Path("/bundle"), "preflight")
+        self.assertEqual(preflight[preflight.index("--phase") + 1], "preflight")
+        self.assertNotIn("/acu", preflight)
 
     def test_changed_input_device_or_missing_receipt_cannot_pass(self):
         ours, fla = self.records()

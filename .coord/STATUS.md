@@ -1,25 +1,34 @@
 # PPU original-structure port
 
-updated-at: 2026-09-20 23:06:44 UTC
-working-on: ACU capture/bundle complete; awaiting user's uploaded report tar
-blocked-on: no local PPU; native profiler capture will run on user's box
-last-commit: ba05c9f (same-input ACU capture, source/binary evidence and tar)
+updated-at: 2026-09-21 00:59:02 UTC
+working-on: direct ACU replacement verified locally; committing handoff
+blocked-on: no local PPU; direct capture will run on user's box
+last-commit: 33c31cc (prior capture handoff; user reports profiler failure)
 
 User-reported same-input full-API timing: g=-0.1 ours 925.020 us vs FLA
 726.992 us (FLA-WINS); g=-1 ours 457.340 us vs FLA 746.904 us
 (OURS-WINS). These are API event spans, not sums of kernel durations.
-Current task: profile the weak path on both implementations, after JIT and
-warmup, then automatically archive reports, logs, source/binary identities
-and resource evidence. No changes to kernels, dispatcher or tolerances.
+Current task: remove PPUProfiler entirely as requested. Reference is
+quactlize/tools/run_dense_marlin_m8_acu_box.sh: separate correctness process,
+then direct acu -f -o ... --set full against a subject-only process. No
+kernel, dispatcher or tolerance changes. Exact runtime failure log was not
+provided; no unsupported diagnosis of that error is claimed.
 
 New handoff: tools/run_ppu_gdn_fla_acu_box.sh, default weak g=-0.1.
-One warmed full API call per arm, native hggcProfilerStart/Stop from the
-already-loaded PPU runtime; no new SDK runtime injection. Preflight/JIT/
-warmup/oracle outside range. Same-input/device/binary receipts, native ACU
+One subject API call per arm, no subject warmup; preflight in another process.
+CPU-only verification, no profiler hooks/library. Whole-process capture can
+include runtime initialization or fresh-process FLA autotuning, explicitly
+not claimed to be a warmed steady-state kernel range. Same-input/device/binary receipts, native ACU
 reports plus automatic plain-text metrics, source snapshots and binaries,
 resource dumps and checksums go to a single /workspace tar.gz. Failures keep
 an INCOMPLETE diagnostic tar. No CSV copy-paste or manual identity variables.
-Local: 11 capture/bundle contract tests and 8 existing FLA tests; complete
+Revised local gate PASS: 12 direct-capture/bundle tests + 8 FLA tests, then
+the complete host/codegen suite (2/2 CTest, 55 affine cases, CuTe delivery,
+305 unchanged source controls and all 15 linked PPU kernel images). Negatives
+cover accidental profiler hooks, subject warmups, device verification casts,
+preflight/subject identity mismatch, wrong/missing reports and failed tools.
+Actual ACU execution remains box-unverified. No production code changed.
+Previous handoff local: 11 capture/bundle tests and 8 FLA tests; complete
 host/codegen gate passes (55 algebra cases, real CuTe alias/delivery,
 305 original control expressions, 15 linked PPU kernel images). Actual
 capture is box-unverified, not locally PASS. End-to-end missing-ACU negative

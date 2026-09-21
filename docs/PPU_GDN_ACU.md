@@ -35,17 +35,24 @@ there is no GUI screenshot or CSV-copying requirement.
   final-state criterion as `bench_ppu_gdn_fla.py`. Inputs/reference hashes
   must match across arms. Start with zero state; return final state; no QK
   normalization. FLA's Triton path is explicit, not FlashQLA dispatch.
-- JIT/autotune, five warmups, correctness and fingerprint checks happen
-  **outside** the capture range. Exactly one complete public API forward
-  happens inside PPU's `hggcProfilerStart/Stop` (the already-loaded runtime);
-  post-capture output/state must
-  remain bit-identical to that arm's unprofiled preflight.
-- `acu -f -o ... --set full --profile-from-start no` collects **all** kernels
-  in that API call: gate reduction, head expansion, clears, transpose,
-  preparation, recurrence, and FLA's complete pipeline. There is no filter
-  that hides wrapper/preprocessing work. ACU may replay each kernel for its
-  counters; one application call does not mean one physical replay.
-- Explicit ACU cache-control=all; clock-control=none. Profiled durations are
+- Follow `quactlize/tools/run_dense_marlin_m8_acu_box.sh`: first run a
+  **separate unprofiled preflight process** (first call + five warmups with
+  correctness/fingerprint checks), then run a **subject-only process** under
+  `acu -f -o ... --set full python ... --phase subject`.
+- There is no profiler API, dynamic profiler-library lookup, start/stop
+  range, launch-skip/count guess, or kernel-name filter. The subject process
+  calls forward exactly once, with zero warmups. Verification copies results
+  to CPU **before** dtype casts/comparisons, so it adds no verification GPU
+  kernels. Its output/state must match the separate preflight bit-for-bit.
+- ACU profiles the **whole subject process**: runtime setup if any, gate
+  reduction, head expansion, clears, transpose, preparation, recurrence,
+  and FLA's complete pipeline. Preflight and subject inherit the same Triton
+  disk-cache environment, but in-memory autotuner choices are not carried
+  between processes. If the installed FLA repeats library-internal tuning
+  in the fresh process, those launches remain in the report. Do not claim
+  the report excludes all JIT/autotuning or contains only steady-state work.
+  One public API call is not necessarily one kernel launch/replay.
+- ACU's default profiling/cache policy is used. Profiled durations are
   **diagnostic**, not new winner timings. The profiler flushes caches and
   replays launches. Neither sum of profiled kernel times nor wall time of
   capture is the preceding unprofiled full-API event span. Host dispatch
@@ -93,7 +100,8 @@ body. Those are **source facts**, not measured causal attributions. Determine:
    state/fragment delivery, or public API preprocessing. Low occupancy alone
    does not establish which optimization will win.
 
-Local tests validate the profiler range/order, identity binding, report
+Local tests validate separate preflight/subject call counts, CPU-only
+verification, absence of profiler APIs, identity binding, report
 selection, failure propagation and tar/checksum contracts. No local PPU is
 available: actual ACU interception/counters remain **box-unverified** until
 this command completes successfully. No new device speedup is claimed.

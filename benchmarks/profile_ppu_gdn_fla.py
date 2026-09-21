@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""One warmed public-API forward inside an ACU start/stop range.
+"""Separate preflight and subject-only processes for direct ACU capture.
 
 This is a counter capture, NOT another latency benchmark. Reuse the comparison
 fixture, oracle, tolerance and FLA dispatch/compatibility code without forking
 their numerical contract.
 """
 import argparse
-import ctypes
 import hashlib
 import json
 import os
@@ -30,40 +29,33 @@ def loaded_library_paths():
     return paths
 
 
-class PPUProfiler:
-    """Use the already-loaded PPU runtime, never introduce a second SDK/CUDART."""
-    def __init__(self):
-        wrappers = [p for p in loaded_library_paths() if p.name == "libhggc_wrapper.so"]
-        if len(wrappers) != 1:
-            raise RuntimeError(f"need one loaded PPU profiler runtime, found {wrappers}")
-        self.path = wrappers[0]
-        self.lib = ctypes.CDLL(str(self.path))
-        for name in ("hggcProfilerStart", "hggcProfilerStop"):
-            fn = getattr(self.lib, name)
-            fn.argtypes, fn.restype = [], ctypes.c_int
-
-    def invoke(self, name):
-        rc = getattr(self.lib, name)()
-        if rc:
-            raise RuntimeError(f"{name} failed: PPU runtime status={rc}")
-
-    def start(self):
-        self.invoke("hggcProfilerStart")
-
-    def stop(self):
-        self.invoke("hggcProfilerStop")
-
-
-def capture_one(call, synchronize, start, stop):
-    """Warmup/checks are deliberately the caller's responsibility, outside here."""
+def capture_one(call, synchronize):
+    """No profiler API, warmup loop or alternate kernel in the subject process."""
     synchronize()
-    start()
-    try:
-        result = call()
-        synchronize()
-        return result
-    finally:
-        stop()
+    result = call()
+    synchronize()
+    return result
+
+
+def checked_cpu_pair(result, want):
+    # bench.checked_pair/error casts to float. Copy first, so those casts and
+    # all comparison kernels execute on CPU, not under ACU on the PPU.
+    result_cpu = tuple(x.detach().cpu() for x in result)
+    return result_cpu, bench.checked_pair(result_cpu, want)
+
+
+def run_phase(call, synchronize, want, phase, warmup):
+    if phase not in ("preflight", "subject"):
+        raise ValueError(f"unknown capture phase: {phase}")
+    first, errors = checked_cpu_pair(capture_one(call, synchronize), want)
+    fingerprint = bench.admission.digest(first)
+    warmups = warmup if phase == "preflight" else 0
+    for _ in range(warmups):
+        warm, _ = checked_cpu_pair(capture_one(call, synchronize), want)
+        if bench.admission.digest(warm) != fingerprint:
+            raise AssertionError("preflight output/state is not bit-stable")
+    return dict(errors=errors, output_sha=fingerprint, warmup=warmups,
+                public_api_calls=1 + warmups)
 
 
 def save_fla_sources(destination):
@@ -99,6 +91,7 @@ def save_fla_sources(destination):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--role", required=True, choices=("ours", "fla"))
+    parser.add_argument("--phase", required=True, choices=("preflight", "subject"))
     parser.add_argument("--extension", type=Path, required=True)
     parser.add_argument("--gate", type=float, choices=(-0.1, -1.0), default=-0.1)
     parser.add_argument("--warmup", type=int, default=5)
@@ -125,34 +118,18 @@ def main():
         fn, identity = bench.load_fla()
         call = bench.fla_call(fn, inputs, "native")
 
-    print(f"[PPU GDN ACU config] role={args.role} g={args.gate} "
+    print(f"[PPU GDN ACU config] role={args.role} phase={args.phase} g={args.gate} "
           f"shape=B1,S2048,Hk16,Hv32,D128 input_sha={input_hash} "
           "initial_state=zero final_state=1 GVA=native forward_only=1", flush=True)
-    first = call()  # import/JIT/autotune outside profiler range
-    torch.cuda.synchronize()
-    errors = bench.checked_pair(first, want)
-    fingerprint = bench.admission.digest(first)
-    del first
-    for _ in range(args.warmup):
-        warm = call()
-    torch.cuda.synchronize()
-    if bench.admission.digest(warm) != fingerprint:
-        raise AssertionError("warmup output/state is not bit-stable")
-    del warm
+    if args.phase == "subject":
+        print(f"[PPU GDN ACU subject-only] role={args.role} public_api_calls=1 "
+              "warmup=0 verification_device_kernels=0 profile_control=external-acu", flush=True)
+    measured = run_phase(call, torch.cuda.synchronize, want, args.phase, args.warmup)
     if bench.admission.digest(inputs) != input_hash:
-        raise AssertionError("preflight modified fixture inputs")
-    print(f"[PPU GDN ACU preflight] role={args.role} output_state_error={errors} "
-          f"output_sha={fingerprint} NUMERIC/PASS replay=RAW-BIT/STABLE", flush=True)
-
-    profiler = PPUProfiler()
-    print(f"[PPU GDN ACU range] begin role={args.role} public_api_calls=1", flush=True)
-    result = capture_one(call, torch.cuda.synchronize, profiler.start, profiler.stop)
-    print(f"[PPU GDN ACU range] end role={args.role} public_api_calls=1", flush=True)
-    post_errors = bench.checked_pair(result, want)
-    if bench.admission.digest(result) != fingerprint:
-        raise AssertionError("profiled output/state differs from unprofiled preflight")
-    if bench.admission.digest(inputs) != input_hash:
-        raise AssertionError("profiled call modified fixture inputs")
+        raise AssertionError(f"{args.phase} modified fixture inputs")
+    print(f"[PPU GDN ACU check] role={args.role} phase={args.phase} "
+          f"output_state_error={measured['errors']} output_sha={measured['output_sha']} "
+          "verification=CPU NUMERIC/PASS", flush=True)
 
     source_manifest = save_fla_sources(args.sources) if args.role == "fla" else []
     # Actual mapped library paths/hashes expose a stale dependency even when the
@@ -160,17 +137,18 @@ def main():
     loaded = {str(path): hashlib.sha256(path.read_bytes()).hexdigest()
               for path in loaded_library_paths()
               if path.name.startswith(("libhggc", "libcuda", "libgdn", "_gdn_chunk"))}
-    receipt = dict(status="PASS", role=args.role, gate=args.gate,
+    receipt = dict(status="PASS", role=args.role, phase=args.phase, gate=args.gate,
                    shape=dict(B=1, S=2048, Hk=16, Hv=32, K=128, V=128),
                    input_sha=input_hash, reference_sha=bench.admission.digest(want),
                    fixture_seed=0x6A09E667, gate_bf16=float(cpu[3].flatten()[0]),
-                   output_sha=fingerprint, errors=errors, post_errors=post_errors,
+                   **measured,
                    max_relative_error_limit=bench.admission.MAX_RELATIVE_ERROR,
-                   public_api_calls=1, warmup=args.warmup,
                    initial_state="zero", output_final_state=True, fla_heads="native",
-                   protocol="ACU-full-public-api-single-forward",
+                   protocol="ACU-direct-subject-process-v2",
                    timing_scope="PROFILED_DIAGNOSTIC_NOT_BENCHMARK",
-                   cache_control="all (profiler flush; not benchmark cache state)",
+                   cache_control="ACU default; not benchmark cache state",
+                   capture_scope="whole subject process, including runtime/library setup if any",
+                   autotune_scope="library-internal autotuning may repeat in the fresh process; not excluded by a range",
                    torch=torch.__version__, torch_cuda=torch.version.cuda,
                    torch_build_config=torch.__config__.show(),
                    python=sys.version, python_executable=sys.executable,
@@ -180,12 +158,10 @@ def main():
                                uuid=str(getattr(props, "uuid", "UNAVAILABLE")),
                                visible=os.environ.get("CUDA_VISIBLE_DEVICES")),
                    extension_sha256=hashlib.sha256(args.extension.read_bytes()).hexdigest(),
-                   loaded_libraries=loaded, fla=identity, fla_sources=source_manifest,
-                   profiler_api=dict(start="hggcProfilerStart", stop="hggcProfilerStop",
-                                     library=str(profiler.path),
-                                     sha256=hashlib.sha256(profiler.path.read_bytes()).hexdigest()))
+                   loaded_libraries=loaded, fla=identity, fla_sources=source_manifest)
     args.receipt.write_text(json.dumps(receipt, indent=2) + "\n")
-    print(f"[PPU GDN ACU] PASS: role={args.role} one API call; receipt={args.receipt}", flush=True)
+    print(f"[PPU GDN ACU] PASS: role={args.role} phase={args.phase} "
+          f"API_calls={measured['public_api_calls']} receipt={args.receipt}", flush=True)
 
 
 if __name__ == "__main__":
