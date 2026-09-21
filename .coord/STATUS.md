@@ -1,9 +1,22 @@
 # PPU original-structure port
 
-updated-at: 2026-09-21 04:48:43 UTC
-working-on: direct WY/FLA ACU handoff ready; awaiting stage counters, original/WY routing unchanged
-blocked-on: new WY per-stage counters require the PPU box; no local PPU execution
-last-commit: a0fe950 (capture-only follow-up; next checkpoint is metadata only)
+updated-at: 2026-09-21 07:23:21 UTC
+working-on: repair ACU selection precedence and retain native-exception library identities; kernels unchanged
+blocked-on: user ACU capture throws map::at after preflight; precise native throw site unknown; no local PPU
+last-commit: 54d83ba (previous capture handoff)
+
+Current capture is USER-REPORTED/FAIL, not NOT_RUN or numerical FAIL. The
+site ACU path was selected before the SDK. Earlier saved site-version proof:
+v2.0.0_20251231/data12006; actual local SDK ACU --version gives
+v2.1.1_20260725/data15000 (host-only version invocation, no profiling).
+Failed-run tool binary/version not yet received: version mismatch remains a
+hypothesis for the exception, not a proved cause. Fix SDK-first precedence,
+keep explicit overrides, print actual tool version/hash, and preserve loaded
+profiler/parser identities even on failure. Never retry/suppress map::at.
+Pre-fix SDK-vs-site negative failed on the old chooser; patched 44 Python
+contracts and 3/3 host tests pass. Planted map::at preserves FAIL evidence,
+throws the same exception once, and cannot pass comparison admission.
+No production source or binary has been changed.
 
 User-reported WY device gate: PASS, 16 cases; all comparison arms 8/8 repeat.
 Weak original/WY/FLA median: 915.720/715.232/480.806 us. Strong:
@@ -20,7 +33,7 @@ Local follow-up PASS: 40 Python contracts (18 ACU + 7 WY + 8 FLA + 7 HGGC),
 3/3 compiled host tests, 45 algebra cases plus five negatives; 305 original
 control expressions unchanged. Fake-tool integration proves reuse never builds
 or selects original; real missing-ACU invocation returns rc=1 + INCOMPLETE tar,
-not PASS. Runtime counter capture remains NOT_RUN (no local PPU).
+not PASS. Local counter execution remains NOT_RUN; user capture FAIL is above.
 Logs: /workspace/gdn-wy-acu-followup-20260921.
 Command: DEVICE=0 bash tools/run_ppu_gdn_fla_acu_box.sh --wy-run
 /workspace/gdn-wy-fla-dd70e5d-20260921T041641Z.

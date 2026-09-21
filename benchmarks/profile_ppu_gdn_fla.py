@@ -45,6 +45,31 @@ def loaded_library_paths():
     return paths
 
 
+def loaded_library_hashes():
+    # Read existing mappings only: no extra library is loaded and no profiler
+    # API is invoked. Include the parser/injection DSOs on failures as well.
+    prefixes = ("libhggc", "libcuda", "libgdn", "_gdn_chunk", "_gdn_wy",
+                "libhg_wrapper", "libasight", "libhgpti", "libperfworks",
+                "libhgBinaryAnalysis", "libhgdisassembler", "libcheckpoint")
+    return {str(path): hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in loaded_library_paths() if path.name.startswith(prefixes)}
+
+
+def run_with_failure_receipt(call, receipt, identity):
+    try:
+        return call()
+    except Exception as error:
+        # Preserve the actual exception. A failed profiler must not disappear
+        # before the loaded SDK/profiler identities can join the diagnostic tar.
+        failure = identity | dict(status="FAIL", error_type=type(error).__name__, error=str(error))
+        try:
+            failure["loaded_libraries"] = loaded_library_hashes()
+            receipt.write_text(json.dumps(failure, indent=2) + "\n")
+        except Exception as diagnostic_error:
+            print(f"[PPU GDN ACU failure receipt] UNAVAILABLE: {diagnostic_error}", file=sys.stderr)
+        raise
+
+
 def capture_one(call, synchronize):
     """No profiler API, warmup loop or alternate kernel in the subject process."""
     synchronize()
@@ -140,7 +165,12 @@ def main():
     if args.phase == "subject":
         print(f"[PPU GDN ACU subject-only] role={args.role} public_api_calls=1 "
               "warmup=0 verification_device_kernels=0 profile_control=external-acu", flush=True)
-    measured = run_phase(call, torch.cuda.synchronize, want, args.phase, args.warmup)
+    measured = run_with_failure_receipt(
+        lambda: run_phase(call, torch.cuda.synchronize, want, args.phase, args.warmup),
+        args.receipt, dict(role=args.role, implementation=args.implementation, phase=args.phase,
+            gate=args.gate, input_sha=input_hash, device=str(props),
+            extension_sha256=hashlib.sha256(args.extension.read_bytes()).hexdigest(),
+            library_sha256=hashlib.sha256(library.read_bytes()).hexdigest()))
     if bench.admission.digest(inputs) != input_hash:
         raise AssertionError(f"{args.phase} modified fixture inputs")
     print(f"[PPU GDN ACU check] role={args.role} phase={args.phase} "
@@ -150,9 +180,7 @@ def main():
     source_manifest = save_fla_sources(args.sources) if args.role == "fla" else []
     # Actual mapped library paths/hashes expose a stale dependency even when the
     # extension filename itself looks current. Do not archive process env vars.
-    loaded = {str(path): hashlib.sha256(path.read_bytes()).hexdigest()
-              for path in loaded_library_paths()
-              if path.name.startswith(("libhggc", "libcuda", "libgdn", "_gdn_chunk", "_gdn_wy"))}
+    loaded = loaded_library_hashes()
     receipt = dict(status="PASS", role=args.role, phase=args.phase, gate=args.gate,
                    implementation=args.implementation,
                    shape=dict(B=1, S=2048, Hk=16, Hv=32, K=128, V=128),

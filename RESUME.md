@@ -1,10 +1,21 @@
 # WY alignment checkpoint
 
-updated-at: 2026-09-21 04:48:43 UTC
+updated-at: 2026-09-21 07:23:21 UTC
 parent: 8837640119835b6c8b7953d2c61e24de9fe35000
-working-on: capture-only follow-up for the admitted dd70e5d WY comparison
-blocked-on: new per-stage ACU counters need PPU execution
-last-commit: a0fe950 (capture-only follow-up)
+working-on: matched-SDK ACU follow-up after native map::at exception
+blocked-on: precise native throw site unknown; no local PPU
+last-commit: 54d83ba (previous capture handoff)
+
+User's direct WY ACU capture failed after successful preflights: map::at,
+no kernels profiled. Old chooser preferred shared-site ACU, historically
+v2.0.0_20251231, over SDK2.1.1's v2.1.1_20260725. Correct SDK-first selection
+and capture loaded profiler/parser hashes on exceptions without swallowing or
+retrying them. These fix a tooling selection/evidence gap, NOT a locally proven
+resolution of the vendor exception. Test the same dd70e5d binaries using
+ACU=/usr/local/PPU_SDK/asight/bin/acu PPU_SDK=/usr/local/PPU_SDK.
+Old failed bundle /workspace/gdn-qsa-acu-20260921T070716Z-252514 stays intact.
+New local tests: 44 Python contracts + 3 compiled host gates PASS; the actual
+native exception remains unreplicated locally, and its exact cause is open.
 
 User has now reported 16/16 device cases PASS and 8/8 repeats. Weak
 original/WY/FLA median 915.720/715.232/480.806 us, strong

@@ -213,10 +213,14 @@ def pack(bundle, status):
 def find_acu(sdk):
     if os.environ.get("ACU"):
         return Path(os.environ["ACU"]).resolve()
-    candidates = [Path("/sim/eec/shared/junfu.qx/asight/bin/acu"), sdk / "asight/bin/acu"]
+    # The site installation can predate the compiler/runtime by a release.
+    # Prefer the profiler shipped with the explicitly selected SDK. Never
+    # retry a failed profiler with another version inside the same experiment.
+    candidates = [sdk / "asight/bin/acu"]
     on_path = shutil.which("acu")
     if on_path:
         candidates.append(Path(on_path))
+    candidates.append(Path("/sim/eec/shared/junfu.qx/asight/bin/acu"))
     return next((p for p in candidates if p.is_file() and os.access(p, os.X_OK)), candidates[0])
 
 
@@ -244,8 +248,12 @@ def collect(args, bundle, env):
             raise RuntimeError(f"FLA_ROOT is not an FLA checkout: {env['FLA_ROOT']}")
         if not args.acu.is_file() or not os.access(args.acu, os.X_OK):
             raise RuntimeError(f"ACU unavailable: {args.acu}; set ACU=/path/to/acu")
-        for name, command in (("acu-version", [args.acu, "--version"]),
-                              ("acu-help", [args.acu, "--help"]),
+        status["acu_identity"] = dict(path=str(args.acu), sha256=sha(args.acu),
+            sdk_bundled=args.acu.resolve() == (args.sdk / "asight/bin/acu").resolve())
+        print(f"[GDN ACU tool] sdk={args.sdk} acu={args.acu} "
+              f"sdk_bundled={int(status['acu_identity']['sdk_bundled'])}", flush=True)
+        status["probes"]["acu-version"] = run([args.acu, "--version"], bundle / "acu-version.txt", env)
+        for name, command in (("acu-help", [args.acu, "--help"]),
                               ("hgcc-version", [args.sdk / "bin/hgcc", "--version"]),
                               ("host", ["uname", "-a"])):
             status["probes"][name] = run(command, bundle / f"{name}.txt", env,

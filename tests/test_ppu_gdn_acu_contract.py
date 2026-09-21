@@ -45,6 +45,27 @@ class ACUContract(unittest.TestCase):
         fla["role"] = "fla"
         return ours, fla
 
+    def test_sdk_acu_outranks_shared_site_and_path(self):
+        directory = self.directory()
+        sdk = directory / "sdk"
+        matched = sdk / "asight/bin/acu"
+        matched.parent.mkdir(parents=True)
+        matched.write_text("synthetic executable identity only\n")
+        matched.chmod(0o755)
+        site = Path("/sim/eec/shared/junfu.qx/asight/bin/acu")
+        with patch.dict(os.environ, {}, clear=True), \
+                patch.object(collect.shutil, "which", return_value=str(directory / "older-acu")), \
+                patch.object(Path, "is_file", return_value=True), \
+                patch.object(collect.os, "access", return_value=True):
+            self.assertEqual(collect.find_acu(sdk), matched)
+            self.assertNotEqual(collect.find_acu(sdk), site)
+
+    def test_explicit_acu_is_not_silently_replaced(self):
+        directory = self.directory()
+        absent = directory / "missing-explicit-acu"
+        with patch.dict(os.environ, {"ACU": str(absent)}, clear=True):
+            self.assertEqual(collect.find_acu(directory / "sdk"), absent.resolve())
+
     def test_direct_subject_calls_once_without_profiler_hooks(self):
         order = []
         def step(name):
@@ -59,6 +80,38 @@ class ACUContract(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "launch failure"):
             profile.capture_one(bad, lambda: order.append("sync"))
         self.assertEqual(order, ["sync"])
+
+    def test_native_exception_keeps_failed_receipt_and_is_not_retried(self):
+        directory = self.directory()
+        receipt = directory / "wy.json"
+        calls = []
+        thrown = IndexError("map::at")
+        def bad():
+            calls.append("forward")
+            raise thrown
+        with patch.object(profile, "loaded_library_hashes", return_value={"/sdk/libparser.so": "hash"}):
+            with self.assertRaises(IndexError) as error:
+                profile.run_with_failure_receipt(bad, receipt, dict(role="wy", phase="subject"))
+        self.assertIs(error.exception, thrown)
+        self.assertEqual(calls, ["forward"])
+        saved = json.loads(receipt.read_text())
+        self.assertEqual(saved["status"], "FAIL")
+        self.assertEqual(saved["error"], "map::at")
+        self.assertEqual(saved["loaded_libraries"], {"/sdk/libparser.so": "hash"})
+        _, fla = self.records()
+        with self.assertRaises(ValueError):
+            collect.validate_pair(saved, fla, "wy")
+
+    def test_profiler_libraries_join_identity_without_loading_anything(self):
+        directory = self.directory()
+        paths = {directory / name for name in ("libhgBinaryAnalysis.so.13", "libhggc_injection.so",
+                 "libperfworks.so", "_gdn_wy_ppu.so", "unrelated.so")}
+        for path in paths:
+            path.write_bytes(b"synthetic DSO")
+        with patch.object(profile, "loaded_library_paths", return_value=paths):
+            actual = profile.loaded_library_hashes()
+        self.assertEqual(len(actual), 4)
+        self.assertNotIn(str(directory / "unrelated.so"), actual)
 
     def test_wy_is_not_an_alias_for_original(self):
         import gdn_qsa_sm80

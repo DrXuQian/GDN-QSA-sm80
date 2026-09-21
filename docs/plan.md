@@ -72,3 +72,9 @@ reuse the box's comparison binding + device library (no rebuild), same-input
 FLA, tar all reports and preceding API samples. Identify preparation/state/
 output costs before the next single-change candidate. Profiled replay times
 are not subtracted from older API spans to invent a host-gap measurement.
+
+Capture follow-up: first user WY capture throws native `map::at` only under
+ACU, after independent preflight. Correct the old site-before-SDK tool
+selection first, using the same binaries; retain exception/library evidence.
+No performance candidate is selected from this failed capture. Exact native
+throw site and matched-SDK capture remain pending; see PPU_GDN_ACU.md.

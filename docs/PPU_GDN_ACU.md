@@ -31,6 +31,42 @@ origin of the reused kernel binary; the old SHA/diff remains its provenance.
 Upload the single tar printed after `UPLOAD=`. No CSV copy-paste or screenshot
 is needed. `--gate -1.0` explicitly selects the separate strong-decay control.
 
+### Profiler exception reported on 2026-09-21
+
+The user capture at `/workspace/gdn-qsa-acu-20260921T070716Z-252514` failed in
+WY's first profiled call with `IndexError: map::at` and no profiled kernels.
+The collector reaches this point only after both independent preflights pass.
+This is a capture failure, not a new output/state mismatch. Its Python stack
+does **not** identify the C++ map that threw. In particular, it does not prove
+bad tensor indexing, a failed shared-memory attribute call or bad replay.
+
+The old discovery order preferred the shared site's ACU over the chosen SDK.
+An earlier saved capture of that same site path reports ACU
+`v2.0.0_20251231-4f7cd70` / data 12006, while HGGC is 2.1.1. The local SDK's
+own ACU reports `v2.1.1_20260725-15d8b9d` / data 15000. The failed run's tool
+version has not yet been supplied, so the old path alone is **not proof** of
+which binary version it used or of the exception's root cause.
+
+Discovery now prefers the selected SDK's ACU; explicit `ACU` remains an
+override. To test only this tool change, keep both kernel binaries and inputs
+and use:
+
+```bash
+PPU_SDK=/usr/local/PPU_SDK ACU=/usr/local/PPU_SDK/asight/bin/acu DEVICE=0 \
+  bash tools/run_ppu_gdn_fla_acu_box.sh \
+  --wy-run /workspace/gdn-wy-fla-dd70e5d-20260921T041641Z
+```
+
+The selected path/version is printed before capture; failure to run that tool
+is a failure, never an automatic retry with an older profiler. Native failures
+now retain a FAIL receipt with actual runtime, profiler and binary-analysis
+library paths/hashes, then rethrow the original exception without retrying the
+call. The bundle stays INCOMPLETE. No extra warmup, rebuilt kernel, tolerance
+change or exception suppression is used. If the matched-tool capture still
+throws, those identities and a native throw backtrace are the next diagnostic;
+this selection repair is **not** claimed to have reproduced or fixed the
+vendor exception locally. There is no local PPU execution.
+
 ### The next decision is per phase, not a new winner claim
 
 At B1/S2048/Hk16/Hv32/K128/V128, the WY source and local compilation predict:
@@ -75,8 +111,9 @@ DEVICE=0 JOBS=16 bash tools/run_ppu_gdn_fla_acu_box.sh
 
 Use the same physical `DEVICE` as the preceding latency comparison. The
 default SDK is `/usr/local/PPU_SDK`; override `PPU_SDK` only if needed. ACU is
-found at the site's `/sim/eec/shared/junfu.qx/asight/bin/acu`, then the SDK,
-then PATH; `ACU=/absolute/path/to/acu` overrides discovery. Installed FLA is
+found first at `$PPU_SDK/asight/bin/acu`, then PATH, then the site's
+`/sim/eec/shared/junfu.qx/asight/bin/acu`;
+`ACU=/absolute/path/to/acu` overrides discovery. Installed FLA is
 used by default; optional `FLA_ROOT` selects an existing checkout. No clone,
 pip install, SSH, clock setting, or mandatory identity form is involved.
 
