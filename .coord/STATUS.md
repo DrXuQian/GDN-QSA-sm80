@@ -1,9 +1,9 @@
 # PPU original-structure port
 
 updated-at: 2026-09-21 00:59:02 UTC
-working-on: direct ACU replacement verified locally; committing handoff
+working-on: direct ACU replacement complete; awaiting user's report tar
 blocked-on: no local PPU; direct capture will run on user's box
-last-commit: 33c31cc (prior capture handoff; user reports profiler failure)
+last-commit: c5bc38b (direct ACU subject process; profiler API hooks removed)
 
 User-reported same-input full-API timing: g=-0.1 ours 925.020 us vs FLA
 726.992 us (FLA-WINS); g=-1 ours 457.340 us vs FLA 746.904 us
