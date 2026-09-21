@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-21 13:34:51 UTC
-working-on: three-stage compute-tile candidate locally admitted; prepare commit and box handoff
+updated-at: 2026-09-21 13:36:17 UTC
+working-on: three-stage compute-tile candidate committed; final box handoff
 blocked-on: device raw-bit/race and speed verdict NOT_RUN; no local PPU
-last-commit: d335b13 (checkpoint parent; implementation commit follows)
+last-commit: a712a7d (implementation; this follow-up updates status metadata only)
 
 FINAL post-edit gate PASS: /workspace/gdn-wy-tiles-evidence-20260921/sealed-local-r2.log.
 5/5 CTests, 48 Python contracts, 45 algebra cases + five negatives, original
