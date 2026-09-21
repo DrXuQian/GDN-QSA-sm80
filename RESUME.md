@@ -1,10 +1,10 @@
 # WY alignment checkpoint
 
-updated-at: 2026-09-21 07:23:21 UTC
+updated-at: 2026-09-21 07:24:03 UTC
 parent: 8837640119835b6c8b7953d2c61e24de9fe35000
 working-on: matched-SDK ACU follow-up after native map::at exception
 blocked-on: precise native throw site unknown; no local PPU
-last-commit: 54d83ba (previous capture handoff)
+last-commit: fe0c7be (SDK-first ACU and failure evidence)
 
 User's direct WY ACU capture failed after successful preflights: map::at,
 no kernels profiled. Old chooser preferred shared-site ACU, historically

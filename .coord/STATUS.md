@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-21 07:23:21 UTC
-working-on: repair ACU selection precedence and retain native-exception library identities; kernels unchanged
+updated-at: 2026-09-21 07:24:03 UTC
+working-on: matched-SDK ACU handoff ready; kernel bytes unchanged; waiting for capture evidence
 blocked-on: user ACU capture throws map::at after preflight; precise native throw site unknown; no local PPU
-last-commit: 54d83ba (previous capture handoff)
+last-commit: fe0c7be (SDK-first ACU and failure evidence; following commit is metadata only)
 
 Current capture is USER-REPORTED/FAIL, not NOT_RUN or numerical FAIL. The
 site ACU path was selected before the SDK. Earlier saved site-version proof:
