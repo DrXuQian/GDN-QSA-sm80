@@ -1,0 +1,2 @@
+candidate,shape,decay,protocol,correctness,latency_us,evidence_status
+wy64-v32-r1,B1_S2048_Hk16_Hv32_D128,-0.1,full-public-api-event-span,NOT_RUN,,DEVICE_PENDING

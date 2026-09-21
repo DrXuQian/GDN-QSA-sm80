@@ -1,9 +1,15 @@
 # PPU original-structure port
 
-updated-at: 2026-09-21 01:12:46 UTC
-working-on: HGGC spelling fix complete; awaiting user's direct-ACU rerun
-blocked-on: no local legacy HGGC/PPU; user's exact SDK build awaits rerun
-last-commit: b35b8be (compile-selected PPU1.0 architecture spelling)
+updated-at: 2026-09-21 03:26:22 UTC
+working-on: FLA-aligned explicit WY candidate in /workspace/gdn-wy-align-20260921; docs/plan.md
+blocked-on: no local PPU execution; local SDK compile/link available
+last-commit: 8837640 (original backend preserved as control)
+
+Current plan: C64 parallel W/U preparation, V32 FP32 register-state recurrence,
+chunk-parallel output. Keep original reset/replay/scan and auto routing intact.
+This is an algorithm-structure candidate, not merely a backend replacement.
+CPU/layout/codegen admission precedes device three-arm comparison. No new
+performance claim; FLA proximity target is <=1.10x on the priority weak shape.
 
 User's current build failure is before kernel compilation: inherited actlize
 maps logical ppu0010 to -arch=ppu_10, but box HGGC lists ppu001/ppu0015/all.
