@@ -308,6 +308,14 @@ class ACUContract(unittest.TestCase):
             collect.validate_comparison(comparison, tiled, fla)
         comparison["cases"][0]["arms"]["wy-tiled-all"] = dict(fingerprint="output", state_dtype="torch.float32")
         collect.validate_comparison(comparison, tiled, fla)
+        # Same numerical answer is not evidence that mask48 was measured:
+        # neither all-tiled nor state-only is the new mixed-stage combination.
+        pair = ours | dict(wy_delivery="tiled-state-output")
+        comparison["cases"][0]["arms"]["wy-tiled-state"] = dict(fingerprint="output", state_dtype="torch.float32")
+        with self.assertRaisesRegex(ValueError, "output differs"):
+            collect.validate_comparison(comparison, pair, fla)
+        comparison["cases"][0]["arms"]["wy-tiled-state-output"] = dict(fingerprint="output", state_dtype="torch.float32")
+        collect.validate_comparison(comparison, pair, fla)
         for role, key, value in (("wy", "input_sha", "other"), ("wy", "output_sha", "other"),
                                   ("fla", "fla", dict(entry_sha256="changed")),
                                   ("wy", "state_dtype", "torch.bfloat16"),

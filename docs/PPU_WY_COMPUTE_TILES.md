@@ -38,6 +38,42 @@ The same unsigned delivery ABI is retained: low bits 1/2/4 select legacy
 packing; high bits 8/16/32 select tiling. Both implementations of one stage
 are rejected, not silently prioritized. Scalar/default remains zero.
 
+## Next combination: scalar prepare + tiled state/output
+
+`delivery="tiled-state-output"` selects **mask48 = 16 | 32**. Prepare stays
+scalar (neither bit1 nor bit8 set). These are existing device kernels and
+the existing C ABI; this follow-up changes only the Python named
+experiment, timing inventory and contracts. No C++/CUDA, numerical threshold,
+default or original strong/reset routing change.
+
+Motivation is the user-reported df90c61 strong-decay run: scalar WY 705.644 us,
+tiled-state 453.986 us, tiled-all 443.362 us, FLA 485.896 us, original 424.072 us.
+Prepare alone loses at 765.836 us. The isolated deltas would predict all at
+497.886 us, not its observed 443.362 us: **do not subtract prepare's isolated
+penalty from all to predict this combination's time**. Weak results and the
+raw bundle from that run have not yet been supplied/verified locally.
+
+The new arm prints direct envelope comparisons against scalar WY, FLA,
+tiled-state, tiled-all and original. If the pair wins against all, keep scalar
+prepare for this measured candidate; if it loses, retain all; if envelopes
+overlap, report UNRESOLVED. Apply this separately at each gate. In every case
+preserve the original strong winner and precision scope (original final state
+BF16, WY/FLA FP32). No automatic selection follows from this experiment.
+
+Local negative controls reject a wrongly forwarded mask56, omission of the
+new role, reuse of the old unbalanced 14-sample cycle and an ACU capture bound
+to tiled-all's numerical fingerprint instead of the exact new role. The same
+16 device cases now check scalar plus five candidates; raw output/state
+equality and eight repeats remain required before timing.
+
+Follow-up local checks: 53 Python contracts and 45 algebra cases/five negatives
+PASS, including a CPU-mocked complete comparison with the real admission and
+sample loops. Unchanged five compiled host gates and the prior real-SDK
+nine-image binary/seven-negative gate rechecked read-only. Device sources,
+host geometry sources and actlize gitlink match a712a7d; no new build or
+hardware execution is claimed. Evidence:
+`/workspace/gdn-wy-state-output-evidence-20260922`.
+
 ## Local admission and its limits
 
 Real SDK 2.1.1 compiles and links the original 15 device images and WY's six
@@ -88,17 +124,24 @@ Local artifacts: `/workspace/gdn-wy-tiles-evidence-20260921`.
 
 ```bash
 git pull --ff-only
-PPU_SDK=/usr/local/PPU_SDK DEVICE=0 JOBS=16 TILE_AB=1 DELIVERY_AB=0 \
+PPU_SDK=/usr/local/PPU_SDK DEVICE=0 JOBS=16 TILE_AB=1 DELIVERY_AB=0 SAMPLES=16 \
   bash tools/run_ppu_wy_fla_box.sh
 ```
 
-Seven sequential roles: original, scalar WY, tiled prepare-only, state-only,
-output-only, all-tiled, FLA. Gates -0.1 and -1.0; five warmups, 14 balanced
+Eight sequential roles: original, scalar WY, tiled prepare-only, state-only,
+output-only, state+output, all-tiled, FLA. Gates -0.1 and -1.0; five warmups, 16 balanced
 samples x 10 calls per arm. No concurrent timed kernels; full API includes
 allocation/submission, not just one stage. The script records all samples,
 identities and correctness before reporting disjoint-envelope verdicts.
 Overlaps remain UNRESOLVED; terminal PASS does not mean a performance win.
 The <=1.10x FLA target is unchanged. No auto-selection or routing promotion.
+Without `SAMPLES`, the benchmark derives a complete two-pass order cycle
+from the role inventory (16 for this family). An explicit 14 is now an error;
+legacy `DELIVERY_AB` still defaults to 14 and three-role mode to 12.
+Both gates and all samples are saved to `comparison.json`. The new result
+key is `cases[].arms.wy-tiled-state-output`, with `delivery_mask=48` and
+five `versus` entries. Its named selection is recorded, not inferred from
+the equal numerical fingerprint; hardware execution remains a box check.
 
 Optional subsequent ACU capture **reuses** the completed run and explicitly
 selects the new family:
@@ -107,9 +150,11 @@ selects the new family:
 PPU_SDK=/usr/local/PPU_SDK DEVICE=0 \
   bash tools/run_ppu_gdn_fla_acu_box.sh \
   --wy-run /workspace/<completed-comparison-run> \
-  --wy-delivery tiled-all --gate -0.1
+  --wy-delivery tiled-state-output --gate -0.1
 ```
 
-The collector binds to `wy-tiled-all` in that run, never to old `wy-all` just
-because output fingerprints happen to match. Keep ACU times separate from
+The collector binds to `wy-tiled-state-output` in that run, never to
+`wy-tiled-all`, `wy-tiled-state` or old `wy-all` just because output
+fingerprints happen to match. `--wy-delivery tiled-all` remains available.
+Keep ACU times separate from
 the full-API benchmark. Check all three stage instruction/traffic costs.

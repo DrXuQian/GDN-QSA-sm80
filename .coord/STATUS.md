@@ -1,9 +1,28 @@
 # PPU original-structure port
 
-updated-at: 2026-09-21 15:00:25 UTC
-working-on: record user-reported strong-decay compute-tile result; preserve routing
-blocked-on: weak-decay section and current raw comparison bundle NOT PROVIDED; state+output-only combination NOT MEASURED
-last-commit: df90c61 (status handoff; implementation a712a7d)
+updated-at: 2026-09-21 22:43:48 UTC
+working-on: mask48 experiment locally admitted; commit and box handoff
+blocked-on: device timings pending; no local PPU; prior weak/raw comparison not supplied
+last-commit: dc3d842 (user-reported result checkpoint; device implementation a712a7d)
+
+Active worktree /workspace/gdn-wy-state-output-20260922, evidence and
+registered plan /workspace/gdn-wy-state-output-evidence-20260922.
+No C++/CUDA kernel, actlize, default or original routing edits. Mask48 uses
+existing scalar prepare + tiled state/output. TILE_AB now has eight roles;
+default 16 samples derives from inventory, old explicit14 rejected. The
+pair compares directly to scalar, FLA, state-only, all-tiled and original.
+Final 53 Python contracts (15 WY / 8 FLA / 23 ACU / 7 hgcc), 45 algebra
+cases + five negatives PASS. Full CPU-mocked comparison visits all eight
+roles, preserves raw-bit rejection even within 2%, and prints direct pair
+comparisons. Wrong mask/omitted role/old14/cross-variant captures fail.
+Unchanged five compiled host gates, 305 original controls and nine-image
+SDK binary gate/seven negatives rechecked read-only. C++/CUDA/geometry/
+actlize sources identical to a712a7d; no new device build or execution claimed.
+Box: TILE_AB=1 DELIVERY_AB=0 SAMPLES=16 tools/run_ppu_wy_fla_box.sh.
+Both gates -0.1/-1.0, same shape and raw-bit admission, sequential full-call
+timing; new candidate wy-tiled-state-output. No new speed claim/promotion.
+
+## Preceding user-reported strong result
 
 User-reported run /workspace/gdn-wy-fla-df90c61-20260921T143917Z,
 g=-1.0: scalar WY 705.644 us, tiled-all 443.362 us, FLA 485.896 us.

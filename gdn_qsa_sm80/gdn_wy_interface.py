@@ -17,9 +17,11 @@ def _backend():
 
 
 PACKED_DELIVERIES = ("prepare", "state", "output", "all")
-TILED_DELIVERIES = ("tiled-prepare", "tiled-state", "tiled-output", "tiled-all")
+TILED_DELIVERIES = ("tiled-prepare", "tiled-state", "tiled-output",
+                    "tiled-state-output", "tiled-all")
 DELIVERIES = {"scalar": 0, "prepare": 1, "state": 2, "output": 4, "all": 7,
-              "tiled-prepare": 8, "tiled-state": 16, "tiled-output": 32, "tiled-all": 56}
+              "tiled-prepare": 8, "tiled-state": 16, "tiled-output": 32,
+              "tiled-state-output": 48, "tiled-all": 56}
 
 
 def gdn_chunk_wy(q, k, v, g, beta, initial_state=None, output_final_state=True, *, delivery="scalar"):

@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from bench_ppu_gdn_fla import admission, checked_pair, fla_call, load_fla, verdict
 from gdn_qsa_sm80 import gdn_chunk_wy
-from gdn_qsa_sm80.gdn_wy_interface import PACKED_DELIVERIES, TILED_DELIVERIES
+from gdn_qsa_sm80.gdn_wy_interface import DELIVERIES, PACKED_DELIVERIES, TILED_DELIVERIES
 
 
 DELIVERY_ROLES = ("original", "wy", "wy-prepare", "wy-state", "wy-output", "wy-all", "fla")
@@ -26,6 +26,17 @@ def experiment(delivery_ab=False, tile_ab=False):
         raise ValueError("choose one balanced candidate family")
     names = TILED_DELIVERIES if tile_ab else PACKED_DELIVERIES if delivery_ab else ()
     return names, ("original", "wy", *(f"wy-{name}" for name in names), "fla")
+
+
+def resolve_samples(requested, roles):
+    """A changed role inventory must not inherit a partial timing-order cycle."""
+    candidates = roles != ("original", "wy", "fla")
+    cycle = 2 * len(roles)
+    samples = requested if requested is not None else cycle if candidates else 12
+    if candidates and (samples < cycle or samples % cycle):
+        raise ValueError(f"{len(roles)}-role A/B needs a multiple of {cycle} samples "
+                         "for complete balanced orders")
+    return samples
 
 
 def order(sample, roles=("original", "wy", "fla")):
@@ -40,6 +51,21 @@ def order(sample, roles=("original", "wy", "fla")):
             (roles[0], roles[2], roles[1]), (roles[2], roles[0], roles[1]),
             (roles[1], roles[0], roles[2]))
     return rows[sample % len(rows)]
+
+
+def delivery_comparisons(arms, delivery):
+    """Compare the new pair directly, without subtracting isolated stage costs."""
+    controls = ("wy", "fla")
+    if delivery == "tiled-state-output":
+        controls += ("wy-tiled-state", "wy-tiled-all", "original")
+    candidate = arms[f"wy-{delivery}"]["samples_us"]
+    result = {}
+    for control in controls:
+        baseline = arms[control]["samples_us"]
+        label = verdict(candidate, baseline).replace("OURS", "CANDIDATE").replace("FLA", "CONTROL")
+        result[control] = dict(verdict=label,
+                               descriptive_speedup=statistics.median(baseline) / statistics.median(candidate))
+    return result
 
 
 def comparison_summary(arms):
@@ -78,10 +104,14 @@ def compare(fn, gate, args, device):
                 raise AssertionError(f"{role} replay changed")
         record["arms"][role] = dict(errors=errors, fingerprint=fingerprint,
                                    state_dtype=str(first[1].dtype), samples_us=[])
+        if role == "wy" or role.startswith("wy-"):
+            delivery = "scalar" if role == "wy" else role.removeprefix("wy-")
+            record["arms"][role]["delivery_mask"] = DELIVERIES[delivery]
         del first
         for _ in range(args.warmup):
             call()
         print(f"[WY compare admission] g={gate} role={role} errors={errors} "
+              f"delivery_mask={record['arms'][role].get('delivery_mask', 'NA')} "
               "repeat=8/8 NUMERIC/PASS", flush=True)
     for sample in range(args.samples):
         for role in order(sample, roles):
@@ -118,13 +148,9 @@ def compare(fn, gate, args, device):
         for delivery in names:
             role = f"wy-{delivery}"
             candidate = record["arms"][role]
-            candidate["versus"] = {}
-            for control in ("wy", "fla"):
-                baseline = record["arms"][control]
-                label = verdict(candidate["samples_us"], baseline["samples_us"])
-                label = label.replace("OURS", "CANDIDATE").replace("FLA", "CONTROL")
-                speedup = baseline["median_us"] / candidate["median_us"]
-                candidate["versus"][control] = dict(verdict=label, descriptive_speedup=speedup)
+            candidate["versus"] = delivery_comparisons(record["arms"], delivery)
+            for control, comparison in candidate["versus"].items():
+                label, speedup = comparison["verdict"], comparison["descriptive_speedup"]
                 print(f"[WY delivery verdict] g={gate} candidate={role} control={control} "
                       f"speedup={speedup:.4f}x verdict={label} rule=disjoint-observed-envelopes "
                       "raw-bit-vs-scalar=PASS routing=UNCHANGED", flush=True)
@@ -137,17 +163,22 @@ def main():
     p.add_argument("--wy-extension", required=True, type=Path)
     p.add_argument("--results", required=True, type=Path)
     p.add_argument("--device", type=int, default=0)
-    p.add_argument("--samples", type=int, default=12)
+    p.add_argument("--samples", type=int,
+                   help="default: 12 without candidates, otherwise twice the role count")
     p.add_argument("--launches", type=int, default=10)
     p.add_argument("--warmup", type=int, default=5)
     family = p.add_mutually_exclusive_group()
     family.add_argument("--delivery-ab", action="store_true", help="paired legacy packed-delivery controls")
-    family.add_argument("--tile-ab", action="store_true", help="paired compute-tile prepare/state/output/all controls")
+    family.add_argument("--tile-ab", action="store_true",
+                        help="paired compute-tile prepare/state/output/state+output/all controls")
     args = p.parse_args()
+    _, roles = experiment(args.delivery_ab, args.tile_ab)
+    try:
+        args.samples = resolve_samples(args.samples, roles)
+    except ValueError as exc:
+        p.error(str(exc))
     if args.samples < 3 or args.launches < 1 or args.samples * args.launches < 50 or args.warmup < 5:
         p.error("need >=5 warmups, >=3 samples and >=50 timed launches per arm")
-    if (args.delivery_ab or args.tile_ab) and (args.samples < 14 or args.samples % 14):
-        p.error("delivery A/B needs a multiple of 14 samples for complete balanced orders")
     for key, path in (("GDN_QSA_PPU_EXTENSION", args.extension), ("GDN_QSA_WY_EXTENSION", args.wy_extension)):
         if not path.is_file():
             p.error(f"missing {key}: {path}")
@@ -164,7 +195,7 @@ def main():
                   torch=torch.__version__, fla=identity, samples=args.samples, launches=args.launches,
                   warmup=args.warmup, limit=admission.MAX_RELATIVE_ERROR,
                   delivery_ab=args.delivery_ab or args.tile_ab, tile_ab=args.tile_ab,
-                  roles=experiment(args.delivery_ab, args.tile_ab)[1],
+                  roles=roles, order_cycle_samples=2 * len(roles),
                   binary_sha256={str(x): hashlib.sha256(x.read_bytes()).hexdigest()
                                  for x in (args.extension, args.wy_extension)}, cases=[])
     for gate in (-.1, -1.):

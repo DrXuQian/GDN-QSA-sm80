@@ -30,20 +30,21 @@ export CUDA_VISIBLE_DEVICES="${DEVICE:-0}"
 export LD_LIBRARY_PATH="$PPU_SDK_ROOT/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export PYTHONPATH="$ROOT${FLA_ROOT:+:$FLA_ROOT}${PYTHONPATH:+:$PYTHONPATH}"
 variant_flags=()
-default_samples=12
+sample_flags=()
+if [[ -n "${SAMPLES+x}" ]]; then
+  sample_flags+=(--samples "$SAMPLES")
+fi
 if [[ "${DELIVERY_AB:-0}" == 1 ]]; then
   variant_flags+=(--delivery-ab)
-  default_samples=14
 fi
 if [[ "${TILE_AB:-0}" == 1 ]]; then
   variant_flags+=(--tile-ab)
-  default_samples=14
 fi
 python "$ROOT/tests/test_ppu_gdn_backend.py" --extension "${old[0]}" --device 0 2>&1 | tee "$OUT/original-correctness.log"
 python "$ROOT/tests/test_ppu_wy_backend.py" --wy-extension "${new[0]}" --device 0 "${variant_flags[@]}" 2>&1 | tee "$OUT/wy-correctness.log"
 if [[ "${PERF:-1}" == 1 ]]; then
   python "$ROOT/benchmarks/bench_ppu_wy_fla.py" --extension "${old[0]}" --wy-extension "${new[0]}" \
-    --device 0 --samples "${SAMPLES:-$default_samples}" --launches "${LAUNCHES:-10}" --warmup "${WARMUP:-5}" "${variant_flags[@]}" \
+    --device 0 "${sample_flags[@]}" --launches "${LAUNCHES:-10}" --warmup "${WARMUP:-5}" "${variant_flags[@]}" \
     --results "$OUT/comparison.json" 2>&1 | tee "$OUT/comparison.log"
 fi
 echo "[WY box] PASS: artifacts=$OUT auto-routing=UNCHANGED"
