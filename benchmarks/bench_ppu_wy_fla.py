@@ -16,8 +16,17 @@ from bench_ppu_gdn_fla import admission, checked_pair, fla_call, load_fla, verdi
 from gdn_qsa_sm80 import gdn_chunk_wy
 
 
-def order(sample):
-    roles = ("original", "wy", "fla")
+DELIVERY_ROLES = ("original", "wy", "wy-prepare", "wy-state", "wy-output", "wy-all", "fla")
+
+
+def order(sample, roles=("original", "wy", "fla")):
+    if roles != ("original", "wy", "fla"):
+        # A complete 2*N cycle puts each role twice in every timing position;
+        # reverse the traversal on the second half without concurrent launches.
+        n = len(roles)
+        shift = sample % n
+        row = roles[shift:] + roles[:shift]
+        return row if (sample // n) % 2 == 0 else row[::-1]
     rows = (roles, roles[::-1], (roles[1], roles[2], roles[0]),
             (roles[0], roles[2], roles[1]), (roles[2], roles[0], roles[1]),
             (roles[1], roles[0], roles[2]))
@@ -43,12 +52,19 @@ def compare(fn, gate, args, device):
     want = admission.reference(cpu)
     calls = dict(original=lambda: admission.gdn_chunk(*inputs),
                  wy=lambda: gdn_chunk_wy(*inputs), fla=fla_call(fn, inputs, "native"))
+    if args.delivery_ab:
+        for delivery in ("prepare", "state", "output", "all"):
+            calls[f"wy-{delivery}"] = lambda delivery=delivery: gdn_chunk_wy(*inputs, delivery=delivery)
+    roles = DELIVERY_ROLES if args.delivery_ab else ("original", "wy", "fla")
     record = dict(g=gate, shape="B1/S2048/Hk16/Hv32/D128", input_sha=admission.digest(cpu), arms={})
-    for role, call in calls.items():
+    for role in roles:
+        call = calls[role]
         first = call()
         torch.cuda.synchronize()
         errors = checked_pair(first, want)
         fingerprint = admission.digest(first)
+        if role.startswith("wy-") and fingerprint != record["arms"]["wy"]["fingerprint"]:
+            raise AssertionError(f"{role} output/state bits differ from scalar WY")
         for _ in range(7):
             if admission.digest(call()) != fingerprint:
                 raise AssertionError(f"{role} replay changed")
@@ -60,7 +76,7 @@ def compare(fn, gate, args, device):
         print(f"[WY compare admission] g={gate} role={role} errors={errors} "
               "repeat=8/8 NUMERIC/PASS", flush=True)
     for sample in range(args.samples):
-        for role in order(sample):
+        for role in order(sample, roles):
             torch.cuda.synchronize()
             start, end = [torch.cuda.Event(enable_timing=True) for _ in range(2)]
             start.record()
@@ -90,6 +106,20 @@ def compare(fn, gate, args, device):
     print(f"[WY ratios] g={gate} WY/FLA={record['wy_over_fla']:.4f} "
           f"original/WY={record['speedup_over_original']:.4f} scope={record['ratio_scope']} "
           f"WY_vs_FLA={record['wy_vs_fla']} routing=UNCHANGED")
+    if args.delivery_ab:
+        for delivery in ("prepare", "state", "output", "all"):
+            role = f"wy-{delivery}"
+            candidate = record["arms"][role]
+            candidate["versus"] = {}
+            for control in ("wy", "fla"):
+                baseline = record["arms"][control]
+                label = verdict(candidate["samples_us"], baseline["samples_us"])
+                label = label.replace("OURS", "CANDIDATE").replace("FLA", "CONTROL")
+                speedup = baseline["median_us"] / candidate["median_us"]
+                candidate["versus"][control] = dict(verdict=label, descriptive_speedup=speedup)
+                print(f"[WY delivery verdict] g={gate} candidate={role} control={control} "
+                      f"speedup={speedup:.4f}x verdict={label} rule=disjoint-observed-envelopes "
+                      "raw-bit-vs-scalar=PASS routing=UNCHANGED", flush=True)
     return record
 
 
@@ -102,9 +132,12 @@ def main():
     p.add_argument("--samples", type=int, default=12)
     p.add_argument("--launches", type=int, default=10)
     p.add_argument("--warmup", type=int, default=5)
+    p.add_argument("--delivery-ab", action="store_true", help="paired scalar/prepare/state/output/all controls")
     args = p.parse_args()
     if args.samples < 3 or args.launches < 1 or args.samples * args.launches < 50 or args.warmup < 5:
         p.error("need >=5 warmups, >=3 samples and >=50 timed launches per arm")
+    if args.delivery_ab and (args.samples < 14 or args.samples % 14):
+        p.error("delivery A/B needs a multiple of 14 samples for complete balanced orders")
     for key, path in (("GDN_QSA_PPU_EXTENSION", args.extension), ("GDN_QSA_WY_EXTENSION", args.wy_extension)):
         if not path.is_file():
             p.error(f"missing {key}: {path}")
@@ -120,6 +153,7 @@ def main():
                   qk_norm=False, scale="1/sqrt(128)", dtype="bf16", device=str(props),
                   torch=torch.__version__, fla=identity, samples=args.samples, launches=args.launches,
                   warmup=args.warmup, limit=admission.MAX_RELATIVE_ERROR,
+                  delivery_ab=args.delivery_ab, roles=DELIVERY_ROLES if args.delivery_ab else ("original", "wy", "fla"),
                   binary_sha256={str(x): hashlib.sha256(x.read_bytes()).hexdigest()
                                  for x in (args.extension, args.wy_extension)}, cases=[])
     for gate in (-.1, -1.):

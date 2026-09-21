@@ -73,21 +73,22 @@ def report_file(base):
     return candidates[0]
 
 
-def child_command(extension, role, gate, bundle, phase, implementation="original"):
+def child_command(extension, role, gate, bundle, phase, implementation="original", delivery="scalar"):
     receipt = f"{role}-preflight.json" if phase == "preflight" else f"{role}.json"
     return [sys.executable, "-u", str(ROOT / "benchmarks/profile_ppu_gdn_fla.py"),
             "--extension", str(extension), "--role", role, "--phase", phase, "--gate", str(gate),
             "--implementation", implementation,
+            "--wy-delivery", delivery,
             "--receipt", str(bundle / receipt),
             "--sources", str(bundle / "sources/reference")]
 
 
-def acu_command(acu, report, extension, role, gate, bundle, implementation="original"):
+def acu_command(acu, report, extension, role, gate, bundle, implementation="original", delivery="scalar"):
     # Same direct CLI pattern as quactlize/tools/run_dense_marlin_m8_acu_box.sh:
     # preflight is a separate process; ACU owns profiling from process start.
     return [str(acu), "-f", "-o", str(report), "--set", "full",
             "--check-exit-code", "yes",
-            *child_command(extension, role, gate, bundle, "subject", implementation)]
+            *child_command(extension, role, gate, bundle, "subject", implementation, delivery)]
 
 
 def read_wy_run(directory):
@@ -144,7 +145,11 @@ def validate_comparison(comparison, subject, fla):
     # limitation: matching properties do NOT establish cross-run physical identity.
     if comparison.get("device") != subject["device"].get("properties"):
         raise ValueError("capture device properties differ from the comparison")
-    for role, record in (("wy", subject), ("fla", fla)):
+    delivery = subject.get("wy_delivery", "scalar")
+    role_name = "wy" if delivery == "scalar" else f"wy-{delivery}"
+    if delivery != "scalar" and not comparison.get("delivery_ab"):
+        raise ValueError("selected delivery was not admitted in the preceding comparison")
+    for role, record in ((role_name, subject), ("fla", fla)):
         arm = cases[0].get("arms", {}).get(role, {})
         if arm.get("fingerprint") != record["output_sha"]:
             raise ValueError(f"{role}: output differs from the compared binary/input")
@@ -153,6 +158,8 @@ def validate_comparison(comparison, subject, fla):
 
 
 def validate_preflight(preflight, subject):
+    if preflight.get("wy_delivery", "scalar") != subject.get("wy_delivery", "scalar"):
+        raise ValueError("subject differs from independent preflight: wy_delivery")
     if (preflight.get("status") != "PASS" or preflight.get("phase") != "preflight"
             or preflight.get("warmup", 0) < 1
             or preflight.get("public_api_calls") != preflight["warmup"] + 1):
@@ -167,6 +174,8 @@ def validate_preflight(preflight, subject):
 
 
 def validate_pair(ours, fla, implementation="original"):
+    if ours.get("wy_delivery", "scalar") != fla.get("wy_delivery", "scalar"):
+        raise ValueError("capture pair delivery labels differ")
     if implementation not in ("original", "wy"):
         raise ValueError(f"unknown implementation: {implementation}")
     for record, role in ((ours, "wy" if implementation == "wy" else "ours"), (fla, "fla")):
@@ -226,8 +235,9 @@ def find_acu(sdk):
 
 def collect(args, bundle, env):
     implementation = "wy" if args.wy_run else "original"
+    delivery = getattr(args, "wy_delivery", "scalar")
     roles = ("wy" if implementation == "wy" else "ours", "fla")
-    status = dict(status="INCOMPLETE", errors=[], probes={}, implementation=implementation)
+    status = dict(status="INCOMPLETE", errors=[], probes={}, implementation=implementation, wy_delivery=delivery)
     try:
         for name, command in (
             ("git-head", ["git", "rev-parse", "HEAD"]),
@@ -306,7 +316,7 @@ def collect(args, bundle, env):
 
         for role in roles:
             try:
-                run(child_command(extension, role, args.gate, bundle, "preflight", implementation),
+                run(child_command(extension, role, args.gate, bundle, "preflight", implementation, delivery),
                     bundle / f"{role}-preflight.log", env)
             except Exception as exc:
                 status["errors"].append(f"{role} preflight: {type(exc).__name__}: {exc}")
@@ -319,7 +329,7 @@ def collect(args, bundle, env):
         for role in roles:
             try:
                 base = bundle / f"{role}-g{args.gate}.report"
-                command = acu_command(args.acu, base, extension, role, args.gate, bundle, implementation)
+                command = acu_command(args.acu, base, extension, role, args.gate, bundle, implementation, delivery)
                 run(command, bundle / f"{role}-acu.log", env)
                 report = report_file(base)
                 # Native reports remain the authority. Text exports make the tar
@@ -364,9 +374,12 @@ def main():
     parser.add_argument("--extension", type=Path, default=os.environ.get("EXTENSION"))
     parser.add_argument("--wy-run", type=Path,
                         help="reuse this completed WY comparison directory; never compile")
+    parser.add_argument("--wy-delivery", choices=("scalar", "prepare", "state", "output", "all"), default="scalar")
     args = parser.parse_args()
     if args.wy_run and args.extension:
         parser.error("--wy-run and --extension/EXTENSION are mutually exclusive")
+    if args.wy_delivery != "scalar" and not args.wy_run:
+        parser.error("--wy-delivery requires --wy-run with admitted comparison samples")
     if args.wy_run:
         args.wy_run = args.wy_run.resolve()
     args.sdk = Path(os.environ.get("PPU_SDK", "/usr/local/PPU_SDK")).resolve()

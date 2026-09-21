@@ -7,12 +7,16 @@
 extern "C" int gdn_wy_forward(
     void const*, void const*, void const*, void const*, void const*, float const*,
     void*, float*, void*, void*, void*, void*, float*, int, int, int, int, bool, cudaStream_t);
+extern "C" int gdn_wy_forward_delivery(
+    void const*, void const*, void const*, void const*, void const*, float const*,
+    void*, float*, void*, void*, void*, void*, float*, int, int, int, int, bool, cudaStream_t, unsigned);
 
 namespace {
 std::vector<torch::Tensor> forward(torch::Tensor q, torch::Tensor k, torch::Tensor v,
     torch::Tensor g, torch::Tensor beta, c10::optional<torch::Tensor> initial,
-    bool output_final_state) {
+    bool output_final_state, unsigned delivery) {
   using namespace gdn_qsa::wy;
+  TORCH_CHECK(delivery <= 7, "invalid WY delivery mask");
   TORCH_CHECK(q.dim() == 4 && q.size(3) == Dim && k.sizes() == q.sizes(),
               "WY q/k must have identical [B,S,Hk,128] shapes");
   TORCH_CHECK(v.dim() == 4 && v.size(0) == q.size(0) && v.size(1) == q.size(1) && v.size(3) == Dim,
@@ -48,11 +52,11 @@ std::vector<torch::Tensor> forward(torch::Tensor q, torch::Tensor k, torch::Tens
   auto u = torch::empty_like(w), vn = torch::empty_like(w);
   auto snapshots = torch::empty({B * Hv * nt, Dim, Dim}, q.options());
   auto gates = torch::empty({B * Hv * nt, Chunk}, q.options().dtype(torch::kFloat32));
-  int const rc = gdn_wy_forward(q.data_ptr(), k.data_ptr(), v.data_ptr(), g.data_ptr(), beta.data_ptr(),
+  int const rc = gdn_wy_forward_delivery(q.data_ptr(), k.data_ptr(), v.data_ptr(), g.data_ptr(), beta.data_ptr(),
       initial.has_value() ? initial->data_ptr<float>() : nullptr, out.data_ptr(),
       output_final_state ? final.data_ptr<float>() : nullptr, w.data_ptr(), u.data_ptr(),
       snapshots.data_ptr(), vn.data_ptr(), gates.data_ptr<float>(), int(B), int(S), int(Hk), int(Hv),
-      g.scalar_type() == torch::kFloat32, at::cuda::getCurrentCUDAStream().stream());
+      g.scalar_type() == torch::kFloat32, at::cuda::getCurrentCUDAStream().stream(), delivery);
   TORCH_CHECK(rc == 0, "PPU WY kernel launch failed: status=", rc);
   return {out, final};
 }
@@ -61,5 +65,5 @@ std::vector<torch::Tensor> forward(torch::Tensor q, torch::Tensor k, torch::Tens
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("forward", &forward, pybind11::arg("q"), pybind11::arg("k"), pybind11::arg("v"),
         pybind11::arg("g"), pybind11::arg("beta"), pybind11::arg("initial_state") = pybind11::none(),
-        pybind11::arg("output_final_state") = true);
+        pybind11::arg("output_final_state") = true, pybind11::arg("delivery") = 0);
 }

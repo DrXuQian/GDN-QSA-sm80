@@ -1,5 +1,12 @@
 # FLA-aligned weak-path candidate
 
+Current follow-up (2026-09-21): the matched-binary capture has succeeded;
+see [ACU attribution](PPU_WY_ACU_20260921.md). Implement and locally admit
+[coalesced delivery for all three stages](PPU_WY_DELIVERY.md), preserving
+scalar controls and all arithmetic/routing. State-only / prepare-only /
+output-only / combined arms precede any promotion. The earlier capture
+failure and initial algorithm plan below are historical checkpoints.
+
 Source parent: `8837640119835b6c8b7953d2c61e24de9fe35000`.
 Worktree: `/workspace/gdn-wy-align-20260921`; forward only, pure C++/CuTe/actlize.
 No PPU is available locally. This iteration ends at locally verified code and

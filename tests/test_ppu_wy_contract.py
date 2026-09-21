@@ -9,7 +9,7 @@ import torch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT), str(ROOT / "benchmarks")]
 from gdn_qsa_sm80 import gdn_wy_interface as api
-from bench_ppu_wy_fla import comparison_summary, order
+from bench_ppu_wy_fla import comparison_summary, order, DELIVERY_ROLES
 from bench_ppu_gdn_fla import checked_pair, verdict
 
 
@@ -33,6 +33,32 @@ class Contracts(unittest.TestCase):
         for column in zip(*rows):
             for role in ("original", "wy", "fla"):
                 self.assertEqual(column.count(role), 2)
+
+    def test_delivery_orders_are_complete_and_balanced(self):
+        rows = [order(i, DELIVERY_ROLES) for i in range(14)]
+        self.assertEqual(len(set(rows)), 14)
+        for row in rows:
+            self.assertEqual(set(row), set(DELIVERY_ROLES))
+        for column in zip(*rows):
+            for role in DELIVERY_ROLES:
+                self.assertEqual(column.count(role), 2)
+
+    def test_delivery_mask_is_consumed_not_silently_ignored(self):
+        class Fake:
+            def forward(self, *args):
+                self.args = args
+                return torch.ones(1), torch.ones(1)
+        x = torch.zeros(1)
+        fake = Fake()
+        for name, mask in api.DELIVERIES.items():
+            with patch.object(api, "_backend", return_value=fake):
+                api.gdn_chunk_wy(x, x, x, x, x, delivery=name)
+            self.assertEqual(len(fake.args), 7 if name == "scalar" else 8)
+            if name != "scalar":
+                self.assertEqual(fake.args[-1], mask)
+        with patch.object(api, "_backend", side_effect=AssertionError("should not load")):
+            with self.assertRaisesRegex(ValueError, "unknown WY delivery"):
+                api.gdn_chunk_wy(x, x, x, x, x, delivery="typo")
 
     def test_wrong_values_are_failures(self):
         want = (torch.ones(3), torch.ones(4))

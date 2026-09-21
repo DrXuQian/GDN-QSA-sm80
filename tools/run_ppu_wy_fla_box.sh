@@ -25,11 +25,17 @@ sha256sum "${old[0]}" "${new[0]}" "$OUT/build/libgdn_qsa_ppu.so" "$OUT/build/lib
 export CUDA_VISIBLE_DEVICES="${DEVICE:-0}"
 export LD_LIBRARY_PATH="$PPU_SDK_ROOT/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export PYTHONPATH="$ROOT${FLA_ROOT:+:$FLA_ROOT}${PYTHONPATH:+:$PYTHONPATH}"
+variant_flags=()
+default_samples=12
+if [[ "${DELIVERY_AB:-0}" == 1 ]]; then
+  variant_flags+=(--delivery-ab)
+  default_samples=14
+fi
 python "$ROOT/tests/test_ppu_gdn_backend.py" --extension "${old[0]}" --device 0 2>&1 | tee "$OUT/original-correctness.log"
-python "$ROOT/tests/test_ppu_wy_backend.py" --wy-extension "${new[0]}" --device 0 2>&1 | tee "$OUT/wy-correctness.log"
+python "$ROOT/tests/test_ppu_wy_backend.py" --wy-extension "${new[0]}" --device 0 "${variant_flags[@]}" 2>&1 | tee "$OUT/wy-correctness.log"
 if [[ "${PERF:-1}" == 1 ]]; then
   python "$ROOT/benchmarks/bench_ppu_wy_fla.py" --extension "${old[0]}" --wy-extension "${new[0]}" \
-    --device 0 --samples "${SAMPLES:-12}" --launches "${LAUNCHES:-10}" --warmup "${WARMUP:-5}" \
+    --device 0 --samples "${SAMPLES:-$default_samples}" --launches "${LAUNCHES:-10}" --warmup "${WARMUP:-5}" "${variant_flags[@]}" \
     --results "$OUT/comparison.json" 2>&1 | tee "$OUT/comparison.log"
 fi
 echo "[WY box] PASS: artifacts=$OUT auto-routing=UNCHANGED"

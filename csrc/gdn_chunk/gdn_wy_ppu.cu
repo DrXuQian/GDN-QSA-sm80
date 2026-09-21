@@ -3,6 +3,7 @@
 #include "gdn_target.cuh"
 #include "gdn_qsa/wy_contract.hpp"
 #include "gdn_qsa/ppu/wy_mma.cuh"
+#include "gdn_qsa/ppu/wy_delivery.cuh"
 
 namespace gdn_qsa::wy {
 
@@ -41,10 +42,14 @@ __device__ float gate(Inputs const& p, int64_t i) {
 struct PrepareStorage {
   alignas(128) BF16 k[Chunk * Dim], v[Chunk * Dim];
   alignas(128) float lower[Chunk * Chunk], inverse[Chunk * Chunk];
-  alignas(128) float temp[4][16 * 16];
+  union {
+    alignas(128) float temp[4][16 * 16];
+    alignas(128) BF16 packed[4][2 * 16 * 16];  // solve scratch is dead during W/U
+  };
   float prefix[Chunk], beta[Chunk];
 };
 
+template <bool Packed>
 __global__ void __launch_bounds__(ParallelThreads) gdn_wy_prepare(Inputs p, Workspace ws) {
   extern __shared__ __align__(128) unsigned char storage[];
   auto& sm = *reinterpret_cast<PrepareStorage*>(storage);
@@ -161,11 +166,23 @@ __global__ void __launch_bounds__(ParallelThreads) gdn_wy_prepare(Inputs p, Work
       load<Chunk, Dim, true>(sm.v, k, bc * 16, bv);
       bf16_mma(w, a, bk); bf16_mma(u, a, bv);
     }
-    CUTE_UNROLL
-    for (int s = 0; s < 8; ++s) {
-      auto const rc = result_coord(lane, s);
-      int64_t const at = tile_offset(group) + (br * 16 + rc.row) * Dim + bc * 16 + rc.col;
-      ws.w[at] = BF16(w[s]); ws.u[at] = BF16(u[s]);
+    if constexpr (Packed) {
+      BF16* const wtile = sm.packed[warp];
+      BF16* const utile = wtile + 16 * 16;
+      stage_fragment(w, wtile, lane);
+      stage_fragment(u, utile, lane);
+      __syncwarp();
+      int64_t const base = tile_offset(group) + br * 16 * Dim + bc * 16;
+      publish_bf16<16, 16, 32>(wtile, ws.w + base, Dim, lane);
+      publish_bf16<16, 16, 32>(utile, ws.u + base, Dim, lane);
+      __syncwarp();  // every reader finishes before this warp reuses its scratch
+    } else {
+      CUTE_UNROLL
+      for (int s = 0; s < 8; ++s) {
+        auto const rc = result_coord(lane, s);
+        int64_t const at = tile_offset(group) + (br * 16 + rc.row) * Dim + bc * 16 + rc.col;
+        ws.w[at] = BF16(w[s]); ws.u[at] = BF16(u[s]);
+      }
     }
   }
 }
@@ -176,9 +193,35 @@ struct StateStorage {
   float g[Chunk];
 };
 
+struct CoalescedStateStorage {
+  union {
+    alignas(128) BF16 w[Chunk * Dim];
+    alignas(128) float final_h[Dim * ValueTile];  // W is dead after the chunk loop
+  };
+  alignas(128) BF16 k[Chunk * Dim];
+  union {
+    alignas(128) BF16 snapshot[Dim * ValueTile];
+    struct {
+      BF16 u[Chunk * ValueTile];
+      BF16 scaled_v[Chunk * ValueTile];
+    } values;
+  } exchange;
+  float g[Chunk];
+};
+static_assert(Dim * ValueTile * sizeof(float) == Chunk * Dim * sizeof(BF16),
+              "final-state exchange must fit the dead W allocation");
+static_assert(Dim * ValueTile == 2 * Chunk * ValueTile,
+              "snapshot exchange must cover U plus scaled V exactly");
+static_assert(StateThreads == 2 * 32 && ValueTile == 2 * 16,
+              "state ownership is two V16 warps, not a tunable thread count");
+
+template <bool Packed>
+using StateSmem = std::conditional_t<Packed, CoalescedStateStorage, StateStorage>;
+
+template <bool Packed>
 __global__ void __launch_bounds__(StateThreads) gdn_wy_state(Inputs p, Workspace ws, float* final) {
   extern __shared__ __align__(128) unsigned char storage[];
-  auto& sm = *reinterpret_cast<StateStorage*>(storage);
+  auto& sm = *reinterpret_cast<StateSmem<Packed>*>(storage);
   int const tid = int(threadIdx.x), warp = unsigned(threadIdx.x) >> 5, lane = unsigned(threadIdx.x) & 31;
   int const slice = int(blockIdx.x) % (Dim / ValueTile);
   int const bh = int(blockIdx.x) / (Dim / ValueTile);
@@ -207,10 +250,21 @@ __global__ void __launch_bounds__(StateThreads) gdn_wy_state(Inputs p, Workspace
       CUTE_UNROLL
       for (int s = 0; s < 8; ++s) {
         auto const rc = result_coord(lane, s);
-        ws.snapshots[state_offset(group) + (k * 16 + rc.row) * Dim + v0 + rc.col] = BF16(state[k][s]);
+        if constexpr (Packed)
+          sm.exchange.snapshot[swizzle<Dim, ValueTile>(k * 16 + rc.row, warp * 16 + rc.col)] = BF16(state[k][s]);
+        else
+          ws.snapshots[state_offset(group) + (k * 16 + rc.row) * Dim + v0 + rc.col] = BF16(state[k][s]);
       }
     }
     commit_wait();
+    if constexpr (Packed) {
+      publish_bf16<Dim, ValueTile, StateThreads>(sm.exchange.snapshot,
+          ws.snapshots + state_offset(group) + slice * ValueTile, Dim, tid);
+      __syncthreads();  // snapshot readers complete before exchange becomes U/V
+      stage<Chunk, ValueTile, StateThreads>(sm.exchange.values.u,
+          ws.u + tile_offset(group) + slice * ValueTile, Dim, Chunk);
+      cute::cp_async_fence();  // overlap U delivery with W @ H
+    }
     float value[4][8] = {};
     CUTE_UNROLL
     for (int k = 0; k < 8; ++k) {
@@ -223,6 +277,13 @@ __global__ void __launch_bounds__(StateThreads) gdn_wy_state(Inputs p, Workspace
         bf16_mma(value[r], w, hs);
       }
     }
+    if constexpr (Packed) {
+      cute::cp_async_wait<0>();
+      __syncthreads();
+    }
+    BF16* scaled_v;
+    if constexpr (Packed) scaled_v = sm.exchange.values.scaled_v;
+    else scaled_v = sm.scaled_v;
     float const last = sm.g[valid - 1];
     CUTE_UNROLL
     for (int r = 0; r < 4; ++r) {
@@ -231,13 +292,22 @@ __global__ void __launch_bounds__(StateThreads) gdn_wy_state(Inputs p, Workspace
         auto const rc = result_coord(lane, s);
         int const row = r * 16 + rc.row, col = v0 + rc.col;
         int64_t const at = tile_offset(group) + row * Dim + col;
-        float const x = row < valid ? float(ws.u[at]) - value[r][s] : 0.0f;
-        ws.vnew[at] = BF16(x);
-        sm.scaled_v[swizzle<Chunk, ValueTile>(row, warp * 16 + rc.col)] =
+        int const shared_at = swizzle<Chunk, ValueTile>(row, warp * 16 + rc.col);
+        float x;
+        if constexpr (Packed)
+          x = row < valid ? float(sm.exchange.values.u[shared_at]) - value[r][s] : 0.0f;
+        else
+          x = row < valid ? float(ws.u[at]) - value[r][s] : 0.0f;
+        if constexpr (Packed) sm.exchange.values.u[shared_at] = BF16(x);
+        else ws.vnew[at] = BF16(x);
+        scaled_v[shared_at] =
             BF16(x * expf(last - sm.g[row]));
       }
     }
     __syncthreads();
+    if constexpr (Packed)
+      publish_bf16<Chunk, ValueTile, StateThreads>(sm.exchange.values.u,
+          ws.vnew + tile_offset(group) + slice * ValueTile, Dim, tid);
     float const decay = expf(last);
     CUTE_UNROLL
     for (int k = 0; k < 8; ++k) {
@@ -247,7 +317,7 @@ __global__ void __launch_bounds__(StateThreads) gdn_wy_state(Inputs p, Workspace
       for (int r = 0; r < 4; ++r) {
         uint32_t a[4], v[4];
         load<Chunk, Dim, true>(sm.k, r * 16, k * 16, a);
-        load<Chunk, ValueTile, true>(sm.scaled_v, r * 16, warp * 16, v);
+        load<Chunk, ValueTile, true>(scaled_v, r * 16, warp * 16, v);
         bf16_mma(state[k], a, v);
       }
     }
@@ -259,8 +329,16 @@ __global__ void __launch_bounds__(StateThreads) gdn_wy_state(Inputs p, Workspace
       CUTE_UNROLL
       for (int s = 0; s < 8; ++s) {
         auto const rc = result_coord(lane, s);
-        final[(int64_t(bh) * Dim + k * 16 + rc.row) * Dim + v0 + rc.col] = state[k][s];
+        if constexpr (Packed)
+          sm.final_h[(k * 16 + rc.row) * ValueTile + warp * 16 + rc.col] = state[k][s];
+        else
+          final[(int64_t(bh) * Dim + k * 16 + rc.row) * Dim + v0 + rc.col] = state[k][s];
       }
+    }
+    if constexpr (Packed) {
+      __syncthreads();
+      publish_fp32<Dim, ValueTile, StateThreads>(sm.final_h,
+          final + int64_t(bh) * Dim * Dim + slice * ValueTile, Dim, tid);
     }
   }
 }
@@ -271,9 +349,16 @@ struct OutputStorage {
   float g[Chunk];
 };
 
+struct CoalescedOutputStorage : OutputStorage {
+  alignas(128) BF16 packed[4][16 * 16];
+};
+template <bool Packed>
+using OutputSmem = std::conditional_t<Packed, CoalescedOutputStorage, OutputStorage>;
+
+template <bool Packed>
 __global__ void __launch_bounds__(ParallelThreads) gdn_wy_output(Inputs p, Workspace ws, BF16* output) {
   extern __shared__ __align__(128) unsigned char storage[];
-  auto& sm = *reinterpret_cast<OutputStorage*>(storage);
+  auto& sm = *reinterpret_cast<OutputSmem<Packed>*>(storage);
   int const tid = int(threadIdx.x), warp = unsigned(threadIdx.x) >> 5, lane = unsigned(threadIdx.x) & 31;
   int const ct = int(blockIdx.x) % p.shape.chunks(), bh = int(blockIdx.x) / p.shape.chunks();
   int const h = bh % p.shape.value_heads, b = bh / p.shape.value_heads, qh = p.shape.q_head(h);
@@ -326,24 +411,37 @@ __global__ void __launch_bounds__(ParallelThreads) gdn_wy_output(Inputs p, Works
       load<Chunk, Dim, true>(sm.v, k * 16, c * 16, v);
       bf16_mma(acc, a, v);
     }
-    CUTE_UNROLL
-    for (int s = 0; s < 8; ++s) {
-      auto const rc = result_coord(lane, s);
-      int const row = warp * 16 + rc.row;
-      if (row < valid)
-        output[p.shape.input(b, first + row, h, p.shape.value_heads) + c * 16 + rc.col] =
-            BF16(acc[s] * 0.08838834764831845f);
+    if constexpr (Packed) {
+      CUTE_UNROLL
+      for (int s = 0; s < 8; ++s) acc[s] *= 0.08838834764831845f;
+      stage_fragment(acc, sm.packed[warp], lane);
+      __syncwarp();
+      if (warp * 16 < valid)
+        publish_bf16<16, 16, 32>(sm.packed[warp],
+            output + p.shape.input(b, first + warp * 16, h, p.shape.value_heads) + c * 16,
+            int64_t(p.shape.value_heads) * Dim, lane, min(16, valid - warp * 16));
+      __syncwarp();
+    } else {
+      CUTE_UNROLL
+      for (int s = 0; s < 8; ++s) {
+        auto const rc = result_coord(lane, s);
+        int const row = warp * 16 + rc.row;
+        if (row < valid)
+          output[p.shape.input(b, first + row, h, p.shape.value_heads) + c * 16 + rc.col] =
+              BF16(acc[s] * 0.08838834764831845f);
+      }
     }
   }
 }
 }  // namespace gdn_qsa::wy
 
-extern "C" int gdn_wy_forward(
+extern "C" int gdn_wy_forward_delivery(
     void const* q, void const* k, void const* v, void const* g, void const* beta,
     float const* initial, void* output, float* final, void* w, void* u,
     void* snapshots, void* vnew, float* gates, int batch, int sequence,
-    int q_heads, int value_heads, bool gate_fp32, gdn_arch::Stream stream) {
+    int q_heads, int value_heads, bool gate_fp32, gdn_arch::Stream stream, unsigned delivery) {
   using namespace gdn_qsa::wy;
+  if (delivery > 7) return int(hggcErrorInvalidValue);
   Inputs p{static_cast<BF16 const*>(q), static_cast<BF16 const*>(k),
            static_cast<BF16 const*>(v), static_cast<BF16 const*>(beta),
            g, initial, gate_fp32, {batch, sequence, q_heads, value_heads}};
@@ -351,18 +449,43 @@ extern "C" int gdn_wy_forward(
                static_cast<BF16*>(vnew), gates};
   // Match the original backend's explicit opt-in for >48 KiB shared memory.
   // An SDK/device resource refusal is a launch failure, never a fallback.
-  auto status = hggcFuncSetAttribute(gdn_wy_prepare, hggcFuncAttributeMaxDynamicSharedMemorySize, sizeof(PrepareStorage));
+  auto status = hggcFuncSetAttribute(delivery & 1 ? gdn_wy_prepare<true> : gdn_wy_prepare<false>,
+      hggcFuncAttributeMaxDynamicSharedMemorySize, sizeof(PrepareStorage));
   if (status != hggcSuccess) return int(status);
-  status = hggcFuncSetAttribute(gdn_wy_state, hggcFuncAttributeMaxDynamicSharedMemorySize, sizeof(StateStorage));
+  status = hggcFuncSetAttribute(delivery & 2 ? gdn_wy_state<true> : gdn_wy_state<false>,
+      hggcFuncAttributeMaxDynamicSharedMemorySize,
+      delivery & 2 ? sizeof(StateSmem<true>) : sizeof(StateSmem<false>));
   if (status != hggcSuccess) return int(status);
-  status = hggcFuncSetAttribute(gdn_wy_output, hggcFuncAttributeMaxDynamicSharedMemorySize, sizeof(OutputStorage));
+  status = hggcFuncSetAttribute(delivery & 4 ? gdn_wy_output<true> : gdn_wy_output<false>,
+      hggcFuncAttributeMaxDynamicSharedMemorySize,
+      delivery & 4 ? sizeof(OutputSmem<true>) : sizeof(OutputSmem<false>));
   if (status != hggcSuccess) return int(status);
-  gdn_wy_prepare<<<unsigned(p.shape.groups()), ParallelThreads, sizeof(PrepareStorage), stream>>>(p, ws);
+  if (delivery & 1)
+    gdn_wy_prepare<true><<<unsigned(p.shape.groups()), ParallelThreads, sizeof(PrepareStorage), stream>>>(p, ws);
+  else
+    gdn_wy_prepare<false><<<unsigned(p.shape.groups()), ParallelThreads, sizeof(PrepareStorage), stream>>>(p, ws);
   status = hggcGetLastError();
   if (status != hggcSuccess) return int(status);
-  gdn_wy_state<<<unsigned(int64_t(batch) * value_heads * (Dim / ValueTile)), StateThreads, sizeof(StateStorage), stream>>>(p, ws, final);
+  unsigned const state_grid = unsigned(int64_t(batch) * value_heads * (Dim / ValueTile));
+  if (delivery & 2)
+    gdn_wy_state<true><<<state_grid, StateThreads, sizeof(StateSmem<true>), stream>>>(p, ws, final);
+  else
+    gdn_wy_state<false><<<state_grid, StateThreads, sizeof(StateSmem<false>), stream>>>(p, ws, final);
   status = hggcGetLastError();
   if (status != hggcSuccess) return int(status);
-  gdn_wy_output<<<unsigned(p.shape.groups()), ParallelThreads, sizeof(OutputStorage), stream>>>(p, ws, static_cast<BF16*>(output));
+  if (delivery & 4)
+    gdn_wy_output<true><<<unsigned(p.shape.groups()), ParallelThreads, sizeof(OutputSmem<true>), stream>>>(p, ws, static_cast<BF16*>(output));
+  else
+    gdn_wy_output<false><<<unsigned(p.shape.groups()), ParallelThreads, sizeof(OutputSmem<false>), stream>>>(p, ws, static_cast<BF16*>(output));
   return int(hggcGetLastError());
+}
+
+// Keep the existing C ABI and the default scalar WY control intact.
+extern "C" int gdn_wy_forward(
+    void const* q, void const* k, void const* v, void const* g, void const* beta,
+    float const* initial, void* output, float* final, void* w, void* u,
+    void* snapshots, void* vnew, float* gates, int batch, int sequence,
+    int q_heads, int value_heads, bool gate_fp32, gdn_arch::Stream stream) {
+  return gdn_wy_forward_delivery(q, k, v, g, beta, initial, output, final,
+      w, u, snapshots, vnew, gates, batch, sequence, q_heads, value_heads, gate_fp32, stream, 0);
 }

@@ -21,7 +21,7 @@ def oracle(inputs, initial):
         initial_state=initial, output_final_state=True)
 
 
-def run_case(shape, gate, nonzero, device):
+def run_case(shape, gate, nonzero, device, deliveries=()):
     cpu = fixture(*shape, gate)
     if nonzero:
         # Also exercise the FP32 gate ABI without changing its values.
@@ -55,6 +55,27 @@ def run_case(shape, gate, nonzero, device):
         raise AssertionError("output-only path changed output or returned state")
     if digest(inputs) != digest(cpu) or (state is not None and not torch.equal(state.cpu(), initial)):
         raise AssertionError("WY modified an input")
+    for delivery in deliveries:
+        call_variant = lambda: gdn_chunk_wy(*inputs, initial_state=state, delivery=delivery)
+        for _ in range(8):
+            candidate = call_variant()
+            assert_pair(candidate, want)
+            if digest(candidate) != fingerprint:
+                print_failure(f"wy/{delivery}/{shape}", candidate, got)
+                raise AssertionError(f"{delivery} differs from scalar WY bits")
+        candidate_expanded = gdn_chunk_wy(
+            q.repeat_interleave(ratio, 2), k.repeat_interleave(ratio, 2), v, g, beta,
+            initial_state=state, delivery=delivery)
+        if digest(candidate_expanded) != fingerprint:
+            raise AssertionError(f"{delivery} native GVA differs from expanded")
+        candidate_out, candidate_state = gdn_chunk_wy(
+            *inputs, initial_state=state, output_final_state=False, delivery=delivery)
+        if candidate_state is not None or not torch.equal(candidate_out, got[0]):
+            raise AssertionError(f"{delivery} output-only mismatch")
+        if digest(inputs) != digest(cpu) or (state is not None and not torch.equal(state.cpu(), initial)):
+            raise AssertionError(f"{delivery} modified an input")
+        print(f"[WY delivery admission] delivery={delivery} shape={shape} g={gate} "
+              f"initial={nonzero} scalar-raw-bit=PASS repeat=8/8 GVA/output-only=PASS", flush=True)
     for role in (0, 1):
         wrong = list(got)
         wrong[role] = torch.zeros_like(wrong[role])
@@ -74,6 +95,7 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--wy-extension", type=Path, required=True)
     p.add_argument("--device", type=int, default=0)
+    p.add_argument("--delivery-ab", action="store_true")
     args = p.parse_args()
     if not args.wy_extension.is_file():
         p.error("WY extension missing")
@@ -84,13 +106,14 @@ def main():
     if "PPU" not in props.name.upper():
         raise RuntimeError(f"not a PPU: {props.name}")
     device = torch.device("cuda", args.device)
+    deliveries = ("prepare", "state", "output", "all") if args.delivery_ab else ()
     for length in (1, 16, 63, 64, 65, 129):
         for initial in (False, True):
-            run_case((2, length, 1, 2), -.1, initial, device)
+            run_case((2, length, 1, 2), -.1, initial, device, deliveries)
     for gate in (0., -.1, -1.):
-        run_case((1, 2048, 16, 32), gate, False, device)
-    run_case((1, 2048, 16, 64), -.1, False, device)
-    print("[WY device] PASS cases=16 original-numerical-gate=UNCHANGED")
+        run_case((1, 2048, 16, 32), gate, False, device, deliveries)
+    run_case((1, 2048, 16, 64), -.1, False, device, deliveries)
+    print(f"[WY device] PASS cases=16 delivery_variants={1+len(deliveries)} original-numerical-gate=UNCHANGED")
 
 
 if __name__ == "__main__":

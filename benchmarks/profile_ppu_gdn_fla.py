@@ -16,20 +16,25 @@ import sys
 import torch
 
 import bench_ppu_gdn_fla as bench
+from gdn_qsa_sm80.gdn_wy_interface import DELIVERIES
 
 
-def subject_call(role, implementation, extension, inputs):
+def subject_call(role, implementation, extension, inputs, delivery="scalar"):
     """Select an explicit API; never let 'ours' silently change meaning."""
     expected = "wy" if implementation == "wy" else "ours"
     if implementation not in ("original", "wy") or role not in (expected, "fla"):
         raise ValueError(f"role {role} does not belong to {implementation}/FLA comparison")
+    if delivery not in DELIVERIES or (implementation != "wy" and delivery != "scalar"):
+        raise ValueError("delivery selection requires an explicit WY implementation")
     if role == "fla":
         fn, identity = bench.load_fla()
         return bench.fla_call(fn, inputs, "native"), identity
     if role == "wy":
         from gdn_qsa_sm80 import gdn_chunk_wy
         os.environ["GDN_QSA_WY_EXTENSION"] = str(extension.resolve())
-        return lambda: gdn_chunk_wy(*inputs, output_final_state=True), {}
+        if delivery == "scalar":
+            return lambda: gdn_chunk_wy(*inputs, output_final_state=True), {}
+        return lambda: gdn_chunk_wy(*inputs, output_final_state=True, delivery=delivery), {}
     os.environ["GDN_QSA_PPU_EXTENSION"] = str(extension.resolve())
     return lambda: bench.admission.gdn_chunk(*inputs, output_final_state=True), {}
 
@@ -134,6 +139,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--role", required=True, choices=("ours", "wy", "fla"))
     parser.add_argument("--implementation", choices=("original", "wy"), default="original")
+    parser.add_argument("--wy-delivery", choices=tuple(DELIVERIES), default="scalar")
     parser.add_argument("--phase", required=True, choices=("preflight", "subject"))
     parser.add_argument("--extension", type=Path, required=True)
     parser.add_argument("--gate", type=float, choices=(-0.1, -1.0), default=-0.1)
@@ -157,9 +163,10 @@ def main():
     want = bench.admission.reference(cpu)
     inputs = tuple(x.cuda() for x in cpu)
     input_hash = bench.admission.digest(cpu)
-    call, identity = subject_call(args.role, args.implementation, args.extension, inputs)
+    call, identity = subject_call(args.role, args.implementation, args.extension, inputs, args.wy_delivery)
 
     print(f"[PPU GDN ACU config] role={args.role} implementation={args.implementation} phase={args.phase} g={args.gate} "
+          f"wy_delivery={args.wy_delivery} "
           f"shape=B1,S2048,Hk16,Hv32,D128 input_sha={input_hash} "
           "initial_state=zero final_state=1 GVA=native forward_only=1", flush=True)
     if args.phase == "subject":
@@ -167,7 +174,7 @@ def main():
               "warmup=0 verification_device_kernels=0 profile_control=external-acu", flush=True)
     measured = run_with_failure_receipt(
         lambda: run_phase(call, torch.cuda.synchronize, want, args.phase, args.warmup),
-        args.receipt, dict(role=args.role, implementation=args.implementation, phase=args.phase,
+        args.receipt, dict(role=args.role, implementation=args.implementation, wy_delivery=args.wy_delivery, phase=args.phase,
             gate=args.gate, input_sha=input_hash, device=str(props),
             extension_sha256=hashlib.sha256(args.extension.read_bytes()).hexdigest(),
             library_sha256=hashlib.sha256(library.read_bytes()).hexdigest()))
@@ -182,7 +189,7 @@ def main():
     # extension filename itself looks current. Do not archive process env vars.
     loaded = loaded_library_hashes()
     receipt = dict(status="PASS", role=args.role, phase=args.phase, gate=args.gate,
-                   implementation=args.implementation,
+                   implementation=args.implementation, wy_delivery=args.wy_delivery,
                    shape=dict(B=1, S=2048, Hk=16, Hv=32, K=128, V=128),
                    input_sha=input_hash, reference_sha=bench.admission.digest(want),
                    fixture_seed=0x6A09E667, gate_bf16=float(cpu[3].flatten()[0]),

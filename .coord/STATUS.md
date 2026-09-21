@@ -1,19 +1,27 @@
 # PPU original-structure port
 
-updated-at: 2026-09-21 09:59:39 UTC
-working-on: all-three-stage coalesced-delivery candidate in isolated ppu-wy-delivery-20260921 worktree; closing box A/B
-blocked-on: no capture blocker remains for this run; no local PPU for candidate timing
-last-commit: bae4ac7 (verified ACU diagnosis; candidate not committed yet)
+updated-at: 2026-09-21 10:08:03 UTC
+working-on: all-three-stage delivery candidate locally admitted; box A/B handoff ready
+blocked-on: device raw-bit/race and timing admission requires box; no local PPU
+last-commit: 057f252 (preceding checkpoint; candidate commit follows this record)
 
 Candidate sources: /workspace/gdn-wy-align-20260921. Local evidence:
 /workspace/gdn-wy-delivery-20260921. Prepare/state/output packed variants
 compile+link with real SDK: 78/240/60 vregs, zero stack; scalar controls
 84/244/80, zero stack. All three packed variants have real b32x4 global
-stores and no scalar BF16 global stores. Full local gate PASS before latest
-capture-selector test additions; rerun pending. Host ownership: 4,080 cases
-and 12 negatives PASS. Controls and original auto routing retained. All
-three stages are in scope; no device performance claim. Closing same-binary
+stores and no scalar BF16 global stores. Full post-edit gate PASS in
+sealed-local.log: 4 CTests, 47 Python contracts, 45 algebra cases plus five
+negatives, 305 preserved original controls, original 15 + WY 6 kernel images.
+Host ownership: 4,080 cases and 12 negatives PASS. Controls and original
+auto routing retained. All three stages are in scope; no device timing claim.
+Ready same-binary
 scalar / prepare / state / output / all + original / FLA paired box command.
+DELIVERY_AB=1 PPU_SDK=/usr/local/PPU_SDK DEVICE=0 JOBS=16
+bash tools/run_ppu_wy_fla_box.sh. Runs 16 cases across five WY deliveries;
+raw equality to scalar + 8 repeats before seven-arm balanced timing.
+For subsequent ACU reuse: --wy-delivery all, never silently profile scalar.
+See docs/PPU_WY_DELIVERY.md for resources, lifetime barriers, commands,
+and the explicit distinction between recompiled scalar and archived dd70e5d.
 
 New upload gdn-qsa-acu-20260921T073350Z-900246.tar.gz: all 535 files and
 the complete SHA256SUMS denominator verified. STATUS PASS, WY 3 and FLA 7

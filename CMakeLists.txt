@@ -37,11 +37,18 @@ target_include_directories(l007_ppu_wy_ownership PRIVATE
   ${PPU_SDK_ROOT}/CUDA_SDK/targets/x86_64-linux/include/cccl
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/actlize/include)
 target_link_libraries(l007_ppu_wy_ownership PRIVATE gdn_qsa_backend_headers)
+add_executable(l008_ppu_wy_delivery dev/ppu/l008_wy_delivery.cpp)
+target_include_directories(l008_ppu_wy_delivery PRIVATE
+  ${PPU_SDK_ROOT}/include ${PPU_SDK_ROOT}/CUDA_SDK/targets/x86_64-linux/include
+  ${PPU_SDK_ROOT}/CUDA_SDK/targets/x86_64-linux/include/cccl
+  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/actlize/include)
+target_link_libraries(l008_ppu_wy_delivery PRIVATE gdn_qsa_backend_headers)
 
 if(BUILD_TESTING)
   add_test(NAME ppu_affine_pipeline COMMAND l004_ppu_affine_pipeline)
   add_test(NAME ppu_original_delivery COMMAND l006_ppu_original_delivery)
   add_test(NAME ppu_wy_ownership COMMAND l007_ppu_wy_ownership)
+  add_test(NAME ppu_wy_delivery COMMAND l008_ppu_wy_delivery)
 endif()
 
 if(GDN_QSA_ENABLE_PPU)
@@ -162,6 +169,7 @@ if(GDN_QSA_ENABLE_PPU)
         ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_target.cuh
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/wy_contract.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/wy_mma.cuh
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/wy_delivery.cuh
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/shared_copy.cuh
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/fragment.cuh)
     endif()

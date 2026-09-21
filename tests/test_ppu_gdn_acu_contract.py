@@ -205,6 +205,26 @@ class ACUContract(unittest.TestCase):
         with self.assertRaises(ValueError):
             collect.validate_pair(ours | dict(input_sha=""), fla | dict(input_sha=""))
 
+    def test_delivery_reaches_subject_and_receipts_cannot_cross_variants(self):
+        for delivery in ("prepare", "state", "output", "all"):
+            cmd = collect.acu_command(Path("/acu"), Path("/report"), Path("/_gdn_wy_ppu.so"),
+                                      "wy", -.1, Path("/bundle"), "wy", delivery)
+            self.assertEqual(cmd[cmd.index("--wy-delivery") + 1], delivery)
+            with patch("gdn_qsa_sm80.gdn_chunk_wy", return_value=("out", "state")) as forward:
+                call, _ = profile.subject_call("wy", "wy", Path("/_gdn_wy_ppu.so"), (1, 2, 3, 4, 5), delivery)
+                self.assertEqual(call(), ("out", "state"))
+                self.assertEqual(forward.call_args.kwargs["delivery"], delivery)
+        ours, fla = self.records()
+        ours.update(role="wy", implementation="wy", wy_delivery="all")
+        fla.update(implementation="wy", wy_delivery="all")
+        collect.validate_pair(ours, fla, "wy")
+        with self.assertRaisesRegex(ValueError, "delivery"):
+            collect.validate_pair(ours, fla | dict(wy_delivery="scalar"), "wy")
+        pre = ours | dict(phase="preflight", warmup=5, public_api_calls=6)
+        collect.validate_preflight(pre, ours)
+        with self.assertRaisesRegex(ValueError, "wy_delivery"):
+            collect.validate_preflight(pre | dict(wy_delivery="state"), ours)
+
     def test_wy_receipt_cannot_use_original_role_or_other_device_library(self):
         ours, fla = self.records()
         wy = ours | dict(role="wy", implementation="wy")
@@ -271,6 +291,14 @@ class ACUContract(unittest.TestCase):
             dtype="bf16", torch="vendor", fla={}, limit=0.02,
             device=ours["device"]["properties"])
         collect.validate_comparison(comparison, ours, fla)
+        packed = ours | dict(wy_delivery="all")
+        with self.assertRaisesRegex(ValueError, "not admitted"):
+            collect.validate_comparison(comparison, packed, fla)
+        comparison["delivery_ab"] = True
+        with self.assertRaisesRegex(ValueError, "output differs"):
+            collect.validate_comparison(comparison, packed, fla)
+        comparison["cases"][0]["arms"]["wy-all"] = dict(fingerprint="output", state_dtype="torch.float32")
+        collect.validate_comparison(comparison, packed, fla)
         for role, key, value in (("wy", "input_sha", "other"), ("wy", "output_sha", "other"),
                                   ("fla", "fla", dict(entry_sha256="changed")),
                                   ("wy", "state_dtype", "torch.bfloat16"),
