@@ -1,9 +1,23 @@
 # PPU original-structure port
 
-updated-at: 2026-09-21 12:44:56 UTC
-working-on: verified all-delivery ACU and both-gate A/B; traffic target met, speed target not met
-blocked-on: same-run scalar ACU not uploaded; no local PPU for next candidate timing
-last-commit: 1b1f508 (candidate implementation e730f88; no kernel changes this checkpoint)
+updated-at: 2026-09-21 13:23:45 UTC
+working-on: three-stage compute-tile alternatives compiled; exhaustive host and full-tier admission in progress
+blocked-on: no implementation blocker; device arithmetic/races/timing require later box admission
+last-commit: 593429b (verified delivery verdict pushed; new candidate remains in isolated worktree)
+
+Active sources: /workspace/gdn-wy-tiles-20260921, branch ppu-wy-tiles-20260921.
+Evidence/registered plan: /workspace/gdn-wy-tiles-evidence-20260921.
+New prepare/state/output kernels real-SDK compile and link: 160/232/98
+registers, all zero stack. State has 4 useful warps, output 8; shared
+state/output both 49,408 bytes. Native state shuffle opcodes removed (old
+128 static shuffle instructions); independent FP32 state and reduction order
+preserved. Prepare TF32 high/residual solve shared with old control, unchanged.
+Scalar/packed six images retained, tiled three added, explicit stage switches.
+No route promotion. Host native ownership/order and seven negative plants
+pass; complete post-edit suite running before final handoff. No new device
+numerics/performance claims.
+
+## Prior verified device review
 
 New upload gdn-qsa-acu-20260921T123213Z-3755721.tar.gz: all 537 files and
 checksum denominator verified. Actual three <true> kernels, g=-1.0, loaded
