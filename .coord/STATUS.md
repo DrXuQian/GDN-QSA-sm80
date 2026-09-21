@@ -1,9 +1,9 @@
 # PPU original-structure port
 
 updated-at: 2026-09-21 04:05:02 UTC
-working-on: final full local suite PASS; explicit WY candidate and three-arm box handoff ready
+working-on: implementation complete locally; awaiting explicit WY / original / FLA device admission and comparison
 blocked-on: no local PPU execution; local SDK compile/link available
-last-commit: b36290e (plan committed; implementation locally verified, pending commit)
+last-commit: 5e9460a (verified implementation; subsequent checkpoint is metadata only)
 
 Current plan: C64 parallel W/U preparation, V32 FP32 register-state recurrence,
 chunk-parallel output. Keep original reset/replay/scan and auto routing intact.
@@ -13,8 +13,7 @@ performance claim; FLA proximity target is <=1.10x on the priority weak shape.
 
 Local full gate PASS: 3 CTests, 45 arithmetic cases + five numeric negatives,
 33 Python contracts, 305 unchanged original control expressions, all original
-15 and new three device images linked. New prepare/state/output: 94/244/90
-vregs before shared-memory opt-in; final dynamic-shared build: 84/244/80,
+15 and new three device images linked. Final prepare/state/output: 84/244/80 vregs,
 zero stack. Four native-map negatives and three binary negatives red.
 No device execution or timing claimed. Handoff: tools/run_ppu_wy_fla_box.sh,
 which admits original + WY before same-input alternating original/WY/FLA timing.
