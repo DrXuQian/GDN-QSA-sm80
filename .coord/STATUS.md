@@ -1,9 +1,35 @@
 # PPU original-structure port
 
-updated-at: 2026-09-21 13:36:17 UTC
-working-on: three-stage compute-tile candidate committed; final box handoff
-blocked-on: device raw-bit/race and speed verdict NOT_RUN; no local PPU
-last-commit: a712a7d (implementation; this follow-up updates status metadata only)
+updated-at: 2026-09-21 15:00:25 UTC
+working-on: record user-reported strong-decay compute-tile result; preserve routing
+blocked-on: weak-decay section and current raw comparison bundle NOT PROVIDED; state+output-only combination NOT MEASURED
+last-commit: df90c61 (status handoff; implementation a712a7d)
+
+User-reported run /workspace/gdn-wy-fla-df90c61-20260921T143917Z,
+g=-1.0: scalar WY 705.644 us, tiled-all 443.362 us, FLA 485.896 us.
+Tiled-all wins with disjoint observed envelopes against both controls:
+1.5916x vs scalar, 1.0959x vs FLA (37.17% / 8.75% lower latency).
+Original remains faster at 424.072 us, envelope [417.596,430.344] below
+tiled-all [441.996,445.852]; keep strong/reset routing unchanged. Original
+final state BF16 versus WY/FLA FP32 remains a comparison-scope distinction.
+
+Prepare-only 765.836 us definitively loses to scalar; state-only 453.986 us
+wins against scalar and FLA; output-only 689.352 us wins against scalar only.
+All versus state-only improves by 10.624 us, also with disjoint envelopes.
+One-stage deltas predict 497.886 us if additive, but all is 443.362 us:
+the -54.524 us interaction is observed, its mechanism is not established.
+Do not subtract prepare's isolated 60.192 us penalty from the all time.
+Next discriminating cell is state+output-only (delivery mask 48); ABI admits
+it but the Python benchmark currently has no named role for it. No new
+kernel/selector/default edit made from this pasted result.
+
+Reported raw-bit-versus-scalar checks PASS. Current raw JSON/identities have
+not been received/hash-verified locally; weak g=-0.1 is NOT PROVIDED, not
+inferred from strong. Legacy summary WY verdict refers to scalar only;
+candidate verdicts refer to the tiled roles. Local evidence ledger:
+/workspace/gdn-wy-tiles-evidence-20260921/DEVICE_RESULT.md.
+
+## Prior local-only handoff (before the result above)
 
 FINAL post-edit gate PASS: /workspace/gdn-wy-tiles-evidence-20260921/sealed-local-r2.log.
 5/5 CTests, 48 Python contracts, 45 algebra cases + five negatives, original
