@@ -161,6 +161,17 @@ arm is admissible.
 
 On the PPU box, from this repository's `ppu-backend` branch:
 
+The logical actlize target remains `ppu0010`. HGGC releases disagree on its
+CLI spelling: some accept `-arch=ppu_10`, others only `-arch=ppu001`. GDN's
+CMake compiles a tiny kernel to select the accepted spelling before compiling
+the real sources. It retries the legacy spelling **only** after the specific
+unsupported-architecture diagnostic; unrelated SDK/header/codegen failures
+remain failures. It never selects `all`, PPU1.5, or a different collective.
+The final `GDN HGGC arch:` configure line and `gdn_hgcc_arch.txt` record the
+selection. That compiler-hash/architecture contract is a dependency of all
+six device objects, so reconfiguring for a different SDK cannot reuse an old
+architecture selection. No actlize submodule edits/pin changes are needed.
+
 ```bash
 git pull --ff-only
 git submodule update --init --recursive

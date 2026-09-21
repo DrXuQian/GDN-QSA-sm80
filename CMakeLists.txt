@@ -65,6 +65,9 @@ if(GDN_QSA_ENABLE_PPU)
   set(CUTLASS_PPU_EXTRA_HGCC_FLAGS ${_actlize_hgcc_flags})
   set(CUTLASS_PPU_DEV_INCLUDE_FLAGS ${_actlize_device_includes})
   set(PPU_DEVICE_HGCC_REAL ${_actlize_hgcc})
+  include(cmake/GdnHgccArch.cmake)
+  gdn_hgcc_arch_flags(CUTLASS_PPU_EXTRA_HGCC_FLAGS _gdn_arch_contract
+    "${PPU_DEVICE_HGCC_REAL}" ${CUTLASS_PPU_EXTRA_HGCC_FLAGS})
   list(APPEND CUTLASS_PPU_DEV_INCLUDE_FLAGS
        "-I${CMAKE_CURRENT_SOURCE_DIR}/include")
   list(APPEND CUTLASS_PPU_EXTRA_HGCC_FLAGS "-DGDN_QSA_PPU=1")
@@ -84,6 +87,7 @@ if(GDN_QSA_ENABLE_PPU)
   foreach(_object IN LISTS _gdn_objects)
     if(_object MATCHES "[.]o$")
       add_custom_command(OUTPUT "${_object}" APPEND DEPENDS
+        "${_gdn_arch_contract}"
         ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_target.cuh
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/fragment.cuh
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/shared_copy.cuh)

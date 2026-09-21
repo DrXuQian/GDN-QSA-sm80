@@ -162,10 +162,10 @@ def collect(args, bundle, env):
             ("submodules", ["git", "submodule", "status", "--recursive"]),
         ):
             run(command, bundle / f"{name}.txt", env, console=False)
-        for directory in ("csrc/gdn_chunk", "include/gdn_qsa/ppu", "gdn_qsa_sm80",
+        for directory in ("csrc/gdn_chunk", "include/gdn_qsa/ppu", "gdn_qsa_sm80", "cmake",
                           "benchmarks", "tests", "tools", "scripts", "dev/ppu"):
             for path in (ROOT / directory).rglob("*"):
-                if path.is_file() and path.suffix in (".py", ".cu", ".cuh", ".hpp", ".cpp", ".h", ".sh"):
+                if path.is_file() and path.suffix in (".py", ".cu", ".cuh", ".hpp", ".cpp", ".h", ".sh", ".cmake"):
                     copy_file(path, bundle / "sources/ours" / path.relative_to(ROOT))
         for name in ("CMakeLists.txt", ".gitmodules", "docs/PPU_BACKEND.md"):
             copy_file(ROOT / name, bundle / "sources/ours" / name)
@@ -200,6 +200,9 @@ def collect(args, bundle, env):
         else:
             status["binary_source_binding"] = "operator-supplied; current source not asserted as binary origin"
         library = extension.parent / "libgdn_qsa_ppu.so"
+        arch_contract = extension.parent / "gdn_hgcc_arch.txt"
+        if arch_contract.is_file():
+            copy_file(arch_contract, bundle / arch_contract.name)
         for binary in (extension, library):
             if not binary.is_file():
                 raise RuntimeError(f"PPU binary missing: {binary}")

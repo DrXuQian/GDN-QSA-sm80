@@ -1,9 +1,22 @@
 # PPU original-structure port
 
-updated-at: 2026-09-21 00:59:02 UTC
-working-on: direct ACU replacement complete; awaiting user's report tar
-blocked-on: no local PPU; direct capture will run on user's box
-last-commit: c5bc38b (direct ACU subject process; profiler API hooks removed)
+updated-at: 2026-09-21 01:12:04 UTC
+working-on: HGGC spelling fix validated; committing box rerun handoff
+blocked-on: no local legacy HGGC/PPU; user's exact SDK build awaits rerun
+last-commit: 51f03ce (direct ACU subject process handoff)
+
+User's current build failure is before kernel compilation: inherited actlize
+maps logical ppu0010 to -arch=ppu_10, but box HGGC lists ppu001/ppu0015/all.
+GDN's local CMake seam now compile-probes ppu_10, retries ppu001 only on the
+exact unsupported-spelling error, and retains logical ppu0010 plus every
+non-architecture option. Wrong-target/all fallback is forbidden. No kernel
+or actlize submodule changes. Architecture/compiler hash is an explicit
+object dependency and joins the ACU bundle. Full local gate PASS: 7 compiler
+dialect/negative tests (synthetic legacy interface, not real legacy SDK),
+12 direct-ACU tests, 8 FLA tests, 2/2 compiled host tests, 55 algebra cases,
+real CuTe delivery/retile and 305 unchanged source controls. SDK2.1.1 actually
+recompiled all six device TUs and linked both libraries; 15 device images,
+C16 zero stack, unchanged resources/opcode counts. Submodule stays 423253c0.
 
 User-reported same-input full-API timing: g=-0.1 ours 925.020 us vs FLA
 726.992 us (FLA-WINS); g=-1 ours 457.340 us vs FLA 746.904 us
