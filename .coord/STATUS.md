@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-21 10:08:03 UTC
+updated-at: 2026-09-21 10:09:14 UTC
 working-on: all-three-stage delivery candidate locally admitted; box A/B handoff ready
 blocked-on: device raw-bit/race and timing admission requires box; no local PPU
-last-commit: 057f252 (preceding checkpoint; candidate commit follows this record)
+last-commit: e730f88 (three-stage candidate pushed; this follow-up is status metadata only)
 
 Candidate sources: /workspace/gdn-wy-align-20260921. Local evidence:
 /workspace/gdn-wy-delivery-20260921. Prepare/state/output packed variants
