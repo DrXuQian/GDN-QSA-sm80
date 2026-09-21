@@ -1,11 +1,37 @@
 # PPU original-structure port
 
-updated-at: 2026-09-21 07:24:03 UTC
-working-on: matched-SDK ACU handoff ready; kernel bytes unchanged; waiting for capture evidence
-blocked-on: user ACU capture throws map::at after preflight; precise native throw site unknown; no local PPU
-last-commit: fe0c7be (SDK-first ACU and failure evidence; following commit is metadata only)
+updated-at: 2026-09-21 09:36:30 UTC
+working-on: uploaded WY/FLA ACU diagnosis complete; next bounded candidate is coalesced state delivery
+blocked-on: no capture blocker remains for this run; no local PPU for candidate timing
+last-commit: 9ff48b3 (current HEAD; analysis only, production code unchanged)
 
-Current capture is USER-REPORTED/FAIL, not NOT_RUN or numerical FAIL. The
+New upload gdn-qsa-acu-20260921T073350Z-900246.tar.gz: all 535 files and
+the complete SHA256SUMS denominator verified. STATUS PASS, WY 3 and FLA 7
+launches captured, identical inputs/device and preserved dd70e5d binary hashes.
+Actual box ACU is v2.0.2_20260603-2c7c7f1/data15000, not the local SDK's
+v2.1.1. The unchanged binary now captures successfully with SDK-first ACU;
+the precise earlier map::at throw site remains unknown.
+
+Profiled stage times: WY prepare/state/output 165.799/464.781/84.339 us;
+FLA prefix+solve+WU/state/output 83.122/89.155/43.711 us, plus 6.575 us
+for two fills. Kernel-duration sums 714.919 vs 222.563 us are NOT public-API
+event spans. State explains 76.3% of the profiled gap, with identical BF16
+MMA count 524,288. WY state KVD-interface global-store traffic 784 MiB vs
+FLA 98 MiB; DRAM bytes are almost equal. Native scalar fragment stores and
+warp mapping checked before any implementation change. Both state grids
+are 128; WY 64 vs FLA 128 threads, achieved 3.55 vs 7.09 warps/CU.
+All profiled kernels report 1.700 GHz. No new routing or performance verdict.
+Local analysis: /workspace/gdn-wy-acu-analysis-20260921.
+Report: docs/PPU_WY_ACU_20260921.md. Host program uses shipping coordinate
+helper, independently checks native MMA traits and reproduces 802,816 store
+instructions / 784 MiB KVD traffic exactly: snapshots 512 + Vnew 256 + final
+16 MiB for only 50 MiB useful data. Omitted-slot negative fails the counter
+anchor. Actual uploaded assembly has scalar b16/b32 stores. Production
+unchanged; no local device execution, new timing or routing promotion.
+
+## Superseded capture checkpoint
+
+At the previous checkpoint capture was USER-REPORTED/FAIL, not NOT_RUN or numerical FAIL. The
 site ACU path was selected before the SDK. Earlier saved site-version proof:
 v2.0.0_20251231/data12006; actual local SDK ACU --version gives
 v2.1.1_20260725/data15000 (host-only version invocation, no profiling).
