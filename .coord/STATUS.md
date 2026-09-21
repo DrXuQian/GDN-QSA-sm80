@@ -1,9 +1,19 @@
 # PPU original-structure port
 
-updated-at: 2026-09-21 09:36:30 UTC
-working-on: uploaded WY/FLA ACU diagnosis complete; next bounded candidate is coalesced state delivery
+updated-at: 2026-09-21 09:59:39 UTC
+working-on: all-three-stage coalesced-delivery candidate in isolated ppu-wy-delivery-20260921 worktree; closing box A/B
 blocked-on: no capture blocker remains for this run; no local PPU for candidate timing
-last-commit: 9ff48b3 (current HEAD; analysis only, production code unchanged)
+last-commit: bae4ac7 (verified ACU diagnosis; candidate not committed yet)
+
+Candidate sources: /workspace/gdn-wy-align-20260921. Local evidence:
+/workspace/gdn-wy-delivery-20260921. Prepare/state/output packed variants
+compile+link with real SDK: 78/240/60 vregs, zero stack; scalar controls
+84/244/80, zero stack. All three packed variants have real b32x4 global
+stores and no scalar BF16 global stores. Full local gate PASS before latest
+capture-selector test additions; rerun pending. Host ownership: 4,080 cases
+and 12 negatives PASS. Controls and original auto routing retained. All
+three stages are in scope; no device performance claim. Closing same-binary
+scalar / prepare / state / output / all + original / FLA paired box command.
 
 New upload gdn-qsa-acu-20260921T073350Z-900246.tar.gz: all 535 files and
 the complete SHA256SUMS denominator verified. STATUS PASS, WY 3 and FLA 7
