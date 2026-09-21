@@ -1,5 +1,9 @@
 # PPU port of the original optimized GDN
 
+New, explicit candidate: [C64 WY weak-path alignment](PPU_WY_ALIGNMENT.md).
+It has a separate API/binding and does not replace the original implementation
+or the reset/scan admission described below. Device performance is pending.
+
 This port compiles the **original** `csrc/gdn_chunk/` kernels and
 `gdn_ops.cu` host dispatcher for PPU. The simplified backend from
 `a6ac2de` has been removed: it reproduced the broad affine-scan algorithm,
