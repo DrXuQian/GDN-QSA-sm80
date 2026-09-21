@@ -1,4 +1,70 @@
-# Weak-decay GDN versus FLA: one-command counter bundle
+# GDN versus FLA: one-command counter bundle
+
+## Current WY follow-up: reuse the admitted comparison, no rebuild
+
+For the `dd70e5d` WY comparison already run on the box:
+
+```bash
+git pull --ff-only
+DEVICE=0 bash tools/run_ppu_gdn_fla_acu_box.sh \
+  --wy-run /workspace/gdn-wy-fla-dd70e5d-20260921T041641Z
+```
+
+Use the physical `DEVICE` of that comparison. This selects **WY**, not the
+original API denoted by `ours` in older captures. Both roles print their
+implementation; the native reports are named `wy-g-0.1.report.acurep` and
+`fla-g-0.1.report.acurep` (some ACU versions omit the appended extension).
+This mode **never builds or installs anything**. It finds exactly one
+`build/_gdn_wy_ppu*.so`, checks it and `libgdn_wy_ppu.so` against that run's
+`binaries.sha256`, and checks the binding against `comparison.json` too.
+A replaced/missing/ambiguous binary fails, not a silent rebuild or fallback.
+Do not also set `EXTENSION` in this mode.
+
+The complete old samples, manifest and source SHA/diff join the bundle.
+Preflight verifies identical input, output fingerprints, numerical contract,
+FLA identity and device properties before ACU starts. The original comparison
+did not record a device UUID: matching properties alone **cannot** prove the
+same physical card across runs. Current capture receipts do record UUID when
+available. Updated checkout sources describe the capture helper, **not** the
+origin of the reused kernel binary; the old SHA/diff remains its provenance.
+
+Upload the single tar printed after `UPLOAD=`. No CSV copy-paste or screenshot
+is needed. `--gate -1.0` explicitly selects the separate strong-decay control.
+
+### The next decision is per phase, not a new winner claim
+
+At B1/S2048/Hk16/Hv32/K128/V128, the WY source and local compilation predict:
+
+| WY kernel | Corresponding FLA work | WY grid / threads | Shared bytes / vector registers |
+|---|---|---|---|
+| `gdn_wy_prepare` | gate prefix, KKT/solve, W/U | 1024 / 128 | 70,144 / 84 |
+| `gdn_wy_state` | `chunk_gated_delta_rule_fwd_kernel_h_blockdim64` | 128 / 64 | 37,120 / 244 |
+| `gdn_wy_output` | `chunk_fwd_kernel_o` | 1024 / 128 | 73,984 / 80 |
+
+These resources are **local compiler observations**, not box occupancy or
+performance evidence. All three locally have zero stack. Inspect actual
+resources from the reused box binary and all kernels in the FLA report;
+FLA's installed version may fuse or split preparation differently. Include
+clears and transformations separately; do not mistake extra tuning launches
+for a longer steady-state algorithm. No stage is filtered out of capture.
+
+For each stage compare duration, launched work, MMA count, active warps,
+register/stack/shared limits, achieved frequency, memory dependency, sync,
+fetch stalls and traffic. Optimize the largest **measured** gap first:
+preparation fusion may cost occupancy, state may cost register delivery, and
+output may cost fragment/shared delivery. They remain hypotheses until the
+new capture, not three changes to make together.
+
+The ~715 us WY versus ~500 us FLA engineering target comes from unprofiled
+complete-API samples. **Do not subtract the sum of ACU replay durations from
+715 us and call the residual CPU overhead.** Cache, replay and process state
+are different. The API also includes allocation and submission gaps; WY calls
+`hggcFuncSetAttribute` three times per API invocation, whose cost is currently
+unmeasured. Host-gap attribution needs a separate timeline if it remains the
+unexplained part. The prior samples and their UNRESOLVED verdict are preserved
+in [PPU_WY_FIRST_DEVICE_RESULTS.md](PPU_WY_FIRST_DEVICE_RESULTS.md).
+
+## Original path (retained control)
 
 From the `ppu-backend` checkout on the PPU box:
 

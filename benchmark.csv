@@ -1,3 +1,9 @@
 candidate,shape,decay,protocol,correctness,latency_us,evidence_status
 wy64-v32-r1,B1_S2048_Hk16_Hv32_D128,-0.1,full-public-api-event-span,NOT_RUN,,REJECTED_CODEGEN_SPILL
 wy64-v32-r3,B1_S2048_Hk16_Hv32_D128,-0.1,full-public-api-event-span,NOT_RUN,,DEVICE_PENDING
+original-dd70e5d,B1_S2048_Hk16_Hv32_D128,-0.1,full-public-api-event-span,USER_REPORTED_PASS,915.720,USER_LOG_WY_WINS_VS_ORIGINAL
+wy64-v32-r3-dd70e5d,B1_S2048_Hk16_Hv32_D128,-0.1,full-public-api-event-span,USER_REPORTED_PASS,715.232,USER_LOG_UNRESOLVED_VS_FLA
+fla-0.6.0-dd70e5d-run,B1_S2048_Hk16_Hv32_D128,-0.1,full-public-api-event-span,USER_REPORTED_PASS,480.806,USER_LOG_ENVELOPES_OVERLAP
+original-dd70e5d,B1_S2048_Hk16_Hv32_D128,-1.0,full-public-api-event-span,USER_REPORTED_PASS,437.670,USER_LOG_ORIGINAL_WINS_VS_WY
+wy64-v32-r3-dd70e5d,B1_S2048_Hk16_Hv32_D128,-1.0,full-public-api-event-span,USER_REPORTED_PASS,715.126,USER_LOG_UNRESOLVED_VS_FLA
+fla-0.6.0-dd70e5d-run,B1_S2048_Hk16_Hv32_D128,-1.0,full-public-api-event-span,USER_REPORTED_PASS,507.562,USER_LOG_ENVELOPES_OVERLAP

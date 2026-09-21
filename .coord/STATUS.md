@@ -1,9 +1,32 @@
 # PPU original-structure port
 
-updated-at: 2026-09-21 04:05:02 UTC
-working-on: implementation complete locally; awaiting explicit WY / original / FLA device admission and comparison
-blocked-on: no local PPU execution; local SDK compile/link available
-last-commit: 5e9460a (verified implementation; subsequent checkpoint is metadata only)
+updated-at: 2026-09-21 04:47:50 UTC
+working-on: validated direct WY/FLA ACU handoff; committing/pushing capture-only follow-up
+blocked-on: new WY per-stage counters require the PPU box; no local PPU execution
+last-commit: dd70e5d (delivered WY comparison)
+
+User-reported WY device gate: PASS, 16 cases; all comparison arms 8/8 repeat.
+Weak original/WY/FLA median: 915.720/715.232/480.806 us. Strong:
+437.670/715.126/507.562 us. Both WY-versus-FLA observed envelopes overlap,
+so both formal verdicts remain UNRESOLVED; median ratios are descriptive.
+Weak WY beats original, strong original beats WY under the existing envelope
+rule. No routing change. FLA ~500 us is an engineering target, not a new
+admission rule. Prior terminal PASS meant execution/numerics, not a speed win.
+Next capture must explicitly select WY (old `ours` selected original), reuse
+the existing binding AND device library, and keep profiled kernel durations
+separate from unprofiled complete-API spans. Do not subtract unlike protocols.
+
+Local follow-up PASS: 40 Python contracts (18 ACU + 7 WY + 8 FLA + 7 HGGC),
+3/3 compiled host tests, 45 algebra cases plus five negatives; 305 original
+control expressions unchanged. Fake-tool integration proves reuse never builds
+or selects original; real missing-ACU invocation returns rc=1 + INCOMPLETE tar,
+not PASS. Runtime counter capture remains NOT_RUN (no local PPU).
+Logs: /workspace/gdn-wy-acu-followup-20260921.
+Command: DEVICE=0 bash tools/run_ppu_gdn_fla_acu_box.sh --wy-run
+/workspace/gdn-wy-fla-dd70e5d-20260921T041641Z.
+No csrc/include/Python API/CMake/submodule differences from dd70e5d.
+
+## Prior checkpoints (historical; current status is above)
 
 Current plan: C64 parallel W/U preparation, V32 FP32 register-state recurrence,
 chunk-parallel output. Keep original reset/replay/scan and auto routing intact.

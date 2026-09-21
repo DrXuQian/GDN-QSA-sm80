@@ -24,6 +24,18 @@ def order(sample):
     return rows[sample % len(rows)]
 
 
+def comparison_summary(arms):
+    """Keep descriptive medians separate from the unchanged envelope rule."""
+    result = dict(ratio_scope="DESCRIPTIVE_MEDIANS_NOT_ADMISSION")
+    medians = {role: statistics.median(arm["samples_us"]) for role, arm in arms.items()}
+    for control in ("original", "fla"):
+        label = verdict(arms["wy"]["samples_us"], arms[control]["samples_us"])
+        result[f"wy_vs_{control}"] = label.replace("OURS", "WY").replace("FLA", control.upper())
+    result["wy_over_fla"] = medians["wy"] / medians["fla"]
+    result["speedup_over_original"] = medians["original"] / medians["wy"]
+    return result
+
+
 @torch.inference_mode()
 def compare(fn, gate, args, device):
     cpu = admission.fixture(1, 2048, 16, 32, gate)
@@ -71,15 +83,13 @@ def compare(fn, gate, args, device):
         arm["median_us"] = statistics.median(times)
         print(f"[WY compare] g={gate} role={role} median_us={arm['median_us']:.3f} "
               f"range=[{min(times):.3f},{max(times):.3f}] samples_us={times}", flush=True)
+    record.update(comparison_summary(record["arms"]))
     for control in ("original", "fla"):
-        label = verdict(record["arms"]["wy"]["samples_us"], record["arms"][control]["samples_us"])
-        label = label.replace("OURS", "WY").replace("FLA", control.upper())
-        record[f"wy_vs_{control}"] = label
+        label = record[f"wy_vs_{control}"]
         print(f"[WY verdict] g={gate} control={control} verdict={label} rule=disjoint-observed-envelopes")
-    record["wy_over_fla"] = record["arms"]["wy"]["median_us"] / record["arms"]["fla"]["median_us"]
-    record["speedup_over_original"] = record["arms"]["original"]["median_us"] / record["arms"]["wy"]["median_us"]
     print(f"[WY ratios] g={gate} WY/FLA={record['wy_over_fla']:.4f} "
-          f"original/WY={record['speedup_over_original']:.4f} routing=UNCHANGED")
+          f"original/WY={record['speedup_over_original']:.4f} scope={record['ratio_scope']} "
+          f"WY_vs_FLA={record['wy_vs_fla']} routing=UNCHANGED")
     return record
 
 
@@ -116,7 +126,8 @@ def main():
         result["cases"].append(compare(fn, gate, args, torch.device("cuda", args.device)))
         args.results.parent.mkdir(parents=True, exist_ok=True)
         args.results.write_text(json.dumps(result, indent=2) + "\n")
-    print(f"[WY compare] PASS results={args.results} routing=UNCHANGED")
+    print(f"[WY compare] PASS scope=NUMERICS+MEASUREMENT_COMPLETED_NOT_SPEED_ADMISSION "
+          f"results={args.results} routing=UNCHANGED")
 
 
 if __name__ == "__main__":

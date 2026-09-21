@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Collect ours/FLA weak-decay ACU reports and a bounded, uploadable tar.gz.
+"""Collect original/FLA or explicit WY/FLA ACU reports in an uploadable tar.gz.
 
 No remote commands, installs, device clock changes, model data or full caches.
 Failed captures still get a clearly INCOMPLETE diagnostic archive.
@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import shutil
 import subprocess
@@ -72,20 +73,83 @@ def report_file(base):
     return candidates[0]
 
 
-def child_command(extension, role, gate, bundle, phase):
+def child_command(extension, role, gate, bundle, phase, implementation="original"):
     receipt = f"{role}-preflight.json" if phase == "preflight" else f"{role}.json"
     return [sys.executable, "-u", str(ROOT / "benchmarks/profile_ppu_gdn_fla.py"),
             "--extension", str(extension), "--role", role, "--phase", phase, "--gate", str(gate),
+            "--implementation", implementation,
             "--receipt", str(bundle / receipt),
             "--sources", str(bundle / "sources/reference")]
 
 
-def acu_command(acu, report, extension, role, gate, bundle):
+def acu_command(acu, report, extension, role, gate, bundle, implementation="original"):
     # Same direct CLI pattern as quactlize/tools/run_dense_marlin_m8_acu_box.sh:
     # preflight is a separate process; ACU owns profiling from process start.
     return [str(acu), "-f", "-o", str(report), "--set", "full",
             "--check-exit-code", "yes",
-            *child_command(extension, role, gate, bundle, "subject")]
+            *child_command(extension, role, gate, bundle, "subject", implementation)]
+
+
+def read_wy_run(directory):
+    """Bind a reused WY pair to the completed comparison, not today's checkout."""
+    directory = directory.resolve()
+    candidates = sorted((directory / "build").glob("_gdn_wy_ppu*.so"))
+    if len(candidates) != 1:
+        raise ValueError(f"expected one reused WY binding, found {candidates}")
+    extension = candidates[0].resolve()
+    library = extension.parent / "libgdn_wy_ppu.so"
+    comparison = json.loads((directory / "comparison.json").read_text())
+    if (comparison.get("protocol") != "full-public-api-event-span"
+            or not comparison.get("cases")):
+        raise ValueError("WY run lacks the original complete-API comparison")
+    source_sha = (directory / "sha.txt").read_text().strip()
+    if not re.fullmatch(r"[0-9a-f]{40}", source_sha):
+        raise ValueError("WY run has no complete source SHA")
+    recorded = []
+    for line in (directory / "binaries.sha256").read_text().splitlines():
+        digest, filename = line.split(maxsplit=1)
+        recorded.append((Path(filename.lstrip("*")).name, digest))
+    binary_hashes = {}
+    for path in (extension, library):
+        matches = [digest for name, digest in recorded if name == path.name]
+        if matches != [sha(path)]:
+            raise ValueError(f"reused binary differs from comparison manifest: {path.name}")
+        binary_hashes[str(path)] = matches[0]
+    matches = [digest for name, digest in comparison.get("binary_sha256", {}).items()
+               if Path(name).name == extension.name]
+    if matches != [sha(extension)]:
+        raise ValueError("WY binding is not the one recorded by comparison.json")
+    return extension, comparison, dict(source_sha=source_sha, binary_sha256=binary_hashes,
+        source_diff_sha256=sha(directory / "source.diff"),
+        source_diff_empty=(directory / "source.diff").stat().st_size == 0,
+        comparison_sha256=sha(directory / "comparison.json"),
+        binary_manifest_sha256=sha(directory / "binaries.sha256"))
+
+
+def validate_comparison(comparison, subject, fla):
+    """Do not rebind an old median to changed inputs, FLA code or arithmetic."""
+    cases = [case for case in comparison["cases"] if case.get("g") == subject["gate"]]
+    if len(cases) != 1 or cases[0].get("input_sha") != subject["input_sha"]:
+        raise ValueError("capture fixture differs from the selected WY comparison case")
+    for key, value in (("initial_state", "zero"), ("final_state", True),
+                       ("qk_norm", False), ("scale", "1/sqrt(128)"), ("dtype", "bf16")):
+        if comparison.get(key) != value:
+            raise ValueError(f"unsupported preceding comparison contract: {key}")
+    for key in ("torch", "fla"):
+        if key not in comparison or comparison[key] != fla.get(key):
+            raise ValueError(f"capture differs from the preceding comparison: {key}")
+    if comparison.get("limit") != subject["max_relative_error_limit"]:
+        raise ValueError("comparison and capture use different numerical limits")
+    # The older comparison stores properties but no device UUID. Preserve that
+    # limitation: matching properties do NOT establish cross-run physical identity.
+    if comparison.get("device") != subject["device"].get("properties"):
+        raise ValueError("capture device properties differ from the comparison")
+    for role, record in (("wy", subject), ("fla", fla)):
+        arm = cases[0].get("arms", {}).get(role, {})
+        if arm.get("fingerprint") != record["output_sha"]:
+            raise ValueError(f"{role}: output differs from the compared binary/input")
+        if arm.get("state_dtype") != record.get("state_dtype") or not record.get("state_dtype"):
+            raise ValueError(f"{role}: final-state precision differs from the comparison")
 
 
 def validate_preflight(preflight, subject):
@@ -96,23 +160,27 @@ def validate_preflight(preflight, subject):
     if subject.get("phase") != "subject" or subject.get("public_api_calls") != 1 or subject.get("warmup") != 0:
         raise ValueError("subject must contain exactly one API call and no warmup")
     for key in ("role", "gate", "shape", "input_sha", "reference_sha", "output_sha", "device",
-                "torch", "torch_cuda", "fla", "extension_sha256", "protocol"):
+                "torch", "torch_cuda", "fla", "extension_sha256", "library_sha256", "implementation", "protocol",
+                "output_dtype", "state_dtype"):
         if key not in preflight or preflight[key] != subject.get(key):
             raise ValueError(f"subject differs from independent preflight: {key}")
 
 
-def validate_pair(ours, fla):
-    for record, role in ((ours, "ours"), (fla, "fla")):
+def validate_pair(ours, fla, implementation="original"):
+    if implementation not in ("original", "wy"):
+        raise ValueError(f"unknown implementation: {implementation}")
+    for record, role in ((ours, "wy" if implementation == "wy" else "ours"), (fla, "fla")):
         if (record.get("status") != "PASS" or record.get("role") != role
+                or record.get("implementation") != implementation
                 or record.get("phase") != "subject" or record.get("warmup") != 0
                 or record.get("public_api_calls") != 1):
             raise ValueError(f"{role}: missing successful single-call capture receipt")
-        for key in ("input_sha", "reference_sha", "extension_sha256"):
+        for key in ("input_sha", "reference_sha", "extension_sha256", "library_sha256"):
             if not record.get(key):
                 raise ValueError(f"{role}: empty {key}")
     for key in ("gate", "shape", "input_sha", "reference_sha", "device", "torch", "torch_cuda",
                 "initial_state", "output_final_state", "fla_heads", "max_relative_error_limit",
-                "protocol", "cache_control", "extension_sha256"):
+                "protocol", "cache_control", "extension_sha256", "library_sha256"):
         if key not in ours or ours[key] != fla.get(key):
             raise ValueError(f"profile arms differ or lack identity: {key}")
 
@@ -153,7 +221,9 @@ def find_acu(sdk):
 
 
 def collect(args, bundle, env):
-    status = dict(status="INCOMPLETE", errors=[], probes={})
+    implementation = "wy" if args.wy_run else "original"
+    roles = ("wy" if implementation == "wy" else "ours", "fla")
+    status = dict(status="INCOMPLETE", errors=[], probes={}, implementation=implementation)
     try:
         for name, command in (
             ("git-head", ["git", "rev-parse", "HEAD"]),
@@ -162,7 +232,7 @@ def collect(args, bundle, env):
             ("submodules", ["git", "submodule", "status", "--recursive"]),
         ):
             run(command, bundle / f"{name}.txt", env, console=False)
-        for directory in ("csrc/gdn_chunk", "include/gdn_qsa/ppu", "gdn_qsa_sm80", "cmake",
+        for directory in ("csrc/gdn_chunk", "include/gdn_qsa", "gdn_qsa_sm80", "cmake",
                           "benchmarks", "tests", "tools", "scripts", "dev/ppu"):
             for path in (ROOT / directory).rglob("*"):
                 if path.is_file() and path.suffix in (".py", ".cu", ".cuh", ".hpp", ".cpp", ".h", ".sh", ".cmake"):
@@ -188,7 +258,16 @@ def collect(args, bundle, env):
             status["probes"]["ppu-smi"] = dict(status="UNAVAILABLE", reason="not on PATH")
 
         extension = args.extension
-        if extension is None:
+        comparison = None
+        if args.wy_run:
+            extension, comparison, origin = read_wy_run(args.wy_run)
+            status["binary_source_binding"] = "reused-comparison; current sources are capture helpers, not binary origin"
+            status["comparison_origin"] = origin
+            status["prior_device_identity"] = "properties-only; previous comparison did not record a UUID"
+            for name in ("sha.txt", "source.diff", "binaries.sha256", "comparison.json", "comparison.log", "wy-correctness.log"):
+                if (args.wy_run / name).is_file():
+                    copy_file(args.wy_run / name, bundle / "preceding-comparison" / name)
+        elif extension is None:
             build = bundle.parent / "build"
             build_env = env | {"BUILD_DIR": str(build), "PPU_SDK": str(args.sdk)}
             run(["bash", ROOT / "scripts/build_ppu.sh"], bundle / "build.log", build_env)
@@ -199,7 +278,7 @@ def collect(args, bundle, env):
             status["binary_source_binding"] = "built-in-this-run (git head/diff and sources included)"
         else:
             status["binary_source_binding"] = "operator-supplied; current source not asserted as binary origin"
-        library = extension.parent / "libgdn_qsa_ppu.so"
+        library = extension.parent / ("libgdn_wy_ppu.so" if implementation == "wy" else "libgdn_qsa_ppu.so")
         arch_contract = extension.parent / "gdn_hgcc_arch.txt"
         if arch_contract.is_file():
             copy_file(arch_contract, bundle / arch_contract.name)
@@ -207,18 +286,32 @@ def collect(args, bundle, env):
             if not binary.is_file():
                 raise RuntimeError(f"PPU binary missing: {binary}")
             copy_file(binary, bundle / "binaries" / binary.name)
-        status["binaries"] = {str(p): sha(p) for p in (extension, library)}
+        status["binaries"] = (origin["binary_sha256"] if args.wy_run else
+                              {str(p): sha(p) for p in (extension, library)})
+        for path, expected in status["binaries"].items():
+            if sha(path) != expected or sha(bundle / "binaries" / Path(path).name) != expected:
+                raise ValueError(f"binary changed while preparing capture: {path}")
         for option, filename in (("--dump-resource-usage=all", "resources.txt"), ("--dump-isa", "isa.txt")):
             status["probes"][filename] = run(
                 [args.sdk / "bin/hgobjdump", "--arch=ppu1.0", option, library],
                 bundle / filename, env, optional=True, console=False, timeout=60)
 
-        for role in ("ours", "fla"):
+        for role in roles:
             try:
-                run(child_command(extension, role, args.gate, bundle, "preflight"),
+                run(child_command(extension, role, args.gate, bundle, "preflight", implementation),
                     bundle / f"{role}-preflight.log", env)
+            except Exception as exc:
+                status["errors"].append(f"{role} preflight: {type(exc).__name__}: {exc}")
+        if status["errors"]:
+            return status
+        if comparison is not None:
+            preflights = [json.loads((bundle / f"{role}-preflight.json").read_text()) for role in roles]
+            validate_comparison(comparison, *preflights)
+
+        for role in roles:
+            try:
                 base = bundle / f"{role}-g{args.gate}.report"
-                command = acu_command(args.acu, base, extension, role, args.gate, bundle)
+                command = acu_command(args.acu, base, extension, role, args.gate, bundle, implementation)
                 run(command, bundle / f"{role}-acu.log", env)
                 report = report_file(base)
                 # Native reports remain the authority. Text exports make the tar
@@ -236,14 +329,17 @@ def collect(args, bundle, env):
                 bundle / "device-after.txt", env, optional=True, console=False, timeout=20)
         if status["errors"]:
             return status
-        ours, fla = (json.loads((bundle / f"{role}.json").read_text()) for role in ("ours", "fla"))
+        ours, fla = (json.loads((bundle / f"{role}.json").read_text()) for role in roles)
         for subject in (ours, fla):
             preflight = json.loads((bundle / f"{subject['role']}-preflight.json").read_text())
             validate_preflight(preflight, subject)
-        validate_pair(ours, fla)
+        validate_pair(ours, fla, implementation)
+        if comparison is not None:
+            validate_comparison(comparison, ours, fla)
         validate_loaded_binary(ours, extension, library)
-        if ours["extension_sha256"] != status["binaries"][str(extension)]:
-            raise ValueError("profiled extension differs from archived binary")
+        if (ours["extension_sha256"] != status["binaries"][str(extension)]
+                or ours["library_sha256"] != status["binaries"][str(library)]):
+            raise ValueError("profiled binding/library differs from archived binary")
         for path, expected in status["binaries"].items():
             if sha(path) != expected:
                 raise ValueError(f"binary changed during capture: {path}")
@@ -258,7 +354,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--gate", type=float, choices=(-0.1, -1.0), default=-0.1)
     parser.add_argument("--extension", type=Path, default=os.environ.get("EXTENSION"))
+    parser.add_argument("--wy-run", type=Path,
+                        help="reuse this completed WY comparison directory; never compile")
     args = parser.parse_args()
+    if args.wy_run and args.extension:
+        parser.error("--wy-run and --extension/EXTENSION are mutually exclusive")
+    if args.wy_run:
+        args.wy_run = args.wy_run.resolve()
     args.sdk = Path(os.environ.get("PPU_SDK", "/usr/local/PPU_SDK")).resolve()
     args.acu = find_acu(args.sdk)
     args.device = os.environ.get("DEVICE", "0")

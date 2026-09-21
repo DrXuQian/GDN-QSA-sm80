@@ -9,7 +9,7 @@ import torch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT), str(ROOT / "benchmarks")]
 from gdn_qsa_sm80 import gdn_wy_interface as api
-from bench_ppu_wy_fla import order
+from bench_ppu_wy_fla import comparison_summary, order
 from bench_ppu_gdn_fla import checked_pair, verdict
 
 
@@ -46,6 +46,21 @@ class Contracts(unittest.TestCase):
         self.assertEqual(verdict([1, 2], [3, 4]), "OURS-WINS")
         self.assertEqual(verdict([3, 4], [1, 2]), "FLA-WINS")
         self.assertEqual(verdict([1, 3], [2, 4]), "UNRESOLVED")
+
+    def test_fast_median_with_slow_samples_is_still_unresolved(self):
+        arms = {role: dict(samples_us=times) for role, times in (
+            ("original", [910.096, 915.720, 960.612]),
+            ("wy", [713.744, 715.232, 726.492]),
+            ("fla", [474.344, 480.806, 852.296]))}
+        result = comparison_summary(arms)
+        self.assertEqual(result["wy_vs_original"], "WY-WINS")
+        self.assertEqual(result["wy_vs_fla"], "UNRESOLVED")
+        self.assertAlmostEqual(result["wy_over_fla"], 715.232 / 480.806)
+        self.assertEqual(result["ratio_scope"], "DESCRIPTIVE_MEDIANS_NOT_ADMISSION")
+        # Removing the slow sample changes the answer: that is exactly why the
+        # capture must not silently trim it to produce a desired winner.
+        arms["fla"]["samples_us"] = [474.344, 480.806]
+        self.assertEqual(comparison_summary(arms)["wy_vs_fla"], "FLA-WINS")
 
     def test_forwarding_and_no_state(self):
         class Fake:

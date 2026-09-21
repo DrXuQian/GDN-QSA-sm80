@@ -59,3 +59,16 @@ preservation, SDK compile/link/resource checks, Python contracts.
 Device validation: unchanged original admission, new path vs recurrent oracle,
 three-arm alternating unprofiled timing, optional direct `acu --set full`.
 Never replace auto dispatch based only on host or compile evidence.
+
+## Next checkpoint: dd70e5d device follow-up
+
+User reports 16/16 device cases PASS. Weak original/WY/FLA medians are
+915.720/715.232/480.806 us; strong 437.670/715.126/507.562 us. Overlapping
+WY/FLA envelopes give UNRESOLVED, not a median-only verdict. The <=1.10x
+target is unchanged and not established. Preserve all samples and routes.
+
+Next bounded step is measurement-only: direct ACU with explicit WY selection,
+reuse the box's comparison binding + device library (no rebuild), same-input
+FLA, tar all reports and preceding API samples. Identify preparation/state/
+output costs before the next single-change candidate. Profiled replay times
+are not subtracted from older API spans to invent a host-gap measurement.

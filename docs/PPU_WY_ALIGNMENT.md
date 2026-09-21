@@ -67,7 +67,12 @@ spill, missing native MMA and a missing cross-TU launcher to fail.
 
 These tests cannot establish runtime image loading, PPU instruction semantics,
 race freedom, exact BF16 rounding or speed. **No local PPU is available.**
-No device result or automatic routing promotion is claimed.
+At this local checkpoint no device result or automatic routing promotion was
+claimed. Subsequent user-reported 16-case admission and first timing results
+are recorded in [PPU_WY_FIRST_DEVICE_RESULTS.md](PPU_WY_FIRST_DEVICE_RESULTS.md):
+WY versus FLA remains UNRESOLVED, and routing is still unchanged. Use the
+[reuse-only ACU command](PPU_GDN_ACU.md) for the next experiment; the command
+below is the original build/admission handoff, not required again to profile.
 
 Local checkpoint (2026-09-21): 3/3 compiled host tests; 45 arithmetic cases
 (including both S2048 head counts) plus five numerical negatives; 33 Python

@@ -18,6 +18,22 @@ import torch
 import bench_ppu_gdn_fla as bench
 
 
+def subject_call(role, implementation, extension, inputs):
+    """Select an explicit API; never let 'ours' silently change meaning."""
+    expected = "wy" if implementation == "wy" else "ours"
+    if implementation not in ("original", "wy") or role not in (expected, "fla"):
+        raise ValueError(f"role {role} does not belong to {implementation}/FLA comparison")
+    if role == "fla":
+        fn, identity = bench.load_fla()
+        return bench.fla_call(fn, inputs, "native"), identity
+    if role == "wy":
+        from gdn_qsa_sm80 import gdn_chunk_wy
+        os.environ["GDN_QSA_WY_EXTENSION"] = str(extension.resolve())
+        return lambda: gdn_chunk_wy(*inputs, output_final_state=True), {}
+    os.environ["GDN_QSA_PPU_EXTENSION"] = str(extension.resolve())
+    return lambda: bench.admission.gdn_chunk(*inputs, output_final_state=True), {}
+
+
 def loaded_library_paths():
     paths = set()
     for line in Path("/proc/self/maps").read_text().splitlines():
@@ -55,6 +71,7 @@ def run_phase(call, synchronize, want, phase, warmup):
         if bench.admission.digest(warm) != fingerprint:
             raise AssertionError("preflight output/state is not bit-stable")
     return dict(errors=errors, output_sha=fingerprint, warmup=warmups,
+                output_dtype=str(first[0].dtype), state_dtype=str(first[1].dtype),
                 public_api_calls=1 + warmups)
 
 
@@ -90,7 +107,8 @@ def save_fla_sources(destination):
 @torch.inference_mode()
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--role", required=True, choices=("ours", "fla"))
+    parser.add_argument("--role", required=True, choices=("ours", "wy", "fla"))
+    parser.add_argument("--implementation", choices=("original", "wy"), default="original")
     parser.add_argument("--phase", required=True, choices=("preflight", "subject"))
     parser.add_argument("--extension", type=Path, required=True)
     parser.add_argument("--gate", type=float, choices=(-0.1, -1.0), default=-0.1)
@@ -100,7 +118,10 @@ def main():
     args = parser.parse_args()
     if not args.extension.is_file() or args.warmup < 1:
         parser.error("require an existing PPU extension and at least one warmup")
-    os.environ["GDN_QSA_PPU_EXTENSION"] = str(args.extension.resolve())
+    library = args.extension.parent / ("libgdn_wy_ppu.so" if args.implementation == "wy" else "libgdn_qsa_ppu.so")
+    prefix = "_gdn_wy_ppu" if args.implementation == "wy" else "_gdn_chunk_ppu"
+    if not args.extension.name.startswith(prefix) or not library.is_file():
+        parser.error(f"{args.implementation} requires {prefix}*.so and {library.name}")
     torch.set_num_threads(1)
     torch.cuda.set_device(0)  # physical device is fixed by CUDA_VISIBLE_DEVICES
     props = torch.cuda.get_device_properties(0)
@@ -111,14 +132,9 @@ def main():
     want = bench.admission.reference(cpu)
     inputs = tuple(x.cuda() for x in cpu)
     input_hash = bench.admission.digest(cpu)
-    identity = {}
-    if args.role == "ours":
-        call = lambda: bench.admission.gdn_chunk(*inputs, output_final_state=True)
-    else:
-        fn, identity = bench.load_fla()
-        call = bench.fla_call(fn, inputs, "native")
+    call, identity = subject_call(args.role, args.implementation, args.extension, inputs)
 
-    print(f"[PPU GDN ACU config] role={args.role} phase={args.phase} g={args.gate} "
+    print(f"[PPU GDN ACU config] role={args.role} implementation={args.implementation} phase={args.phase} g={args.gate} "
           f"shape=B1,S2048,Hk16,Hv32,D128 input_sha={input_hash} "
           "initial_state=zero final_state=1 GVA=native forward_only=1", flush=True)
     if args.phase == "subject":
@@ -136,15 +152,16 @@ def main():
     # extension filename itself looks current. Do not archive process env vars.
     loaded = {str(path): hashlib.sha256(path.read_bytes()).hexdigest()
               for path in loaded_library_paths()
-              if path.name.startswith(("libhggc", "libcuda", "libgdn", "_gdn_chunk"))}
+              if path.name.startswith(("libhggc", "libcuda", "libgdn", "_gdn_chunk", "_gdn_wy"))}
     receipt = dict(status="PASS", role=args.role, phase=args.phase, gate=args.gate,
+                   implementation=args.implementation,
                    shape=dict(B=1, S=2048, Hk=16, Hv=32, K=128, V=128),
                    input_sha=input_hash, reference_sha=bench.admission.digest(want),
                    fixture_seed=0x6A09E667, gate_bf16=float(cpu[3].flatten()[0]),
                    **measured,
                    max_relative_error_limit=bench.admission.MAX_RELATIVE_ERROR,
                    initial_state="zero", output_final_state=True, fla_heads="native",
-                   protocol="ACU-direct-subject-process-v2",
+                   protocol="ACU-direct-subject-process-v3",
                    timing_scope="PROFILED_DIAGNOSTIC_NOT_BENCHMARK",
                    cache_control="ACU default; not benchmark cache state",
                    capture_scope="whole subject process, including runtime/library setup if any",
@@ -158,6 +175,7 @@ def main():
                                uuid=str(getattr(props, "uuid", "UNAVAILABLE")),
                                visible=os.environ.get("CUDA_VISIBLE_DEVICES")),
                    extension_sha256=hashlib.sha256(args.extension.read_bytes()).hexdigest(),
+                   library_sha256=hashlib.sha256(library.read_bytes()).hexdigest(),
                    loaded_libraries=loaded, fla=identity, fla_sources=source_manifest)
     args.receipt.write_text(json.dumps(receipt, indent=2) + "\n")
     print(f"[PPU GDN ACU] PASS: role={args.role} phase={args.phase} "
