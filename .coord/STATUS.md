@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-21 04:47:50 UTC
-working-on: validated direct WY/FLA ACU handoff; committing/pushing capture-only follow-up
+updated-at: 2026-09-21 04:48:43 UTC
+working-on: direct WY/FLA ACU handoff ready; awaiting stage counters, original/WY routing unchanged
 blocked-on: new WY per-stage counters require the PPU box; no local PPU execution
-last-commit: dd70e5d (delivered WY comparison)
+last-commit: a0fe950 (capture-only follow-up; next checkpoint is metadata only)
 
 User-reported WY device gate: PASS, 16 cases; all comparison arms 8/8 repeat.
 Weak original/WY/FLA median: 915.720/715.232/480.806 us. Strong:

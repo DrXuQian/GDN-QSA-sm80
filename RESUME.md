@@ -1,10 +1,10 @@
 # WY alignment checkpoint
 
-updated-at: 2026-09-21 04:47:50 UTC
+updated-at: 2026-09-21 04:48:43 UTC
 parent: 8837640119835b6c8b7953d2c61e24de9fe35000
 working-on: capture-only follow-up for the admitted dd70e5d WY comparison
 blocked-on: new per-stage ACU counters need PPU execution
-last-commit: dd70e5d (prior delivered implementation)
+last-commit: a0fe950 (capture-only follow-up)
 
 User has now reported 16/16 device cases PASS and 8/8 repeats. Weak
 original/WY/FLA median 915.720/715.232/480.806 us, strong
