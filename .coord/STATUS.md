@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-21 01:12:04 UTC
-working-on: HGGC spelling fix validated; committing box rerun handoff
+updated-at: 2026-09-21 01:12:46 UTC
+working-on: HGGC spelling fix complete; awaiting user's direct-ACU rerun
 blocked-on: no local legacy HGGC/PPU; user's exact SDK build awaits rerun
-last-commit: 51f03ce (direct ACU subject process handoff)
+last-commit: b35b8be (compile-selected PPU1.0 architecture spelling)
 
 User's current build failure is before kernel compilation: inherited actlize
 maps logical ppu0010 to -arch=ppu_10, but box HGGC lists ppu001/ppu0015/all.
