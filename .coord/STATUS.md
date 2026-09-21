@@ -1,9 +1,63 @@
 # PPU original-structure port
 
-updated-at: 2026-09-21 10:09:14 UTC
-working-on: all-three-stage delivery candidate locally admitted; box A/B handoff ready
-blocked-on: device raw-bit/race and timing admission requires box; no local PPU
-last-commit: e730f88 (three-stage candidate pushed; this follow-up is status metadata only)
+updated-at: 2026-09-21 12:44:56 UTC
+working-on: verified all-delivery ACU and both-gate A/B; traffic target met, speed target not met
+blocked-on: same-run scalar ACU not uploaded; no local PPU for next candidate timing
+last-commit: 1b1f508 (candidate implementation e730f88; no kernel changes this checkpoint)
+
+New upload gdn-qsa-acu-20260921T123213Z-3755721.tar.gz: all 537 files and
+checksum denominator verified. Actual three <true> kernels, g=-1.0, loaded
+binding/library match comparison origin 1b1f508; WY/FLA same inputs and GPU
+UUID, all CE clocks 1.700 GHz. No scalar capture in this archive. Included
+comparison.json supplies both gates; medians/envelopes recomputed, 16-case /
+64-candidate / 8-repeat numerical denominator validated.
+
+ACU prepare/state/output: all 164.106/443.367/86.580 us versus FLA
+82.146/91.879/44.786 us (prepare includes prefix+solve+WU). Executed instruction
+ratios 2.69x/3.88x/2.14x. State KVD write bytes now exactly FLA's 98 MiB,
+store instructions both 102400, BF16 MMA both 524288; matching write traffic
+did not close the 4.83x state time gap. Stage write-footprint predictions
+128.25/98/64 MiB all confirmed. State still 64 vs FLA 128 threads, 3.55 vs
+7.10 active warps/CU; register shuffle/repack consumer remains after the new
+snapshot exchange. Prepare has 3x TF32 MMA (explicit high/residual precision).
+
+Complete API medians weak: scalar/all/FLA 717.626/724.098/496.814 us; strong:
+710.058/719.990/495.610 us. Every candidate UNRESOLVED vs scalar, loses to
+FLA. Keep defaults/original routing, no candidate speed admission. Original
+strong route wins under existing numerical gate, with BF16 final state vs
+WY/FLA FP32 explicitly noted. No cross-protocol time subtraction and no
+old-scalar/new-candidate latency delta: the old ACU gate/build differs.
+
+Report: docs/PPU_WY_DELIVERY_VERDICT_20260921.md. Local analysis:
+/workspace/gdn-wy-delivery-acu-20260921/analyze_bundle.py and parsed.json.
+Next bounded direction is MMA producer/consumer tile layout and warp work
+distribution across all three stages, not another global-store-only patch.
+No implementation, numerical criterion, default or routing changes here.
+
+## Earlier pasted-result checkpoint (raw files are now verified above)
+
+User-reported run /workspace/gdn-wy-fla-1b1f508-20260921T111202Z,
+g=-1.0 only: original/scalar-WY/FLA medians 425.240/710.058/495.610 us.
+prepare/state/output/all candidates: 708.476/714.356/713.394/719.990 us.
+All four candidate-versus-scalar observed envelopes overlap: UNRESOLVED,
+not an admitted improvement. All four lose to FLA with disjoint envelopes.
+Original beats FLA with disjoint envelopes; preserve its strong-decay path.
+Reported raw-bit checks pass. Terminal PASS means numerics and measurement
+completed, not speed. Raw comparison file and run bundle have not been
+received/hash-verified locally. Weak g=-0.1 is NOT PROVIDED, not inferred.
+
+Source audit: delivery 1/2/4/7 reaches prepare/state/output template selection;
+benchmark lambdas bind each delivery correctly. This is not runtime proof
+of selected device images. Reuse the existing --wy-run binary for separate
+--wy-delivery scalar/all --gate -1.0 ACU captures, covering all three stages.
+Check kernel identities, actual KVD traffic, added shared/barrier costs and
+kernel durations; do not subtract unlike API-event and profiled protocols.
+Predicted transaction reduction is NOT yet a measured candidate result and
+the old traffic amplification does not establish latency causality.
+Local record: /workspace/gdn-wy-delivery-20260921/DEVICE_RESULT.md.
+No routing/default/kernel modification; no device execution on this host.
+
+## Delivery handoff checkpoint (superseded by device report above)
 
 Candidate sources: /workspace/gdn-wy-align-20260921. Local evidence:
 /workspace/gdn-wy-delivery-20260921. Prepare/state/output packed variants

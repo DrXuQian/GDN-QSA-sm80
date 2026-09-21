@@ -3,7 +3,10 @@
 Parent: `bae4ac7`. Scope and diagnosis are in
 [the verified ACU analysis](PPU_WY_ACU_20260921.md). This is a forward-only
 delivery change, not a new GDN algorithm, lower-precision state, reset policy,
-larger grid or automatic route promotion. No candidate has device timings yet.
+larger grid or automatic route promotion. The subsequent device verdict is
+[traffic target met, speed target not met](PPU_WY_DELIVERY_VERDICT_20260921.md):
+both gates passed numerical admission; no delivery ablation established a
+speed advantage, and all lost to FLA. The candidate stays opt-in, not default.
 
 ## Changes and invariants
 
@@ -56,7 +59,8 @@ anchor producer fragment ownership; every valid output is owned once and
 every invalid/padding cell stays untouched. Twelve negative tests plant
 wrong word permutation, one missing transaction, and a tail write. Existing
 algebra/reference, native layout, API and original-source preservation gates
-remain required. Actual device rounding/races/performance remain NOT_RUN.
+remain required. At the original local handoff device tests were NOT_RUN;
+the linked device verdict now records the completed box results.
 
 Complete post-edit rerun: **4/4 CTests, 47/47 Python contracts, 45 algebra
 cases plus five negatives PASS**; 305 original control expressions unchanged;
@@ -66,8 +70,9 @@ original 15 and WY six device images compile/link. Local evidence:
 The useful target for the next ACU ledger is state writes 784 -> 98 MiB;
 prepare W/U+gates 512.25 -> 128.25 MiB; output 256 -> 64 MiB at the KVD
 interface, using the footprint calibrated by the incumbent capture.
-These are **address-footprint predictions**, not newly measured traffic or
-latency. Prepare/output still store warp-sized N16 tiles; this first candidate
+These were **address-footprint predictions** at handoff; the subsequent
+all-delivery ACU confirmed all three counts exactly, without a speed win.
+Prepare/output still store warp-sized N16 tiles; this first candidate
 does not claim their global coalescing is already identical to FLA's full tile.
 
 ## One-command box experiment
