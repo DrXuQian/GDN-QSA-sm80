@@ -7,6 +7,8 @@ larger grid or automatic route promotion. The subsequent device verdict is
 [traffic target met, speed target not met](PPU_WY_DELIVERY_VERDICT_20260921.md):
 both gates passed numerical admission; no delivery ablation established a
 speed advantage, and all lost to FLA. The candidate stays opt-in, not default.
+The subsequent [compute-tile experiment](PPU_WY_COMPUTE_TILES.md) preserves
+these controls and introduces a separate `tiled-*` candidate family.
 
 ## Changes and invariants
 

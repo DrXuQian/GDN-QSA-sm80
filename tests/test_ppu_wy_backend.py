@@ -95,7 +95,9 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--wy-extension", type=Path, required=True)
     p.add_argument("--device", type=int, default=0)
-    p.add_argument("--delivery-ab", action="store_true")
+    family = p.add_mutually_exclusive_group()
+    family.add_argument("--delivery-ab", action="store_true")
+    family.add_argument("--tile-ab", action="store_true")
     args = p.parse_args()
     if not args.wy_extension.is_file():
         p.error("WY extension missing")
@@ -106,7 +108,8 @@ def main():
     if "PPU" not in props.name.upper():
         raise RuntimeError(f"not a PPU: {props.name}")
     device = torch.device("cuda", args.device)
-    deliveries = ("prepare", "state", "output", "all") if args.delivery_ab else ()
+    from gdn_qsa_sm80.gdn_wy_interface import PACKED_DELIVERIES, TILED_DELIVERIES
+    deliveries = TILED_DELIVERIES if args.tile_ab else PACKED_DELIVERIES if args.delivery_ab else ()
     for length in (1, 16, 63, 64, 65, 129):
         for initial in (False, True):
             run_case((2, length, 1, 2), -.1, initial, device, deliveries)

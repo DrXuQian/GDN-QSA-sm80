@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ "${DELIVERY_AB:-0}" == 1 && "${TILE_AB:-0}" == 1 ]]; then
+  echo "[WY box] FAIL: choose DELIVERY_AB or TILE_AB, not both" >&2
+  exit 1
+fi
 PPU_SDK_ROOT="${PPU_SDK:-/usr/local/PPU_SDK}"
 SHA="$(git -C "$ROOT" rev-parse --short HEAD)"
 OUT="${OUT:-/workspace/gdn-wy-fla-${SHA}-$(date -u +%Y%m%dT%H%M%SZ)}"
@@ -29,6 +33,10 @@ variant_flags=()
 default_samples=12
 if [[ "${DELIVERY_AB:-0}" == 1 ]]; then
   variant_flags+=(--delivery-ab)
+  default_samples=14
+fi
+if [[ "${TILE_AB:-0}" == 1 ]]; then
+  variant_flags+=(--tile-ab)
   default_samples=14
 fi
 python "$ROOT/tests/test_ppu_gdn_backend.py" --extension "${old[0]}" --device 0 2>&1 | tee "$OUT/original-correctness.log"

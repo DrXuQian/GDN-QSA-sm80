@@ -14,9 +14,18 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from bench_ppu_gdn_fla import admission, checked_pair, fla_call, load_fla, verdict
 from gdn_qsa_sm80 import gdn_chunk_wy
+from gdn_qsa_sm80.gdn_wy_interface import PACKED_DELIVERIES, TILED_DELIVERIES
 
 
 DELIVERY_ROLES = ("original", "wy", "wy-prepare", "wy-state", "wy-output", "wy-all", "fla")
+TILE_ROLES = ("original", "wy", *(f"wy-{name}" for name in TILED_DELIVERIES), "fla")
+
+
+def experiment(delivery_ab=False, tile_ab=False):
+    if delivery_ab and tile_ab:
+        raise ValueError("choose one balanced candidate family")
+    names = TILED_DELIVERIES if tile_ab else PACKED_DELIVERIES if delivery_ab else ()
+    return names, ("original", "wy", *(f"wy-{name}" for name in names), "fla")
 
 
 def order(sample, roles=("original", "wy", "fla")):
@@ -52,10 +61,9 @@ def compare(fn, gate, args, device):
     want = admission.reference(cpu)
     calls = dict(original=lambda: admission.gdn_chunk(*inputs),
                  wy=lambda: gdn_chunk_wy(*inputs), fla=fla_call(fn, inputs, "native"))
-    if args.delivery_ab:
-        for delivery in ("prepare", "state", "output", "all"):
-            calls[f"wy-{delivery}"] = lambda delivery=delivery: gdn_chunk_wy(*inputs, delivery=delivery)
-    roles = DELIVERY_ROLES if args.delivery_ab else ("original", "wy", "fla")
+    names, roles = experiment(args.delivery_ab, args.tile_ab)
+    for delivery in names:
+        calls[f"wy-{delivery}"] = lambda delivery=delivery: gdn_chunk_wy(*inputs, delivery=delivery)
     record = dict(g=gate, shape="B1/S2048/Hk16/Hv32/D128", input_sha=admission.digest(cpu), arms={})
     for role in roles:
         call = calls[role]
@@ -106,8 +114,8 @@ def compare(fn, gate, args, device):
     print(f"[WY ratios] g={gate} WY/FLA={record['wy_over_fla']:.4f} "
           f"original/WY={record['speedup_over_original']:.4f} scope={record['ratio_scope']} "
           f"WY_vs_FLA={record['wy_vs_fla']} routing=UNCHANGED")
-    if args.delivery_ab:
-        for delivery in ("prepare", "state", "output", "all"):
+    if names:
+        for delivery in names:
             role = f"wy-{delivery}"
             candidate = record["arms"][role]
             candidate["versus"] = {}
@@ -132,11 +140,13 @@ def main():
     p.add_argument("--samples", type=int, default=12)
     p.add_argument("--launches", type=int, default=10)
     p.add_argument("--warmup", type=int, default=5)
-    p.add_argument("--delivery-ab", action="store_true", help="paired scalar/prepare/state/output/all controls")
+    family = p.add_mutually_exclusive_group()
+    family.add_argument("--delivery-ab", action="store_true", help="paired legacy packed-delivery controls")
+    family.add_argument("--tile-ab", action="store_true", help="paired compute-tile prepare/state/output/all controls")
     args = p.parse_args()
     if args.samples < 3 or args.launches < 1 or args.samples * args.launches < 50 or args.warmup < 5:
         p.error("need >=5 warmups, >=3 samples and >=50 timed launches per arm")
-    if args.delivery_ab and (args.samples < 14 or args.samples % 14):
+    if (args.delivery_ab or args.tile_ab) and (args.samples < 14 or args.samples % 14):
         p.error("delivery A/B needs a multiple of 14 samples for complete balanced orders")
     for key, path in (("GDN_QSA_PPU_EXTENSION", args.extension), ("GDN_QSA_WY_EXTENSION", args.wy_extension)):
         if not path.is_file():
@@ -153,7 +163,8 @@ def main():
                   qk_norm=False, scale="1/sqrt(128)", dtype="bf16", device=str(props),
                   torch=torch.__version__, fla=identity, samples=args.samples, launches=args.launches,
                   warmup=args.warmup, limit=admission.MAX_RELATIVE_ERROR,
-                  delivery_ab=args.delivery_ab, roles=DELIVERY_ROLES if args.delivery_ab else ("original", "wy", "fla"),
+                  delivery_ab=args.delivery_ab or args.tile_ab, tile_ab=args.tile_ab,
+                  roles=experiment(args.delivery_ab, args.tile_ab)[1],
                   binary_sha256={str(x): hashlib.sha256(x.read_bytes()).hexdigest()
                                  for x in (args.extension, args.wy_extension)}, cases=[])
     for gate in (-.1, -1.):

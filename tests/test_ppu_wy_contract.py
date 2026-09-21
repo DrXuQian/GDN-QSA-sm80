@@ -9,7 +9,7 @@ import torch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT), str(ROOT / "benchmarks")]
 from gdn_qsa_sm80 import gdn_wy_interface as api
-from bench_ppu_wy_fla import comparison_summary, order, DELIVERY_ROLES
+from bench_ppu_wy_fla import comparison_summary, order, DELIVERY_ROLES, TILE_ROLES, experiment
 from bench_ppu_gdn_fla import checked_pair, verdict
 
 
@@ -42,6 +42,19 @@ class Contracts(unittest.TestCase):
         for column in zip(*rows):
             for role in DELIVERY_ROLES:
                 self.assertEqual(column.count(role), 2)
+
+    def test_tiled_orders_and_masks_are_a_distinct_balanced_family(self):
+        names, roles = experiment(tile_ab=True)
+        self.assertEqual(roles, TILE_ROLES)
+        self.assertEqual(tuple(api.DELIVERIES[name] for name in names), (8, 16, 32, 56))
+        rows = [order(i, roles) for i in range(14)]
+        for row in rows:
+            self.assertEqual(set(row), set(roles))
+        for column in zip(*rows):
+            for role in roles:
+                self.assertEqual(column.count(role), 2)
+        with self.assertRaises(ValueError):
+            experiment(delivery_ab=True, tile_ab=True)
 
     def test_delivery_mask_is_consumed_not_silently_ignored(self):
         class Fake:

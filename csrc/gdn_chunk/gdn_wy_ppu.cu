@@ -1,159 +1,16 @@
 // Forward-only C64 WY candidate. Original reset/scan/serial kernels are
 // deliberately separate. No approximate history reset occurs in this TU.
-#include "gdn_target.cuh"
-#include "gdn_qsa/wy_contract.hpp"
-#include "gdn_qsa/ppu/wy_mma.cuh"
-#include "gdn_qsa/ppu/wy_delivery.cuh"
+#include "gdn_wy_prepare.cuh"
 
 namespace gdn_qsa::wy {
-
-struct Inputs {
-  BF16 const *q, *k, *v, *beta;
-  void const* g;
-  float const* initial;
-  bool gate_fp32;
-  Shape shape;
-};
-struct Workspace {
-  BF16 *w, *u, *snapshots, *vnew;
-  float* gates;
-};
-
-template <int Rows, int Cols, int Threads>
-__device__ void stage(BF16* dst, BF16 const* src, int64_t stride, int valid_rows) {
-  // Each transaction is eight contiguous BF16 values, including under the
-  // hardware swizzle. Tail transactions use zfill without an invalid pointer.
-  for (int i = int(threadIdx.x); i < Rows * Cols / 8; i += Threads) {
-    int const r = i / (Cols / 8), c = (i % (Cols / 8)) * 8;
-    auto const* p = src + (r < valid_rows ? r * stride + c : 0);
-    gdn_arch::async_copy16(dst + swizzle<Rows, Cols>(r, c), p, r < valid_rows);
-  }
-}
-__device__ void commit_wait() {
-  cute::cp_async_fence();
-  cute::cp_async_wait<0>();
-  __syncthreads();
-}
-__device__ float gate(Inputs const& p, int64_t i) {
-  return p.gate_fp32 ? static_cast<float const*>(p.g)[i]
-                     : float(static_cast<BF16 const*>(p.g)[i]);
-}
-
-struct PrepareStorage {
-  alignas(128) BF16 k[Chunk * Dim], v[Chunk * Dim];
-  alignas(128) float lower[Chunk * Chunk], inverse[Chunk * Chunk];
-  union {
-    alignas(128) float temp[4][16 * 16];
-    alignas(128) BF16 packed[4][2 * 16 * 16];  // solve scratch is dead during W/U
-  };
-  float prefix[Chunk], beta[Chunk];
-};
 
 template <bool Packed>
 __global__ void __launch_bounds__(ParallelThreads) gdn_wy_prepare(Inputs p, Workspace ws) {
   extern __shared__ __align__(128) unsigned char storage[];
   auto& sm = *reinterpret_cast<PrepareStorage*>(storage);
   int const tid = int(threadIdx.x), warp = unsigned(threadIdx.x) >> 5, lane = unsigned(threadIdx.x) & 31;
-  int const ct = int(blockIdx.x) % p.shape.chunks();
-  int const bh = int(blockIdx.x) / p.shape.chunks();
-  int const h = bh % p.shape.value_heads, b = bh / p.shape.value_heads;
-  int const first = ct * Chunk, valid = min(Chunk, p.shape.sequence - first);
-  int const qh = p.shape.q_head(h);
-  int64_t const group = p.shape.group(b, h, ct);
-  stage<Chunk, Dim, ParallelThreads>(sm.k, p.k + p.shape.input(b, first, qh, p.shape.q_heads),
-                                    int64_t(p.shape.q_heads) * Dim, valid);
-  stage<Chunk, Dim, ParallelThreads>(sm.v, p.v + p.shape.input(b, first, h, p.shape.value_heads),
-                                    int64_t(p.shape.value_heads) * Dim, valid);
-  if (tid < Chunk) {
-    int64_t const gi = (int64_t(b) * p.shape.sequence + first + min(tid, valid - 1))
-                      * p.shape.value_heads + h;
-    float g = tid < valid ? gate(p, gi) : 0.0f;
-    CUTE_UNROLL
-    for (int offset = 1; offset < 32; offset *= 2) {
-      float const other = __shfl_up_sync(0xffffffffu, g, offset);
-      if (lane >= offset) g += other;
-    }
-    sm.prefix[tid] = g;
-    sm.beta[tid] = tid < valid ? float(p.beta[gi]) : 0.0f;
-  }
-  commit_wait();
-  if (tid >= 32 && tid < Chunk) sm.prefix[tid] += sm.prefix[31];
-  __syncthreads();
-  if (tid < Chunk) ws.gates[group * Chunk + tid] = sm.prefix[tid];
-
-  // Ten lower triangular 16x16 products; upper entries are never read.
-  for (int tile = warp; tile < 16; tile += 4) {
-    int const br = tile / 4, bc = tile % 4;
-    if (bc > br) continue;
-    float acc[8] = {};
-    CUTE_UNROLL
-    for (int k = 0; k < Dim; k += 16) {
-      uint32_t a[4], bt[4];
-      load<Chunk, Dim>(sm.k, br * 16, k, a);
-      load<Chunk, Dim>(sm.k, bc * 16, k, bt);
-      bf16_mma(acc, a, bt);
-    }
-    CUTE_UNROLL
-    for (int s = 0; s < 8; ++s) {
-      auto const rc = result_coord(lane, s);
-      int const r = br * 16 + rc.row, c = bc * 16 + rc.col;
-      sm.lower[r * Chunk + c] = r > c
-          ? acc[s] * sm.beta[r] * expf(sm.prefix[r] - sm.prefix[c]) : 0.0f;
-    }
-  }
-  __syncthreads();
-
-  // Four independent unit-lower 16x16 diagonal solves in FP32. Each active
-  // lane owns one entire inverse column; no CTA barrier per scalar row.
-  float column[16];
-  CUTE_UNROLL
-  for (int r = 0; r < 16; ++r) {
-    float x = r == (lane % 16) ? 1.0f : 0.0f;
-    CUTE_UNROLL
-    for (int k = 0; k < r; ++k)
-      x -= sm.lower[(warp * 16 + r) * Chunk + warp * 16 + k] * column[k];
-    column[r] = x;
-    if (lane < 16) sm.inverse[(warp * 16 + r) * Chunk + warp * 16 + lane] = x;
-  }
-  __syncthreads();
-  // Block forward substitution: R_ij = -R_ii sum(A_ip R_pj).
-  #pragma unroll 1
-  for (int gap = 1; gap < 4; ++gap) {
-    int const br = warp + gap, bc = warp;
-    if (br < 4) {
-      float acc[8] = {};
-      #pragma unroll 1
-      for (int k = bc; k < br; ++k)
-        tf32_product(acc, sm.lower + br * 16 * Chunk + k * 16, Chunk,
-                     sm.inverse + k * 16 * Chunk + bc * 16, Chunk);
-      CUTE_UNROLL
-      for (int s = 0; s < 8; ++s) {
-        auto const rc = result_coord(lane, s);
-        sm.temp[warp][rc.row * 16 + rc.col] = acc[s];
-      }
-      __syncwarp();
-      float merged[8] = {};
-      tf32_product(merged, sm.inverse + br * 16 * Chunk + br * 16, Chunk, sm.temp[warp], 16);
-      CUTE_UNROLL
-      for (int s = 0; s < 8; ++s) {
-        auto const rc = result_coord(lane, s);
-        sm.inverse[(br * 16 + rc.row) * Chunk + bc * 16 + rc.col] = -merged[s];
-      }
-    }
-    __syncthreads();
-  }
-  // lower is dead; reuse its storage for the BF16 inverse consumed by W/U.
+  int64_t const group = prepare_inverse(p, ws, sm);
   BF16* inv = reinterpret_cast<BF16*>(sm.lower);
-  for (int i = tid; i < Chunk * Chunk; i += ParallelThreads) {
-    int const r = i / Chunk, c = i % Chunk;
-    inv[swizzle<Chunk, Chunk>(r, c)] = BF16(r >= c ? sm.inverse[i] : 0.0f);
-  }
-  for (int i = tid; i < Chunk * Dim; i += ParallelThreads) {
-    int const r = i / Dim, c = i % Dim, at = swizzle<Chunk, Dim>(r, c);
-    sm.k[at] = BF16(float(sm.k[at]) * sm.beta[r] * expf(sm.prefix[r]));
-    sm.v[at] = BF16(float(sm.v[at]) * sm.beta[r]);
-  }
-  __syncthreads();
   #pragma unroll 1
   for (int tile = warp; tile < 32; tile += 4) {
     int const br = tile / 8, bc = tile % 8;
@@ -441,7 +298,7 @@ extern "C" int gdn_wy_forward_delivery(
     void* snapshots, void* vnew, float* gates, int batch, int sequence,
     int q_heads, int value_heads, bool gate_fp32, gdn_arch::Stream stream, unsigned delivery) {
   using namespace gdn_qsa::wy;
-  if (delivery > 7) return int(hggcErrorInvalidValue);
+  if (!valid_delivery(delivery)) return int(hggcErrorInvalidValue);
   Inputs p{static_cast<BF16 const*>(q), static_cast<BF16 const*>(k),
            static_cast<BF16 const*>(v), static_cast<BF16 const*>(beta),
            g, initial, gate_fp32, {batch, sequence, q_heads, value_heads}};
@@ -449,30 +306,52 @@ extern "C" int gdn_wy_forward_delivery(
                static_cast<BF16*>(vnew), gates};
   // Match the original backend's explicit opt-in for >48 KiB shared memory.
   // An SDK/device resource refusal is a launch failure, never a fallback.
-  auto status = hggcFuncSetAttribute(delivery & 1 ? gdn_wy_prepare<true> : gdn_wy_prepare<false>,
-      hggcFuncAttributeMaxDynamicSharedMemorySize, sizeof(PrepareStorage));
-  if (status != hggcSuccess) return int(status);
-  status = hggcFuncSetAttribute(delivery & 2 ? gdn_wy_state<true> : gdn_wy_state<false>,
-      hggcFuncAttributeMaxDynamicSharedMemorySize,
-      delivery & 2 ? sizeof(StateSmem<true>) : sizeof(StateSmem<false>));
-  if (status != hggcSuccess) return int(status);
-  status = hggcFuncSetAttribute(delivery & 4 ? gdn_wy_output<true> : gdn_wy_output<false>,
-      hggcFuncAttributeMaxDynamicSharedMemorySize,
-      delivery & 4 ? sizeof(OutputSmem<true>) : sizeof(OutputSmem<false>));
-  if (status != hggcSuccess) return int(status);
-  if (delivery & 1)
-    gdn_wy_prepare<true><<<unsigned(p.shape.groups()), ParallelThreads, sizeof(PrepareStorage), stream>>>(p, ws);
-  else
-    gdn_wy_prepare<false><<<unsigned(p.shape.groups()), ParallelThreads, sizeof(PrepareStorage), stream>>>(p, ws);
-  status = hggcGetLastError();
-  if (status != hggcSuccess) return int(status);
+  if (delivery & 56) {
+    int const rc = configure_tiled(delivery);
+    if (rc) return rc;
+  }
+  auto status = hggcSuccess;
+  if (!(delivery & 8)) {
+    status = hggcFuncSetAttribute(delivery & 1 ? gdn_wy_prepare<true> : gdn_wy_prepare<false>,
+        hggcFuncAttributeMaxDynamicSharedMemorySize, sizeof(PrepareStorage));
+    if (status != hggcSuccess) return int(status);
+  }
+  if (!(delivery & 16)) {
+    status = hggcFuncSetAttribute(delivery & 2 ? gdn_wy_state<true> : gdn_wy_state<false>,
+        hggcFuncAttributeMaxDynamicSharedMemorySize,
+        delivery & 2 ? sizeof(StateSmem<true>) : sizeof(StateSmem<false>));
+    if (status != hggcSuccess) return int(status);
+  }
+  if (!(delivery & 32)) {
+    status = hggcFuncSetAttribute(delivery & 4 ? gdn_wy_output<true> : gdn_wy_output<false>,
+        hggcFuncAttributeMaxDynamicSharedMemorySize,
+        delivery & 4 ? sizeof(OutputSmem<true>) : sizeof(OutputSmem<false>));
+    if (status != hggcSuccess) return int(status);
+  }
+  if (delivery & 8) {
+    int const rc = launch_tiled_prepare(p, ws, stream);
+    if (rc) return rc;
+  } else {
+    if (delivery & 1)
+      gdn_wy_prepare<true><<<unsigned(p.shape.groups()), ParallelThreads, sizeof(PrepareStorage), stream>>>(p, ws);
+    else
+      gdn_wy_prepare<false><<<unsigned(p.shape.groups()), ParallelThreads, sizeof(PrepareStorage), stream>>>(p, ws);
+    status = hggcGetLastError();
+    if (status != hggcSuccess) return int(status);
+  }
   unsigned const state_grid = unsigned(int64_t(batch) * value_heads * (Dim / ValueTile));
-  if (delivery & 2)
-    gdn_wy_state<true><<<state_grid, StateThreads, sizeof(StateSmem<true>), stream>>>(p, ws, final);
-  else
-    gdn_wy_state<false><<<state_grid, StateThreads, sizeof(StateSmem<false>), stream>>>(p, ws, final);
-  status = hggcGetLastError();
-  if (status != hggcSuccess) return int(status);
+  if (delivery & 16) {
+    int const rc = launch_tiled_state(p, ws, final, stream);
+    if (rc) return rc;
+  } else {
+    if (delivery & 2)
+      gdn_wy_state<true><<<state_grid, StateThreads, sizeof(StateSmem<true>), stream>>>(p, ws, final);
+    else
+      gdn_wy_state<false><<<state_grid, StateThreads, sizeof(StateSmem<false>), stream>>>(p, ws, final);
+    status = hggcGetLastError();
+    if (status != hggcSuccess) return int(status);
+  }
+  if (delivery & 32) return launch_tiled_output(p, ws, static_cast<BF16*>(output), stream);
   if (delivery & 4)
     gdn_wy_output<true><<<unsigned(p.shape.groups()), ParallelThreads, sizeof(OutputSmem<true>), stream>>>(p, ws, static_cast<BF16*>(output));
   else

@@ -1,9 +1,31 @@
 # PPU original-structure port
 
-updated-at: 2026-09-21 13:23:45 UTC
-working-on: three-stage compute-tile alternatives compiled; exhaustive host and full-tier admission in progress
-blocked-on: no implementation blocker; device arithmetic/races/timing require later box admission
-last-commit: 593429b (verified delivery verdict pushed; new candidate remains in isolated worktree)
+updated-at: 2026-09-21 13:34:51 UTC
+working-on: three-stage compute-tile candidate locally admitted; prepare commit and box handoff
+blocked-on: device raw-bit/race and speed verdict NOT_RUN; no local PPU
+last-commit: d335b13 (checkpoint parent; implementation commit follows)
+
+FINAL post-edit gate PASS: /workspace/gdn-wy-tiles-evidence-20260921/sealed-local-r2.log.
+5/5 CTests, 48 Python contracts, 45 algebra cases + five negatives, original
+305 controls preserved; original 15 and WY 9 real SDK device images linked.
+9,516 vector ownership cases / 27 negatives; H exchange 8,192 reads,
+34,816 per-output reduction traces (W/U separately counted), 256 selector
+values / 27 valid combinations, eight new layout/order negatives. Tiled
+prepare/state/output 160/232/98 registers, zero stack; state zero shuffle
+opcodes. Seven binary negatives include missing tiled cross-TU launcher.
+Only prepare controls change codegen after sharing their source-identical
+arithmetic body; all four old state/output machine sequences remain identical
+to the preceding local build. No claim of whole-control binary identity.
+Keep same-new-binary scalar admission/timing, not historical timing subtraction.
+
+Box: PPU_SDK=/usr/local/PPU_SDK DEVICE=0 JOBS=16 TILE_AB=1 DELIVERY_AB=0
+bash tools/run_ppu_wy_fla_box.sh. Sixteen device cases and raw-bit versus
+scalar plus 8 repeats before 7-role balanced timing at both gates. Defaults
+and strong/reset auto routing unchanged. ACU reuse supports --wy-delivery
+tiled-all and binds to that exact compared role. No local device result.
+Design/limits/command: docs/PPU_WY_COMPUTE_TILES.md.
+
+## Initial implementation checkpoint
 
 Active sources: /workspace/gdn-wy-tiles-20260921, branch ppu-wy-tiles-20260921.
 Evidence/registered plan: /workspace/gdn-wy-tiles-evidence-20260921.

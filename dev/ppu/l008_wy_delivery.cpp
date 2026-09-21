@@ -81,5 +81,10 @@ int main() {
   cases += exhaustive<128, 32, 64, 2>();  // full-CTA incoming H
   cases += exhaustive<64, 32, 64, 2>();   // U and Vnew
   cases += exhaustive<128, 32, 64, 4>(); // final FP32 state
+  cases += exhaustive<128, 32, 128, 2>(); // four-warp H snapshot
+  cases += exhaustive<64, 32, 128, 2>();  // four-warp Vnew
+  cases += exhaustive<128, 32, 128, 4>(); // four-warp final state
+  cases += exhaustive<64, 64, 128, 2>();  // CTA-wide W/U panels
+  cases += exhaustive<64, 64, 256, 2>();  // eight-warp output panels
   std::printf("[WY delivery] cases=%d all-tails/padded-strides/offsets exact-once/PASS device=NOT_RUN\n", cases);
 }

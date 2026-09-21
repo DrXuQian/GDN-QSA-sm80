@@ -9,6 +9,12 @@ constexpr int ValueTile = 32;
 constexpr int StateThreads = 64;
 constexpr int ParallelThreads = 128;
 
+// Each stage has mutually exclusive legacy-packed and tiled selectors.
+// No silent precedence if a caller asks for both implementations of one stage.
+constexpr bool valid_delivery(unsigned mask) {
+  return mask < 64 && ((mask & 7u) & (mask >> 3)) == 0;
+}
+
 struct Shape {
   int batch, sequence, q_heads, value_heads;
   constexpr int chunks() const { return (sequence - 1) / Chunk + 1; }

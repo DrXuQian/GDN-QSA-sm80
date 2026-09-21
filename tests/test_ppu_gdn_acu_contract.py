@@ -206,7 +206,9 @@ class ACUContract(unittest.TestCase):
             collect.validate_pair(ours | dict(input_sha=""), fla | dict(input_sha=""))
 
     def test_delivery_reaches_subject_and_receipts_cannot_cross_variants(self):
-        for delivery in ("prepare", "state", "output", "all"):
+        for delivery in collect.DELIVERIES:
+            if delivery == "scalar":
+                continue
             cmd = collect.acu_command(Path("/acu"), Path("/report"), Path("/_gdn_wy_ppu.so"),
                                       "wy", -.1, Path("/bundle"), "wy", delivery)
             self.assertEqual(cmd[cmd.index("--wy-delivery") + 1], delivery)
@@ -299,6 +301,13 @@ class ACUContract(unittest.TestCase):
             collect.validate_comparison(comparison, packed, fla)
         comparison["cases"][0]["arms"]["wy-all"] = dict(fingerprint="output", state_dtype="torch.float32")
         collect.validate_comparison(comparison, packed, fla)
+        # Identical numerical fingerprints must not let a legacy capture
+        # impersonate the new compute-tile kernel family.
+        tiled = ours | dict(wy_delivery="tiled-all")
+        with self.assertRaisesRegex(ValueError, "output differs"):
+            collect.validate_comparison(comparison, tiled, fla)
+        comparison["cases"][0]["arms"]["wy-tiled-all"] = dict(fingerprint="output", state_dtype="torch.float32")
+        collect.validate_comparison(comparison, tiled, fla)
         for role, key, value in (("wy", "input_sha", "other"), ("wy", "output_sha", "other"),
                                   ("fla", "fla", dict(entry_sha256="changed")),
                                   ("wy", "state_dtype", "torch.bfloat16"),

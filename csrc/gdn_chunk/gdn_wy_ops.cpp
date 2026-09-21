@@ -16,7 +16,7 @@ std::vector<torch::Tensor> forward(torch::Tensor q, torch::Tensor k, torch::Tens
     torch::Tensor g, torch::Tensor beta, c10::optional<torch::Tensor> initial,
     bool output_final_state, unsigned delivery) {
   using namespace gdn_qsa::wy;
-  TORCH_CHECK(delivery <= 7, "invalid WY delivery mask");
+  TORCH_CHECK(valid_delivery(delivery), "invalid or conflicting WY delivery mask");
   TORCH_CHECK(q.dim() == 4 && q.size(3) == Dim && k.sizes() == q.sizes(),
               "WY q/k must have identical [B,S,Hk,128] shapes");
   TORCH_CHECK(v.dim() == 4 && v.size(0) == q.size(0) && v.size(1) == q.size(1) && v.size(3) == Dim,

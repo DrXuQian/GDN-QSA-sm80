@@ -12,7 +12,7 @@ if [[ ! -x "$PPU_SDK_ROOT/bin/hgcc" || ! -x "$PPU_SDK_ROOT/bin/hgobjdump" ]]; th
 fi
 mkdir -p "$OUT"
 cmake -S "$ROOT" -B "$OUT" -DGDN_QSA_ENABLE_PPU=ON -DPPU_SDK_ROOT="$PPU_SDK_ROOT" -DCMAKE_BUILD_TYPE=Release
-cmake --build "$OUT" --target _gdn_wy_ppu l004_ppu_affine_pipeline l006_ppu_original_delivery l007_ppu_wy_ownership l008_ppu_wy_delivery -j"${JOBS:-8}"
+cmake --build "$OUT" --target _gdn_wy_ppu l004_ppu_affine_pipeline l006_ppu_original_delivery l007_ppu_wy_ownership l008_ppu_wy_delivery l009_ppu_wy_tiles -j"${JOBS:-8}"
 ctest --test-dir "$OUT" --output-on-failure
 python "$ROOT/tests/test_ppu_wy_algebra.py"
 python "$ROOT/tests/test_ppu_wy_contract.py"

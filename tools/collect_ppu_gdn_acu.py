@@ -19,6 +19,8 @@ import tarfile
 import traceback
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from gdn_qsa_sm80.gdn_wy_interface import DELIVERIES
 
 
 def sha(path):
@@ -374,7 +376,7 @@ def main():
     parser.add_argument("--extension", type=Path, default=os.environ.get("EXTENSION"))
     parser.add_argument("--wy-run", type=Path,
                         help="reuse this completed WY comparison directory; never compile")
-    parser.add_argument("--wy-delivery", choices=("scalar", "prepare", "state", "output", "all"), default="scalar")
+    parser.add_argument("--wy-delivery", choices=tuple(DELIVERIES), default="scalar")
     args = parser.parse_args()
     if args.wy_run and args.extension:
         parser.error("--wy-run and --extension/EXTENSION are mutually exclusive")
