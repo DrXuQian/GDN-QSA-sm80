@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-21 22:43:48 UTC
-working-on: mask48 experiment locally admitted; commit and box handoff
+updated-at: 2026-09-21 22:44:05 UTC
+working-on: mask48 experiment complete; box handoff ready
 blocked-on: device timings pending; no local PPU; prior weak/raw comparison not supplied
-last-commit: dc3d842 (user-reported result checkpoint; device implementation a712a7d)
+last-commit: 1b24b37 (experiment implementation; this follow-up is status-only; device kernels a712a7d)
 
 Active worktree /workspace/gdn-wy-state-output-20260922, evidence and
 registered plan /workspace/gdn-wy-state-output-evidence-20260922.
