@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-22 13:17:53 UTC
-working-on: local seal passed; committing prepare row-factor ablations and box handoff
+updated-at: 2026-09-22 13:19:42 UTC
+working-on: prepare row-factor experiments committed; ready for eight-role box admission
 blocked-on: no local PPU; full binding SKIP/environment (CPU-only local torch); device admission pending
-last-commit: 402c614 (parent; no new default promotion)
+last-commit: 59c2dff (implementation and handoff; this checkpoint changes STATUS only)
 
 Task worktree /workspace/gdn-wy-prepare-rows-20260922; pre-edit plan/evidence
 /workspace/gdn-wy-prepare-rows-evidence-20260922. User-reported strong medians:
