@@ -1,9 +1,35 @@
 # PPU original-structure port
 
-updated-at: 2026-09-22 09:48:30 UTC
-working-on: local admission complete; STATE_AB box handoff ready, defaults unchanged
-blocked-on: device numerical/performance admission awaits box; local CPU torch cannot build the unchanged CUDA binding
-last-commit: 9ab15f5 (state address/gate experiment and complete local admission)
+updated-at: 2026-09-22 12:25:04 UTC
+working-on: final local admission sealed; publishing STAGE_AB prepare/output box handoff
+blocked-on: no local PPU; full binding needs box CUDA torch, no local device result
+last-commit: 5804278 (state ablation handoff; new task starts here)
+
+Task worktree /workspace/gdn-wy-stage-address-20260922, registered plan and
+resume /workspace/gdn-wy-stage-address-evidence-20260922. User-pasted strong
+g=-1.0: mask48 436.296 us, address401.968, gates413.482, both378.696;
+original424.998/FLA490.140. All three gains have disjoint envelopes against
+mask48, both beats singles; weak gate and complete identities not supplied.
+No routing promotion. Next only changes prepare/output address loops, retains
+TF32 high/residual precision and all12 prior native instruction sequences.
+
+Final local pass: 7/7 CTests,60 Python contracts,45 algebra cases+5 negatives;
+new gate28,672 coordinates,
+1,492,480 vector/tail conditions,12,288 prepare element iterations,96 complete
+selector combinations and8 planted defects. All12 prior native instruction+
+operand sequences IDENTICAL in the14-image real SDK build. New prepare/output
+regs86/120, stack0; static copy sites16/14, unchanged BF16/TF32/exp body counts.
+Output regs increased98->120: keep the losing possibility explicit, no speed
+claim. Full unchanged Torch binding remains SKIP/environment locally (CPU
+torch); box must build it and pass raw-bit/replay admission before timing.
+STAGE_AB eight roles retain mask48/mask240 and all three ablations; old
+experiment inventories/defaults/routing unchanged. Final post-edit seal rc=0:
+/workspace/gdn-wy-stage-address-evidence-20260922/sealed-local-r2.log.
+All14 native images linked,17 codegen negatives red as required. Final DSO
+SHA256 8ef9494cbfc487e913738f4ba5b8c6f40b2ee3672e0e76a4fafd31fe9d63ad6f.
+Command/criteria: docs/PPU_WY_STAGE_ADDRESS.md. No device speed admission.
+
+## Prior local state-ablation handoff
 
 Active worktree /workspace/gdn-wy-state-address-20260922, evidence/registered
 plan /workspace/gdn-wy-state-address-evidence-20260922/docs/plan.md. New opt-in

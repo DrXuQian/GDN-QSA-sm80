@@ -55,6 +55,12 @@ target_include_directories(l010_ppu_wy_state_address PRIVATE
   ${PPU_SDK_ROOT}/CUDA_SDK/targets/x86_64-linux/include/cccl
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/actlize/include)
 target_link_libraries(l010_ppu_wy_state_address PRIVATE gdn_qsa_backend_headers)
+add_executable(l011_ppu_wy_stage_address dev/ppu/l011_wy_stage_address.cpp)
+target_include_directories(l011_ppu_wy_stage_address PRIVATE
+  ${PPU_SDK_ROOT}/include ${PPU_SDK_ROOT}/CUDA_SDK/targets/x86_64-linux/include
+  ${PPU_SDK_ROOT}/CUDA_SDK/targets/x86_64-linux/include/cccl
+  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/actlize/include)
+target_link_libraries(l011_ppu_wy_stage_address PRIVATE gdn_qsa_backend_headers)
 
 if(BUILD_TESTING)
   add_test(NAME ppu_affine_pipeline COMMAND l004_ppu_affine_pipeline)
@@ -63,6 +69,7 @@ if(BUILD_TESTING)
   add_test(NAME ppu_wy_delivery COMMAND l008_ppu_wy_delivery)
   add_test(NAME ppu_wy_tiles COMMAND l009_ppu_wy_tiles)
   add_test(NAME ppu_wy_state_address COMMAND l010_ppu_wy_state_address)
+  add_test(NAME ppu_wy_stage_address COMMAND l011_ppu_wy_stage_address)
 endif()
 
 if(GDN_QSA_ENABLE_PPU)
@@ -174,7 +181,8 @@ if(GDN_QSA_ENABLE_PPU)
   cutlass_add_library(gdn_wy_ppu SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_wy_ppu.cu
     ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_wy_tiles_ppu.cu
-    ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_wy_state_ab_ppu.cu)
+    ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_wy_state_ab_ppu.cu
+    ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_wy_stage_ab_ppu.cu)
   target_include_directories(gdn_wy_ppu PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
   target_link_libraries(gdn_wy_ppu PRIVATE CUTLASS ppu::runtime)
   get_target_property(_wy_objects gdn_wy_ppu SOURCES)
@@ -186,11 +194,13 @@ if(GDN_QSA_ENABLE_PPU)
         ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_wy_common.cuh
         ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_wy_prepare.cuh
         ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_wy_state_copy.cuh
+        ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_wy_stage_copy.cuh
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/wy_contract.hpp
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/wy_mma.cuh
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/wy_delivery.cuh
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/wy_tiles.cuh
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/wy_state_address.cuh
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/wy_stage_address.cuh
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/shared_copy.cuh
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/fragment.cuh)
     endif()

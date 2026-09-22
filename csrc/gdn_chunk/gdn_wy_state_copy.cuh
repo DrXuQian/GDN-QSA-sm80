@@ -5,8 +5,9 @@
 
 namespace gdn_qsa::wy {
 
-// State-only alternative. Do not change stage()/publish_*() used by the
-// admitted controls or prepare/output. Compile-time iteration offsets keep
+// First admitted by the state ablation, also used by opt-in stage-address
+// experiments. Do not change stage()/publish_*() used by admitted controls.
+// Compile-time iteration offsets keep
 // per-thread column/cube invariants visible to the device compiler.
 template <int Rows, int Cols, int Threads>
 CUTE_DEVICE void state_stage(BF16* shared, BF16 const* global, int64_t stride, int valid_rows) {

@@ -111,19 +111,27 @@ int reduction_order(int plant = 0) {
       w.check({0, 16, 32, 48}) + u.check({0, 16, 32, 48});
 }
 
-// 3 modes^3 base stages plus 3 options x9 base masks with tiled state.
-// Options on non-tiled state must not be accepted and silently ignored.
+// Independent Cartesian inventory, not a copy of valid_delivery's predicates.
+// 4 prepare choices x6 state choices x4 output choices =96 valid masks.
 int selectors(int plant = 0) {
+  std::array<bool, 2048> expected{};
+  for (unsigned prepare : {0u, 1u, 8u, 256u})
+    for (unsigned state : {0u, 2u, 16u, 80u, 144u, 208u})
+      for (unsigned output : {0u, 4u, 32u, 544u}) {
+        unsigned const mask = prepare | state | output;
+        if (expected[mask]) throw std::runtime_error("duplicate delivery combination");
+        expected[mask] = true;
+      }
   int accepted = 0, bad = 0;
-  for (unsigned mask = 0; mask < 512; ++mask) {
-    bool expected = mask < 256 && (!(mask & 192u) || (mask & 16u));
-    for (int stage = 0; stage < 3; ++stage)
-      expected &= !((mask & (1u << stage)) && (mask & (8u << stage)));
+  int old27 = 0, old54 = 0;
+  for (unsigned mask = 0; mask < expected.size(); ++mask) {
     bool const actual = plant == 7 ? mask < 64 : valid_delivery(mask);
     accepted += actual;
-    bad += actual != expected;
+    old27 += actual && mask < 64;
+    old54 += actual && mask < 256;
+    bad += actual != expected[mask];
   }
-  return bad + (accepted != 54) + valid_delivery(1u << 31);
+  return bad + (accepted != 96) + (old27 != 27) + (old54 != 54) + valid_delivery(1u << 31);
 }
 
 int main() {
@@ -138,5 +146,5 @@ int main() {
     if (!bad) throw std::runtime_error("tiled negative escaped");
     std::printf("[WY tiled negative] plant=%d bad=%d EXPECTED-RED/PASS\n", plant, bad);
   }
-  std::puts("[WY tiles] native H exchange=8192 reads; independent scalar-coordinate reduction order=34816 outputs (W/U counted separately); selectors=512/54 valid (old27+state-options27); PASS device_execution=NOT_RUN");
+  std::puts("[WY tiles] native H exchange=8192 reads; independent scalar-coordinate reduction order=34816 outputs (W/U counted separately); selectors=2048/96 valid (old27/54 preserved); PASS device_execution=NOT_RUN");
 }

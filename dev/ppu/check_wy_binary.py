@@ -20,18 +20,30 @@ def kernel_sequences(isa):
 
 def compare_controls(before, after):
     old, new = kernel_sequences(before), kernel_sequences(after)
-    if len(old) != 9 or len(new) != 12:
-        raise AssertionError("control comparison must cover all9 old and all12 current images")
+    if len(old) != 12 or len(new) != 14:
+        raise AssertionError("control comparison must cover all12 old and all14 current images")
     for name, sequence in old.items():
         if new.get(name) != sequence:
             raise AssertionError(f"admitted control native instructions changed: {name}")
 
 
+def plant_in_kernel(isa, marker, old, new):
+    """Mutate the new body only; an old-control failure cannot satisfy this test."""
+    sections = isa.split("Disassembly of section ")
+    selected = [i for i, section in enumerate(sections)
+                if section.startswith(".text.kernel.") and marker in section.splitlines()[0]]
+    if len(selected) != 1 or old not in sections[selected[0]]:
+        raise AssertionError(f"negative did not locate its exact instruction target: {marker}")
+    index = selected[0]
+    sections[index] = sections[index].replace(old, new, 1)
+    return "Disassembly of section ".join(sections)
+
+
 def audit(isa, resources, symbols):
     funcs = re.findall(r"Func \d+ (\S+) RESOURCE INFO:\n(.*?)(?=Func \d+ \S+ RESOURCE INFO:|\Z)",
                        resources, flags=re.S)
-    if len(funcs) != 12:
-        raise AssertionError(f"WY image denominator must be 6 controls + 3 tiled + 3 state variants, got {len(funcs)}")
+    if len(funcs) != 14:
+        raise AssertionError(f"WY image denominator must be 12 controls + 2 stage-address variants, got {len(funcs)}")
     rows = []
     mma_counts = {}
     for role, packed in ((role, packed) for role in ("prepare", "state", "output") for packed in (False, True)):
@@ -126,11 +138,34 @@ def audit(isa, resources, symbols):
         rows.append(dict(role="state", address=address, row_reuse=gates, registers=regs,
                          stack=stack, static_instructions=len(ops), cp_async_sites=copies,
                          exponent_sites=exponents))
+    for role, copies, bf16, tf32, exponents in (("prepare", 16, 16, 12, 9), ("output", 14, 40, 0, 18)):
+        matches = [(name, body) for name, body in funcs if f"gdn_wy_address_{role}E" in name]
+        if len(matches) != 1:
+            raise AssertionError(f"missing/ambiguous address {role} image")
+        name, body = matches[0]
+        stack = int(re.search(r"STACK SIZE:(\d+)", body)[1])
+        regs = int(re.search(r"vreg_number:(\d+)", body)[1])
+        if stack or name not in sequences:
+            raise AssertionError(f"address {role} spills or is missing its native body")
+        ops = [line.split()[0] for line in sequences[name]]
+        actual = (sum(op.startswith("vmem.ld.tsm") for op in ops),
+                  ops.count("v.mma.f32.bf16.m16n16k16"), ops.count("v.mma.f32.tf32.m16n16k8"),
+                  ops.count("v.exp2.f32"))
+        if actual != (copies, bf16, tf32, exponents):
+            raise AssertionError(f"address {role} copy/arithmetic body changed: {actual}")
+        if not any(op.startswith("tsm.ld.swzl") for op in ops):
+            raise AssertionError(f"address {role} lost its native matrix load")
+        if role == "output" and ("vmem.st.b32x4" not in ops or "vmem.st.b16" in ops):
+            raise AssertionError("address output lost vector publication")
+        rows.append(dict(role=role, delivery="address", registers=regs, stack=stack,
+                         static_instructions=len(ops), cp_async_sites=copies, exponent_sites=exponents,
+                         bf16_mma_sites=bf16, tf32_mma_sites=tf32))
     for name in ("gdn_wy_forward", "gdn_wy_forward_delivery"):
         if not re.search(rf"\b{name}$", symbols, re.M):
             raise AssertionError(f"WY launcher missing from linked library: {name}")
     for name in ("configure_tiled", "launch_tiled_prepare", "launch_tiled_state", "launch_tiled_output",
-                 "configure_state_ab", "launch_state_ab"):
+                 "configure_state_ab", "launch_state_ab", "configure_stage_address",
+                 "launch_address_prepare", "launch_address_output"):
         if not re.search(rf"\b_ZN7gdn_qsa2wy\d+{name}E\S*$", symbols, re.M):
             raise AssertionError(f"tiled cross-TU launcher missing from linked library: {name}")
     return rows
@@ -161,6 +196,13 @@ def main():
             ("missing-state-link", (isa, resources, symbols.replace("launch_state_ab", "MISSING_state_link"))),
             ("state-reuse-not-emitted", (isa.replace("v.exp2.f32", "MISSING_EXP"), resources, symbols)),
             ("state-copy-not-emitted", (isa.replace("vmem.ld.tsm.zfill.b32x4", "vmem.ld.WRONG.b32x4"), resources, symbols)),
+            ("missing-address-prepare", (isa.replace("gdn_wy_address_prepare", "MISSING_address_prepare"), resources, symbols)),
+            ("missing-address-output", (isa.replace("gdn_wy_address_output", "MISSING_address_output"), resources, symbols)),
+            ("missing-stage-host-link", (isa, resources, symbols.replace("launch_address_output", "MISSING_address_output"))),
+            ("address-prepare-lost-tf32", (plant_in_kernel(isa, "gdn_wy_address_prepare",
+                "v.mma.f32.tf32.m16n16k8", "MISSING_TF32"), resources, symbols)),
+            ("address-output-lost-copy", (plant_in_kernel(isa, "gdn_wy_address_output",
+                "vmem.ld.tsm", "MISSING_COPY"), resources, symbols)),
         ):
             try:
                 audit(*texts)
@@ -178,7 +220,7 @@ def main():
                 print("[WY binary negative] changed-control EXPECTED-RED/PASS")
             else:
                 raise AssertionError("control-comparison negative escaped")
-        print("[WY binary controls] 9/9 native instruction+operand sequences IDENTICAL")
+        print("[WY binary controls] 12/12 native instruction+operand sequences IDENTICAL")
     print("[WY binary] PASS device_execution=NOT_RUN")
 
 

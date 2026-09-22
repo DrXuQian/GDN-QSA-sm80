@@ -14,18 +14,21 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from bench_ppu_gdn_fla import admission, checked_pair, fla_call, load_fla, verdict
 from gdn_qsa_sm80 import gdn_chunk_wy
-from gdn_qsa_sm80.gdn_wy_interface import DELIVERIES, PACKED_DELIVERIES, TILED_DELIVERIES, STATE_DELIVERIES
+from gdn_qsa_sm80.gdn_wy_interface import (DELIVERIES, PACKED_DELIVERIES, TILED_DELIVERIES,
+                                          STATE_DELIVERIES, STAGE_DELIVERIES)
 
 
 DELIVERY_ROLES = ("original", "wy", "wy-prepare", "wy-state", "wy-output", "wy-all", "fla")
 TILE_ROLES = ("original", "wy", *(f"wy-{name}" for name in TILED_DELIVERIES), "fla")
 STATE_ROLES = ("original", "wy", *(f"wy-{name}" for name in STATE_DELIVERIES), "fla")
+STAGE_ROLES = ("original", "wy", *(f"wy-{name}" for name in STAGE_DELIVERIES), "fla")
 
 
-def experiment(delivery_ab=False, tile_ab=False, state_ab=False):
-    if sum((delivery_ab, tile_ab, state_ab)) > 1:
+def experiment(delivery_ab=False, tile_ab=False, state_ab=False, stage_ab=False):
+    if sum((delivery_ab, tile_ab, state_ab, stage_ab)) > 1:
         raise ValueError("choose one balanced candidate family")
-    names = STATE_DELIVERIES if state_ab else TILED_DELIVERIES if tile_ab else PACKED_DELIVERIES if delivery_ab else ()
+    names = (STAGE_DELIVERIES if stage_ab else STATE_DELIVERIES if state_ab else
+             TILED_DELIVERIES if tile_ab else PACKED_DELIVERIES if delivery_ab else ())
     return names, ("original", "wy", *(f"wy-{name}" for name in names), "fla")
 
 
@@ -54,10 +57,15 @@ def order(sample, roles=("original", "wy", "fla")):
     return rows[sample % len(rows)]
 
 
-def delivery_comparisons(arms, delivery, state_ab=False):
+def delivery_comparisons(arms, delivery, state_ab=False, stage_ab=False):
     """Compare the new pair directly, without subtracting isolated stage costs."""
     controls = ("wy", "fla")
-    if state_ab:
+    if stage_ab:
+        controls += tuple(role for role in ("original", "wy-tiled-state-output", "wy-tiled-state-output-both")
+                          if role != f"wy-{delivery}")
+        if delivery == "stage-address-both":
+            controls += ("wy-stage-address-prepare", "wy-stage-address-output")
+    elif state_ab:
         controls += tuple(role for role in ("original", "wy-tiled-state-output", "wy-tiled-all")
                           if role != f"wy-{delivery}")
         if delivery == "tiled-state-output-both":
@@ -94,7 +102,8 @@ def compare(fn, gate, args, device):
     calls = dict(original=lambda: admission.gdn_chunk(*inputs),
                  wy=lambda: gdn_chunk_wy(*inputs), fla=fla_call(fn, inputs, "native"))
     state_ab = getattr(args, "state_ab", False)
-    names, roles = experiment(args.delivery_ab, args.tile_ab, state_ab)
+    stage_ab = getattr(args, "stage_ab", False)
+    names, roles = experiment(args.delivery_ab, args.tile_ab, state_ab, stage_ab)
     for delivery in names:
         calls[f"wy-{delivery}"] = lambda delivery=delivery: gdn_chunk_wy(*inputs, delivery=delivery)
     record = dict(g=gate, shape="B1/S2048/Hk16/Hv32/D128", input_sha=admission.digest(cpu), arms={})
@@ -147,7 +156,7 @@ def compare(fn, gate, args, device):
     record.update(comparison_summary(record["arms"]))
     for control in ("original", "fla"):
         label = record[f"wy_vs_{control}"]
-        print(f"[WY verdict] g={gate} control={control} verdict={label} rule=disjoint-observed-envelopes")
+        print(f"[WY verdict] g={gate} subject=wy control={control} verdict={label} rule=disjoint-observed-envelopes")
     print(f"[WY ratios] g={gate} WY/FLA={record['wy_over_fla']:.4f} "
           f"original/WY={record['speedup_over_original']:.4f} scope={record['ratio_scope']} "
           f"WY_vs_FLA={record['wy_vs_fla']} routing=UNCHANGED")
@@ -155,7 +164,7 @@ def compare(fn, gate, args, device):
         for delivery in names:
             role = f"wy-{delivery}"
             candidate = record["arms"][role]
-            candidate["versus"] = delivery_comparisons(record["arms"], delivery, state_ab)
+            candidate["versus"] = delivery_comparisons(record["arms"], delivery, state_ab, stage_ab)
             for control, comparison in candidate["versus"].items():
                 label, speedup = comparison["verdict"], comparison["descriptive_speedup"]
                 print(f"[WY delivery verdict] g={gate} candidate={role} control={control} "
@@ -180,8 +189,10 @@ def main():
                         help="paired compute-tile prepare/state/output/state+output/all controls")
     family.add_argument("--state-ab", action="store_true",
                         help="independent state address/gate reuse and combined arms; retain pair/all controls")
+    family.add_argument("--stage-ab", action="store_true",
+                        help="prepare/output address ablations on frozen state-both; retain old/new pair controls")
     args = p.parse_args()
-    _, roles = experiment(args.delivery_ab, args.tile_ab, args.state_ab)
+    _, roles = experiment(args.delivery_ab, args.tile_ab, args.state_ab, args.stage_ab)
     try:
         args.samples = resolve_samples(args.samples, roles)
     except ValueError as exc:
@@ -203,8 +214,8 @@ def main():
                   qk_norm=False, scale="1/sqrt(128)", dtype="bf16", device=str(props),
                   torch=torch.__version__, fla=identity, samples=args.samples, launches=args.launches,
                   warmup=args.warmup, limit=admission.MAX_RELATIVE_ERROR,
-                  delivery_ab=args.delivery_ab or args.tile_ab or args.state_ab,
-                  tile_ab=args.tile_ab, state_ab=args.state_ab,
+                  delivery_ab=args.delivery_ab or args.tile_ab or args.state_ab or args.stage_ab,
+                  tile_ab=args.tile_ab, state_ab=args.state_ab, stage_ab=args.stage_ab,
                   roles=roles, order_cycle_samples=2 * len(roles),
                   binary_sha256={str(x): hashlib.sha256(x.read_bytes()).hexdigest()
                                  for x in (args.extension, args.wy_extension)}, cases=[])

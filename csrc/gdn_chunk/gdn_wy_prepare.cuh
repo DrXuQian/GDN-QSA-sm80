@@ -1,6 +1,8 @@
 #pragma once
 
 #include "gdn_wy_common.cuh"
+#include "gdn_wy_state_copy.cuh"
+#include "gdn_qsa/ppu/wy_stage_address.cuh"
 
 namespace gdn_qsa::wy {
 struct PrepareStorage {
@@ -15,6 +17,7 @@ struct PrepareStorage {
 
 // Shared arithmetic authority for legacy and tiled prepare variants.
 // Same four-warp solve, TF32 high/residual products and BF16 boundaries.
+template <bool Address = false>
 __device__ __forceinline__ int64_t prepare_inverse(Inputs const& p, Workspace const& ws, PrepareStorage& sm) {
   int const tid = int(threadIdx.x), warp = unsigned(threadIdx.x) >> 5, lane = unsigned(threadIdx.x) & 31;
   int const ct = int(blockIdx.x) % p.shape.chunks();
@@ -23,10 +26,17 @@ __device__ __forceinline__ int64_t prepare_inverse(Inputs const& p, Workspace co
   int const first = ct * Chunk, valid = min(Chunk, p.shape.sequence - first);
   int const qh = p.shape.q_head(h);
   int64_t const group = p.shape.group(b, h, ct);
-  stage<Chunk, Dim, ParallelThreads>(sm.k, p.k + p.shape.input(b, first, qh, p.shape.q_heads),
-                                    int64_t(p.shape.q_heads) * Dim, valid);
-  stage<Chunk, Dim, ParallelThreads>(sm.v, p.v + p.shape.input(b, first, h, p.shape.value_heads),
-                                    int64_t(p.shape.value_heads) * Dim, valid);
+  if constexpr (Address) {
+    state_stage<Chunk, Dim, ParallelThreads>(sm.k, p.k + p.shape.input(b, first, qh, p.shape.q_heads),
+                                           int64_t(p.shape.q_heads) * Dim, valid);
+    state_stage<Chunk, Dim, ParallelThreads>(sm.v, p.v + p.shape.input(b, first, h, p.shape.value_heads),
+                                           int64_t(p.shape.value_heads) * Dim, valid);
+  } else {
+    stage<Chunk, Dim, ParallelThreads>(sm.k, p.k + p.shape.input(b, first, qh, p.shape.q_heads),
+                                      int64_t(p.shape.q_heads) * Dim, valid);
+    stage<Chunk, Dim, ParallelThreads>(sm.v, p.v + p.shape.input(b, first, h, p.shape.value_heads),
+                                      int64_t(p.shape.value_heads) * Dim, valid);
+  }
   if (tid < Chunk) {
     int64_t const gi = (int64_t(b) * p.shape.sequence + first + min(tid, valid - 1))
                       * p.shape.value_heads + h;
@@ -107,14 +117,30 @@ __device__ __forceinline__ int64_t prepare_inverse(Inputs const& p, Workspace co
   }
   // lower is dead; reuse its storage for the BF16 inverse consumed by W/U.
   BF16* inv = reinterpret_cast<BF16*>(sm.lower);
-  for (int i = tid; i < Chunk * Chunk; i += ParallelThreads) {
-    int const r = i / Chunk, c = i % Chunk;
-    inv[swizzle<Chunk, Chunk>(r, c)] = BF16(r >= c ? sm.inverse[i] : 0.0f);
-  }
-  for (int i = tid; i < Chunk * Dim; i += ParallelThreads) {
-    int const r = i / Dim, c = i % Dim, at = swizzle<Chunk, Dim>(r, c);
-    sm.k[at] = BF16(float(sm.k[at]) * sm.beta[r] * expf(sm.prefix[r]));
-    sm.v[at] = BF16(float(sm.v[at]) * sm.beta[r]);
+  if constexpr (Address) {
+    #pragma unroll 1
+    for (unsigned it = 0; it < PrepareElementPlan::InverseIterations; ++it) {
+      unsigned const i = PrepareElementPlan::inverse(unsigned(tid), it);
+      unsigned const r = i / Chunk, c = i % Chunk;
+      inv[state_shared_offset<Chunk, Chunk>(r, c)] = BF16(r >= c ? sm.inverse[i] : 0.0f);
+    }
+    #pragma unroll 1
+    for (unsigned it = 0; it < PrepareElementPlan::ValueIterations; ++it) {
+      unsigned const r = PrepareElementPlan::row(it), c = PrepareElementPlan::column(unsigned(tid));
+      unsigned const at = state_shared_offset<Chunk, Dim>(r, c);
+      sm.k[at] = BF16(float(sm.k[at]) * sm.beta[r] * expf(sm.prefix[r]));
+      sm.v[at] = BF16(float(sm.v[at]) * sm.beta[r]);
+    }
+  } else {
+    for (int i = tid; i < Chunk * Chunk; i += ParallelThreads) {
+      int const r = i / Chunk, c = i % Chunk;
+      inv[swizzle<Chunk, Chunk>(r, c)] = BF16(r >= c ? sm.inverse[i] : 0.0f);
+    }
+    for (int i = tid; i < Chunk * Dim; i += ParallelThreads) {
+      int const r = i / Dim, c = i % Dim, at = swizzle<Chunk, Dim>(r, c);
+      sm.k[at] = BF16(float(sm.k[at]) * sm.beta[r] * expf(sm.prefix[r]));
+      sm.v[at] = BF16(float(sm.v[at]) * sm.beta[r]);
+    }
   }
   __syncthreads();
   return group;

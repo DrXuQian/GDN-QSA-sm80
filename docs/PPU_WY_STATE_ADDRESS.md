@@ -133,3 +133,9 @@ Read `comparison.log` for per-role medians and paired verdicts;
 source SHA/diff and binary hashes are saved alongside. The existing direct
 ACU collector accepts all three new delivery names for a later exact-binary
 capture; no recapture or rebuilt candidate is silently substituted.
+
+## Next independent stage experiment
+
+[Prepare/output address ablations](PPU_WY_STAGE_ADDRESS.md) keep the state-both
+body frozen and test each other stage separately with `STAGE_AB=1`. They do
+not change this STATE_AB inventory or any default route.

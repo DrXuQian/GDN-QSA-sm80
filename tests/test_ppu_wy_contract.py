@@ -14,7 +14,7 @@ sys.path[:0] = [str(ROOT), str(ROOT / "benchmarks")]
 from gdn_qsa_sm80 import gdn_wy_interface as api
 import bench_ppu_wy_fla as benchmark
 from bench_ppu_wy_fla import (comparison_summary, delivery_comparisons, order,
-                              DELIVERY_ROLES, TILE_ROLES, STATE_ROLES, experiment, resolve_samples)
+                              DELIVERY_ROLES, TILE_ROLES, STATE_ROLES, STAGE_ROLES, experiment, resolve_samples)
 from bench_ppu_gdn_fla import checked_pair, verdict
 
 
@@ -140,6 +140,64 @@ class Contracts(unittest.TestCase):
         with self.assertRaises(KeyError):
             delivery_comparisons(arms, "tiled-state-output-both", state_ab=True)
 
+    def test_stage_inventory_masks_and_balanced_orders(self):
+        def inventory():
+            names, roles = experiment(stage_ab=True)
+            self.assertEqual(set(roles), {"original", "wy", "fla", "wy-tiled-state-output",
+                "wy-tiled-state-output-both", "wy-stage-address-prepare", "wy-stage-address-output",
+                "wy-stage-address-both"})
+            self.assertEqual(tuple(api.DELIVERIES[name] for name in names), (48, 240, 496, 752, 1008))
+            self.assertEqual(roles, STAGE_ROLES)
+            return roles
+        roles = inventory()
+        self.assertEqual(resolve_samples(None, roles), 16)
+        for column in zip(*(order(i, roles) for i in range(16))):
+            for role in roles:
+                self.assertEqual(column.count(role), 2)
+        with patch.object(benchmark, "STAGE_DELIVERIES", api.STAGE_DELIVERIES[:-1]):
+            with self.assertRaises(AssertionError):
+                inventory()
+        for kwargs in (dict(delivery_ab=True), dict(tile_ab=True), dict(state_ab=True)):
+            with self.assertRaises(ValueError):
+                experiment(stage_ab=True, **kwargs)
+        with self.assertRaises(ValueError):
+            resolve_samples(14, roles)
+
+    def test_stage_bits_reach_the_python_abi_and_do_not_drop_state_both(self):
+        class Fake:
+            def forward(self, *args):
+                self.mask = args[-1]
+                return torch.ones(1), torch.ones(1)
+        x, fake = torch.zeros(1), Fake()
+        for suffix, expected in (("prepare", 496), ("output", 752), ("both", 1008)):
+            name = f"stage-address-{suffix}"
+            def check():
+                with patch.object(api, "_backend", return_value=fake):
+                    api.gdn_chunk_wy(x, x, x, x, x, delivery=name)
+                self.assertEqual(fake.mask, expected)
+                self.assertEqual(fake.mask & 255, 240)
+            check()
+            for dropped in (expected & 255, expected & ~192):
+                with patch.dict(api.DELIVERIES, {name: dropped}), self.assertRaises(AssertionError):
+                    check()
+
+    def test_stage_combined_compares_mask240_and_both_singles(self):
+        arms = {role: dict(samples_us=[400., 410.]) for role in STAGE_ROLES}
+        candidate = arms["wy-stage-address-both"]
+        candidate["samples_us"] = [350., 360.]
+        result = delivery_comparisons(arms, "stage-address-both", stage_ab=True)
+        self.assertEqual(set(result), set(STAGE_ROLES) - {"wy-stage-address-both"})
+        self.assertTrue(all(x['verdict'] == 'CANDIDATE-WINS' for x in result.values()))
+        candidate["samples_us"] = [350., 420.]
+        self.assertTrue(all(x['verdict'] == 'UNRESOLVED' for x in
+            delivery_comparisons(arms, "stage-address-both", stage_ab=True).values()))
+        candidate["samples_us"] = [420., 430.]
+        self.assertTrue(all(x['verdict'] == 'CONTROL-WINS' for x in
+            delivery_comparisons(arms, "stage-address-both", stage_ab=True).values()))
+        del arms["wy-tiled-state-output-both"]
+        with self.assertRaises(KeyError):
+            delivery_comparisons(arms, "stage-address-both", stage_ab=True)
+
     def test_state_output_keeps_scalar_prepare_at_the_real_python_abi(self):
         class Fake:
             def forward(self, *args):
@@ -194,13 +252,14 @@ class Contracts(unittest.TestCase):
         want = (torch.ones(1), torch.ones(1))
         args = SimpleNamespace(delivery_ab=False, tile_ab=True, warmup=5, samples=16, launches=10)
         seen = []
-        def run(plant=False, state_ab=False):
-            args.tile_ab = not state_ab
+        def run(plant=False, state_ab=False, stage_ab=False):
+            args.tile_ab = not (state_ab or stage_ab)
             args.state_ab = state_ab
+            args.stage_ab = stage_ab
             def wy(*inputs, delivery="scalar"):
                 seen.append(delivery)
                 # Within the unchanged 2% gate, but not scalar raw equality.
-                selected = "tiled-state-output-both" if state_ab else "tiled-state-output"
+                selected = "stage-address-both" if stage_ab else "tiled-state-output-both" if state_ab else "tiled-state-output"
                 return (want[0] + .001, want[1]) if plant and delivery == selected else want
             with patch.object(benchmark.admission, "fixture", return_value=cpu), \
                     patch.object(benchmark.admission, "reference", return_value=want), \
@@ -229,6 +288,16 @@ class Contracts(unittest.TestCase):
         self.assertEqual(len(result['arms']['wy-tiled-state-output-both']['versus']), 7)
         with self.assertRaisesRegex(AssertionError, "wy-tiled-state-output-both output/state bits differ"):
             run(plant=True, state_ab=True)
+        seen.clear()
+        result = run(stage_ab=True)
+        self.assertEqual(set(result['arms']), set(STAGE_ROLES))
+        for name in ("scalar", *api.STAGE_DELIVERIES):
+            self.assertEqual(seen.count(name), 8 + 5 + 16 * 10)
+        combined = result['arms']['wy-stage-address-both']
+        self.assertEqual(combined['delivery_mask'], 1008)
+        self.assertEqual(len(combined['versus']), 7)
+        with self.assertRaisesRegex(AssertionError, "wy-stage-address-both output/state bits differ"):
+            run(plant=True, stage_ab=True)
 
     def test_delivery_mask_is_consumed_not_silently_ignored(self):
         class Fake:

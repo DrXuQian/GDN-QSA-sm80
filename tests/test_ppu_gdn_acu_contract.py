@@ -331,6 +331,13 @@ class ACUContract(unittest.TestCase):
                 collect.validate_comparison(comparison, subject, fla)
             comparison["cases"][0]["arms"][f"wy-{name}"] = dict(fingerprint="output", state_dtype="torch.float32")
             collect.validate_comparison(comparison, subject, fla)
+        for suffix in ("prepare", "output", "both"):
+            name = f"stage-address-{suffix}"
+            subject = ours | dict(wy_delivery=name)
+            with self.assertRaisesRegex(ValueError, "output differs"):
+                collect.validate_comparison(comparison, subject, fla)
+            comparison["cases"][0]["arms"][f"wy-{name}"] = dict(fingerprint="output", state_dtype="torch.float32")
+            collect.validate_comparison(comparison, subject, fla)
         for role, key, value in (("wy", "input_sha", "other"), ("wy", "output_sha", "other"),
                                   ("fla", "fla", dict(entry_sha256="changed")),
                                   ("wy", "state_dtype", "torch.bfloat16"),

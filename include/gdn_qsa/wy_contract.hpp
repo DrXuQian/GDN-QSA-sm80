@@ -13,13 +13,24 @@ constexpr int ParallelThreads = 128;
 constexpr unsigned StateAddress = 64u;
 constexpr unsigned StateRowReuse = 128u;
 constexpr unsigned StateOptions = StateAddress | StateRowReuse;
+constexpr unsigned PrepareAddress = 256u;
+constexpr unsigned OutputAddress = 512u;
+constexpr unsigned StageAddressOptions = PrepareAddress | OutputAddress;
+
+struct StageAddressSelection { bool prepare, output; };
+constexpr StageAddressSelection stage_address_selection(unsigned delivery) {
+  return {bool(delivery & PrepareAddress), bool(delivery & OutputAddress)};
+}
 
 // Each stage has mutually exclusive legacy-packed and tiled selectors.
 // State options require the tiled state; they are never silently ignored.
-// All old masks0..63 keep their original meaning and admission.
+// PrepareAddress extends scalar prepare, never overrides packed/tiled prepare.
+// OutputAddress requires the tiled output. Old masks0..255 keep their meaning.
 constexpr bool valid_delivery(unsigned mask) {
-  return mask < 256 && ((mask & 7u) & ((mask >> 3) & 7u)) == 0 &&
-         (!(mask & StateOptions) || (mask & 16u));
+  return mask < 1024 && ((mask & 7u) & ((mask >> 3) & 7u)) == 0 &&
+         (!(mask & StateOptions) || (mask & 16u)) &&
+         (!(mask & PrepareAddress) || !(mask & 9u)) &&
+         (!(mask & OutputAddress) || (mask & 32u));
 }
 
 // One typed selector for BOTH resource configuration and the actual launch.

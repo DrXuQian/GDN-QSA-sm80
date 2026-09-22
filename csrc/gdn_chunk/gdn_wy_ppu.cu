@@ -299,6 +299,7 @@ extern "C" int gdn_wy_forward_delivery(
     int q_heads, int value_heads, bool gate_fp32, gdn_arch::Stream stream, unsigned delivery) {
   using namespace gdn_qsa::wy;
   if (!valid_delivery(delivery)) return int(hggcErrorInvalidValue);
+  auto const address = stage_address_selection(delivery);
   Inputs p{static_cast<BF16 const*>(q), static_cast<BF16 const*>(k),
            static_cast<BF16 const*>(v), static_cast<BF16 const*>(beta),
            g, initial, gate_fp32, {batch, sequence, q_heads, value_heads}};
@@ -311,7 +312,11 @@ extern "C" int gdn_wy_forward_delivery(
     if (rc) return rc;
   }
   auto status = hggcSuccess;
-  if (!(delivery & 8)) {
+  if (delivery & StageAddressOptions) {
+    int const rc = configure_stage_address(delivery & StageAddressOptions);
+    if (rc) return rc;
+  }
+  if (!(delivery & 8) && !address.prepare) {
     status = hggcFuncSetAttribute(delivery & 1 ? gdn_wy_prepare<true> : gdn_wy_prepare<false>,
         hggcFuncAttributeMaxDynamicSharedMemorySize, sizeof(PrepareStorage));
     if (status != hggcSuccess) return int(status);
@@ -328,7 +333,10 @@ extern "C" int gdn_wy_forward_delivery(
         delivery & 4 ? sizeof(OutputSmem<true>) : sizeof(OutputSmem<false>));
     if (status != hggcSuccess) return int(status);
   }
-  if (delivery & 8) {
+  if (address.prepare) {
+    int const rc = launch_address_prepare(p, ws, stream);
+    if (rc) return rc;
+  } else if (delivery & 8) {
     int const rc = launch_tiled_prepare(p, ws, stream);
     if (rc) return rc;
   } else {
@@ -351,6 +359,7 @@ extern "C" int gdn_wy_forward_delivery(
     status = hggcGetLastError();
     if (status != hggcSuccess) return int(status);
   }
+  if (address.output) return launch_address_output(p, ws, static_cast<BF16*>(output), stream);
   if (delivery & 32) return launch_tiled_output(p, ws, static_cast<BF16*>(output), stream);
   if (delivery & 4)
     gdn_wy_output<true><<<unsigned(p.shape.groups()), ParallelThreads, sizeof(OutputSmem<true>), stream>>>(p, ws, static_cast<BF16*>(output));

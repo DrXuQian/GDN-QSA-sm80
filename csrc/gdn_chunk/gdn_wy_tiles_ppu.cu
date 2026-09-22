@@ -274,7 +274,7 @@ int configure_tiled(unsigned delivery) {
             hggcFuncAttributeMaxDynamicSharedMemorySize, sizeof(TiledStateStorage));
     if (status != hggcSuccess) return int(status);
   }
-  if (delivery & 32)
+  if ((delivery & 32) && !(delivery & OutputAddress))
     status = hggcFuncSetAttribute(gdn_wy_tiled_output,
         hggcFuncAttributeMaxDynamicSharedMemorySize, sizeof(TiledOutputStorage));
   return int(status);

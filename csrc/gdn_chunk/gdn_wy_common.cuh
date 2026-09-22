@@ -42,6 +42,9 @@ __device__ __forceinline__ float gate(Inputs const& p, int64_t i) {
 int configure_tiled(unsigned delivery);
 int configure_state_ab(unsigned options);
 int launch_state_ab(Inputs p, Workspace ws, float* final, gdn_arch::Stream stream, unsigned options);
+int configure_stage_address(unsigned options);
+int launch_address_prepare(Inputs p, Workspace ws, gdn_arch::Stream stream);
+int launch_address_output(Inputs p, Workspace ws, BF16* output, gdn_arch::Stream stream);
 int launch_tiled_prepare(Inputs p, Workspace ws, gdn_arch::Stream stream);
 int launch_tiled_state(Inputs p, Workspace ws, float* final, gdn_arch::Stream stream, unsigned state_options);
 int launch_tiled_output(Inputs p, Workspace ws, BF16* output, gdn_arch::Stream stream);
