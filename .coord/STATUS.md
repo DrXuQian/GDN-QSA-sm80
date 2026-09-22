@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-22 09:47:14 UTC
-working-on: sealing and publishing independent state address/gate-reuse box experiment
+updated-at: 2026-09-22 09:48:30 UTC
+working-on: local admission complete; STATE_AB box handoff ready, defaults unchanged
 blocked-on: device numerical/performance admission awaits box; local CPU torch cannot build the unchanged CUDA binding
-last-commit: dff74e4 (parent; implementation checkpoint not committed yet)
+last-commit: 9ab15f5 (state address/gate experiment and complete local admission)
 
 Active worktree /workspace/gdn-wy-state-address-20260922, evidence/registered
 plan /workspace/gdn-wy-state-address-evidence-20260922/docs/plan.md. New opt-in
@@ -20,6 +20,7 @@ stack, 18/3/18 static copy sites, 17/5/5 exponent sites; each retains32 BF16
 MMA sites. Static footprint/regs increase for address is recorded, not called
 a measured speed win. Native DSO SHA256:
 d659a512fb3e194b66aa1bf91196e706e38268ce7c802ddcfc81ba56c0549a7a.
+Post-edit rerun sealed in the evidence directory's sealed-local.log; rc=0.
 
 Full Torch-binding local build: SKIP/environment (private torch2.9 CPU lacks
 cuda_cmake_macros.h and CUDA torch libraries); no stubbed PASS. Box builds
