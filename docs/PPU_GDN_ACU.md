@@ -1,6 +1,61 @@
 # GDN versus FLA: one-command counter bundle
 
-## Current: state/output combination from 90eafeb
+## Current: prepare shared-row candidate, mask1520
+
+The latest user-reported strong-gate full-API median is352.192 us, versus
+356.590 us for prepare-address and494.490 us for FLA. Capture the **same
+measured binary**, not a new build or the older mask48. The exact run
+directory was not included in that excerpt; paste the directory printed by
+its final `artifacts=` line when the following command prompts:
+
+```bash
+read -r -p 'Previous comparison artifacts directory: ' WY_RUN
+if [ -n "$WY_RUN" ] && [ -f "$WY_RUN/comparison.json" ]; then
+  env -u OUT -u EXTENSION \
+    PPU_SDK=/usr/local/PPU_SDK ACU=/usr/local/PPU_SDK/asight/bin/acu DEVICE=0 \
+    bash tools/run_ppu_gdn_fla_acu_box.sh \
+      --wy-run "$WY_RUN" --wy-delivery prepare-rows-shared --gate -1.0
+else
+  printf '%s\n' 'Missing comparison.json; no capture started. Use the preceding artifacts directory.'
+fi
+```
+
+Use the same physical DEVICE as the comparison. There is no new binary,
+kernel edit, timing sweep or automatic latest-directory selection. The
+existing collector supports this exact role and refuses a different role
+even if it has the same numerical fingerprint. It validates both DSOs,
+the prior fixture/FLA contract and new separate preflight before capture.
+Current helper sources and old binary origin are recorded separately.
+
+Source/compile expectations for B1/S2048/Hk16/Hv32/K128/V128/C64:
+
+| Stage | Expected native body | Grid / threads | Shared B / local registers |
+|---|---|---|---|
+| Prepare | `gdn_wy_rows_prepare<1>` | 1024 /128 | 70,144 /86 |
+| State | `gdn_wy_state_ab<true,true>` | 128 /128 | 49,408 /242 |
+| Output | `gdn_wy_tiled_output` | 1024 /256 | 49,408 /98 |
+
+These are **expected mappings and local compilation resources**, not the
+new box's observed occupancy. Check report symbols and actual resources
+before attribution. FLA's prefix/solve/WU together correspond to prepare;
+state and output compare separately. Keep additional fills/transforms and
+any fresh-process internal autotuning visible rather than discarding them.
+
+The next change is selected from current measured stage duration, actual
+work/traffic, issue/dependency stalls, active warps, spills and frequency.
+The shared cache's4.398 us API improvement does not identify any of those
+causes by itself. Do not reuse old scalar/tiled stage times to rank this
+new pipeline or subtract profiled sums from352.192 us. No weak-gate claim
+or routing promotion follows from this strong-gate capture.
+
+The collector uses direct `acu -f -o ... --set full`, not PPUProfiler;
+captures WY and FLA sequentially; retains all stages; and prints
+`UPLOAD=/workspace/...tar.gz`. Upload that one archive, not screenshots or
+manually copied CSV. It includes the complete preceding comparison, so the
+weak-gate samples and admission log can be reviewed if present. All24 host
+capture-contract tests pass; actual capture is still pending the box run.
+
+## Earlier: state/output combination from 90eafeb
 
 The reported strong-decay state/output result is 439.486 us. Reuse that exact
 comparison binary and select mask48, not scalar WY, old packed-all or tiled-all:

@@ -1,9 +1,19 @@
 # PPU original-structure port
 
-updated-at: 2026-09-22 13:39:18 UTC
-working-on: user-reported strong-gate prepare-row result reviewed; shared improves incumbent, no default promotion
-blocked-on: complete comparison JSON/device identities/numeric admission and weak-gate results not supplied
-last-commit: eed5ba2 (previous handoff; current checkpoint is documentation only)
+updated-at: 2026-09-22 13:44:14 UTC
+working-on: same-binary mask1520 shared-row/FLA ACU handoff verified; no kernel changes
+blocked-on: exact preceding artifacts directory and actual box capture are not yet supplied
+last-commit: 8e40d3e (strong-gate result record; this checkpoint changes documentation only)
+
+Next command in docs/PPU_GDN_ACU.md. Existing collector already supports
+prepare-rows-shared and binds its exact measured role/binding/device library;
+no rebuild, default routing or runner change needed.24 host ACU contract
+tests rerun PASS. Source expectation: shared prepare<1> grid1024/128 threads,
+state_ab<true,true> grid128/128, old tiled output grid1024/256. Capture strong
+g=-1.0 plus FLA sequentially, all stages, direct external acu and automatic
+tar. Current helper SHA remains distinct from reused kernel provenance.
+Actual profiling NOT_RUN locally. No inference from old profiles or API
+sum subtraction. User can paste the exact artifacts path at command prompt.
 
 User-pasted g=-1.0: incumbent496 356.590 [355.552,357.508] us; shared1520
 352.192 [351.240,353.872]; warp2544 354.350 [352.660,357.468]; FLA494.490
