@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-22 12:25:04 UTC
-working-on: final local admission sealed; publishing STAGE_AB prepare/output box handoff
+updated-at: 2026-09-22 12:26:41 UTC
+working-on: STAGE_AB handoff ready; awaiting device admission/timing, no default promotion
 blocked-on: no local PPU; full binding needs box CUDA torch, no local device result
-last-commit: 5804278 (state ablation handoff; new task starts here)
+last-commit: 2b475fa (prepare/output address ablations and sealed local admission)
 
 Task worktree /workspace/gdn-wy-stage-address-20260922, registered plan and
 resume /workspace/gdn-wy-stage-address-evidence-20260922. User-pasted strong
