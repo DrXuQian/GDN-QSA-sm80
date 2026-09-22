@@ -1,6 +1,7 @@
 """Host-only contract/negative tests; no device, ACU or installed FLA required."""
 import copy
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -31,6 +32,13 @@ class ACUContract(unittest.TestCase):
         directory = self.root / self._testMethodName
         directory.mkdir()
         return directory
+
+    def test_portable_streaming_sha_matches_full_digest(self):
+        directory = self.directory()
+        path = directory / "non-ascii-证据.bin"
+        data = bytes(range(256)) * 5000  # spans the streaming chunk boundary
+        path.write_bytes(data)
+        self.assertEqual(collect.sha(path), hashlib.sha256(data).hexdigest())
 
     def records(self):
         ours = dict(status="PASS", role="ours", phase="subject", warmup=0, public_api_calls=1, gate=-0.1,
@@ -316,6 +324,13 @@ class ACUContract(unittest.TestCase):
             collect.validate_comparison(comparison, pair, fla)
         comparison["cases"][0]["arms"]["wy-tiled-state-output"] = dict(fingerprint="output", state_dtype="torch.float32")
         collect.validate_comparison(comparison, pair, fla)
+        for suffix in ("address", "gates", "both"):
+            name = f"tiled-state-output-{suffix}"
+            subject = ours | dict(wy_delivery=name)
+            with self.assertRaisesRegex(ValueError, "output differs"):
+                collect.validate_comparison(comparison, subject, fla)
+            comparison["cases"][0]["arms"][f"wy-{name}"] = dict(fingerprint="output", state_dtype="torch.float32")
+            collect.validate_comparison(comparison, subject, fla)
         for role, key, value in (("wy", "input_sha", "other"), ("wy", "output_sha", "other"),
                                   ("fla", "fla", dict(entry_sha256="changed")),
                                   ("wy", "state_dtype", "torch.bfloat16"),

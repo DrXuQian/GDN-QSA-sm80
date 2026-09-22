@@ -6,11 +6,32 @@ import re
 import subprocess
 
 
+def kernel_sequences(isa):
+    result = {}
+    for section in isa.split("Disassembly of section ")[1:]:
+        if not section.startswith(".text.kernel."):
+            continue
+        name = section.splitlines()[0].removeprefix(".text.kernel.").removesuffix(":")
+        result[name] = re.findall(r"^\s*[0-9a-f]+:\s+(?:[0-9a-f]{2}\s+){8}\s*([^\n]+)", section, re.M)
+        if not result[name]:
+            raise AssertionError(f"empty native instruction sequence: {name}")
+    return result
+
+
+def compare_controls(before, after):
+    old, new = kernel_sequences(before), kernel_sequences(after)
+    if len(old) != 9 or len(new) != 12:
+        raise AssertionError("control comparison must cover all9 old and all12 current images")
+    for name, sequence in old.items():
+        if new.get(name) != sequence:
+            raise AssertionError(f"admitted control native instructions changed: {name}")
+
+
 def audit(isa, resources, symbols):
     funcs = re.findall(r"Func \d+ (\S+) RESOURCE INFO:\n(.*?)(?=Func \d+ \S+ RESOURCE INFO:|\Z)",
                        resources, flags=re.S)
-    if len(funcs) != 9:
-        raise AssertionError(f"WY image denominator must be 6 controls + 3 tiled, got {len(funcs)}")
+    if len(funcs) != 12:
+        raise AssertionError(f"WY image denominator must be 6 controls + 3 tiled + 3 state variants, got {len(funcs)}")
     rows = []
     mma_counts = {}
     for role, packed in ((role, packed) for role in ("prepare", "state", "output") for packed in (False, True)):
@@ -75,10 +96,41 @@ def audit(isa, resources, symbols):
         if role == "state" and ("v.shuffle" in body_isa or "\tvmem.ld.b16\t" in body_isa):
             raise AssertionError("tiled state retained register shuffle or scalar U load")
         rows.append(dict(role=role, delivery="tiled", registers=regs, stack=stack))
+    sequences = kernel_sequences(isa)
+    for address, gates in ((True, False), (False, True), (True, True)):
+        matches = [(name, body) for name, body in funcs
+                   if f"gdn_wy_state_abILb{int(address)}ELb{int(gates)}E" in name]
+        if len(matches) != 1:
+            raise AssertionError(f"missing/ambiguous state variant: address={address} gates={gates}")
+        name, body = matches[0]
+        stack = int(re.search(r"STACK SIZE:(\d+)", body)[1])
+        regs = int(re.search(r"vreg_number:(\d+)", body)[1])
+        if stack:
+            raise AssertionError(f"state variant spills: {stack}")
+        if name not in sequences:
+            raise AssertionError(f"missing state variant native body: {name}")
+        ops = [line.split()[0] for line in sequences[name]]
+        copies = sum(op.startswith("vmem.ld.tsm") for op in ops)
+        exponents = ops.count("v.exp2.f32")
+        if copies != (18 if address else 3):
+            raise AssertionError(f"state address body not emitted: cp.async sites={copies}")
+        if exponents != (5 if gates else 17):
+            raise AssertionError(f"state row reuse body not emitted: exponent sites={exponents}")
+        if ops.count("v.mma.f32.bf16.m16n16k16") != 32 or any("mma.f32.tf32" in op for op in ops):
+            raise AssertionError("state variant changed MMA arithmetic body")
+        for required in ("vmem.st.b32x4", "tsm.ld.swzl"):
+            if not any(op.startswith(required) for op in ops):
+                raise AssertionError(f"state variant lost native/vector delivery: {required}")
+        if any(op.startswith("v.shuffle") or op in ("vmem.st.b16", "vmem.ld.b16") for op in ops):
+            raise AssertionError("state variant regressed to shuffle or scalar global BF16")
+        rows.append(dict(role="state", address=address, row_reuse=gates, registers=regs,
+                         stack=stack, static_instructions=len(ops), cp_async_sites=copies,
+                         exponent_sites=exponents))
     for name in ("gdn_wy_forward", "gdn_wy_forward_delivery"):
         if not re.search(rf"\b{name}$", symbols, re.M):
             raise AssertionError(f"WY launcher missing from linked library: {name}")
-    for name in ("configure_tiled", "launch_tiled_prepare", "launch_tiled_state", "launch_tiled_output"):
+    for name in ("configure_tiled", "launch_tiled_prepare", "launch_tiled_state", "launch_tiled_output",
+                 "configure_state_ab", "launch_state_ab"):
         if not re.search(rf"\b_ZN7gdn_qsa2wy\d+{name}E\S*$", symbols, re.M):
             raise AssertionError(f"tiled cross-TU launcher missing from linked library: {name}")
     return rows
@@ -88,6 +140,8 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("build", type=Path)
     p.add_argument("--self-test", action="store_true")
+    p.add_argument("--baseline-isa", type=Path,
+                   help="optional same-SDK parent build: require exact old instruction/operand sequences")
     args = p.parse_args()
     isa = (args.build / "gdn_wy_ppu.isa").read_text()
     resources = (args.build / "gdn_wy_ppu.resources").read_text()
@@ -103,6 +157,10 @@ def main():
             ("missing-tiled-image", (isa.replace("gdn_wy_tiled_state", "MISSING_tiled_state"), resources, symbols)),
             ("missing-tiled-host-link", (isa, resources, symbols.replace("launch_tiled_state", "MISSING_tiled_state"))),
             ("tiled-shuffle-regression", (isa.replace("tsm.ld.swzl.b32x4.s0.t1.trans1", "v.shuffle.idx.b32"), resources, symbols)),
+            ("missing-state-variant", (isa.replace("gdn_wy_state_abILb1ELb1E", "MISSING_state_variant"), resources, symbols)),
+            ("missing-state-link", (isa, resources, symbols.replace("launch_state_ab", "MISSING_state_link"))),
+            ("state-reuse-not-emitted", (isa.replace("v.exp2.f32", "MISSING_EXP"), resources, symbols)),
+            ("state-copy-not-emitted", (isa.replace("vmem.ld.tsm.zfill.b32x4", "vmem.ld.WRONG.b32x4"), resources, symbols)),
         ):
             try:
                 audit(*texts)
@@ -110,6 +168,17 @@ def main():
                 print(f"[WY binary negative] {label} EXPECTED-RED/PASS")
             else:
                 raise AssertionError(f"escaped negative: {label}")
+    if args.baseline_isa:
+        before = args.baseline_isa.read_text()
+        compare_controls(before, isa)
+        if args.self_test:
+            try:
+                compare_controls(before, isa.replace("v.mma.f32.bf16", "CHANGED_CONTROL", 1))
+            except AssertionError:
+                print("[WY binary negative] changed-control EXPECTED-RED/PASS")
+            else:
+                raise AssertionError("control-comparison negative escaped")
+        print("[WY binary controls] 9/9 native instruction+operand sequences IDENTICAL")
     print("[WY binary] PASS device_execution=NOT_RUN")
 
 

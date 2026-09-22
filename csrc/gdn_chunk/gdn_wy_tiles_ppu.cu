@@ -269,8 +269,9 @@ int configure_tiled(unsigned delivery) {
     if (status != hggcSuccess) return int(status);
   }
   if (delivery & 16) {
-    status = hggcFuncSetAttribute(gdn_wy_tiled_state,
-        hggcFuncAttributeMaxDynamicSharedMemorySize, sizeof(TiledStateStorage));
+    status = delivery & StateOptions ? hggcError_t(configure_state_ab(delivery & StateOptions)) :
+        hggcFuncSetAttribute(gdn_wy_tiled_state,
+            hggcFuncAttributeMaxDynamicSharedMemorySize, sizeof(TiledStateStorage));
     if (status != hggcSuccess) return int(status);
   }
   if (delivery & 32)
@@ -282,7 +283,8 @@ int launch_tiled_prepare(Inputs p, Workspace ws, gdn_arch::Stream stream) {
   gdn_wy_tiled_prepare<<<unsigned(p.shape.groups()), PrepareTile::Threads, sizeof(PrepareStorage), stream>>>(p, ws);
   return int(hggcGetLastError());
 }
-int launch_tiled_state(Inputs p, Workspace ws, float* final, gdn_arch::Stream stream) {
+int launch_tiled_state(Inputs p, Workspace ws, float* final, gdn_arch::Stream stream, unsigned state_options) {
+  if (state_options) return launch_state_ab(p, ws, final, stream, state_options);
   unsigned const grid = unsigned(int64_t(p.shape.batch) * p.shape.value_heads * (Dim / ValueTile));
   gdn_wy_tiled_state<<<grid, StateTile::Threads, sizeof(TiledStateStorage), stream>>>(p, ws, final);
   return int(hggcGetLastError());

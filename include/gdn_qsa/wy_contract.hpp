@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <type_traits>
 
 namespace gdn_qsa::wy {
 constexpr int Chunk = 64;
@@ -9,10 +10,29 @@ constexpr int ValueTile = 32;
 constexpr int StateThreads = 64;
 constexpr int ParallelThreads = 128;
 
+constexpr unsigned StateAddress = 64u;
+constexpr unsigned StateRowReuse = 128u;
+constexpr unsigned StateOptions = StateAddress | StateRowReuse;
+
 // Each stage has mutually exclusive legacy-packed and tiled selectors.
-// No silent precedence if a caller asks for both implementations of one stage.
+// State options require the tiled state; they are never silently ignored.
+// All old masks0..63 keep their original meaning and admission.
 constexpr bool valid_delivery(unsigned mask) {
-  return mask < 64 && ((mask & 7u) & (mask >> 3)) == 0;
+  return mask < 256 && ((mask & 7u) & ((mask >> 3) & 7u)) == 0 &&
+         (!(mask & StateOptions) || (mask & 16u));
+}
+
+// One typed selector for BOTH resource configuration and the actual launch.
+// The host gate visits this same function; equal numerical answers cannot
+// conceal an ignored performance-only option.
+template <class Visitor>
+constexpr int visit_state_options(unsigned options, Visitor visitor, int invalid) {
+  switch (options) {
+    case StateAddress: return visitor(std::true_type{}, std::false_type{});
+    case StateRowReuse: return visitor(std::false_type{}, std::true_type{});
+    case StateOptions: return visitor(std::true_type{}, std::true_type{});
+    default: return invalid;
+  }
 }
 
 struct Shape {

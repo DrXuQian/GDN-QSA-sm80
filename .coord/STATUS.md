@@ -1,9 +1,35 @@
 # PPU original-structure port
 
-updated-at: 2026-09-22 08:55:10 UTC
-working-on: mask48 ACU verdict complete; address/copy hot loop localized, implementation not changed
-blocked-on: none; next implementation is a separate state address/copy ablation
-last-commit: 6052ae5 (verified ACU report; measured binary source 90eafeb)
+updated-at: 2026-09-22 09:47:14 UTC
+working-on: sealing and publishing independent state address/gate-reuse box experiment
+blocked-on: device numerical/performance admission awaits box; local CPU torch cannot build the unchanged CUDA binding
+last-commit: dff74e4 (parent; implementation checkpoint not committed yet)
+
+Active worktree /workspace/gdn-wy-state-address-20260922, evidence/registered
+plan /workspace/gdn-wy-state-address-evidence-20260922/docs/plan.md. New opt-in
+mask112/176/240 arms retain mask48 and all prior controls; no auto routing,
+prepare/output arithmetic, precision or tolerance changes.
+
+Final local checks: 6/6 CTests, 57 Python contracts, 45 CPU algebra cases
+and five algebra negatives PASS. New address gate checks 18,432 coordinates,
+1,406,720 vectors and 131,072 gate-reuse values; six planted defects go red.
+Real SDK2.1.1 compiles and links all12 native WY images; 12 binary negatives
+go red. All9 old instruction+operand sequences are IDENTICAL to the same-SDK
+parent build. New address/gates/both kernels: 238/234/242 registers, zero
+stack, 18/3/18 static copy sites, 17/5/5 exponent sites; each retains32 BF16
+MMA sites. Static footprint/regs increase for address is recorded, not called
+a measured speed win. Native DSO SHA256:
+d659a512fb3e194b66aa1bf91196e706e38268ce7c802ddcfc81ba56c0549a7a.
+
+Full Torch-binding local build: SKIP/environment (private torch2.9 CPU lacks
+cuda_cmake_macros.h and CUDA torch libraries); no stubbed PASS. Box builds
+that binding and must pass device raw-bit/8-repeat admission before timing.
+No local device result. STATE_AB=1 keeps eight balanced roles including
+original, scalar, mask48, all, three candidates and FLA at both gates.
+Command and fixed verdict: docs/PPU_WY_STATE_ADDRESS.md. Waiting on device
+measurements; do not promote a route from static instruction counts.
+
+## Prior verified device evidence
 
 New upload gdn-qsa-acu-20260922T080504Z-2605202.tar.gz: 542 regular
 files, all 541 checksums and exact manifest denominator PASS. Source90eafeb,

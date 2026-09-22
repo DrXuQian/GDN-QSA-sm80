@@ -14,7 +14,7 @@ sys.path[:0] = [str(ROOT), str(ROOT / "benchmarks")]
 from gdn_qsa_sm80 import gdn_wy_interface as api
 import bench_ppu_wy_fla as benchmark
 from bench_ppu_wy_fla import (comparison_summary, delivery_comparisons, order,
-                              DELIVERY_ROLES, TILE_ROLES, experiment, resolve_samples)
+                              DELIVERY_ROLES, TILE_ROLES, STATE_ROLES, experiment, resolve_samples)
 from bench_ppu_gdn_fla import checked_pair, verdict
 
 
@@ -84,6 +84,62 @@ class Contracts(unittest.TestCase):
             with self.subTest(samples=samples), self.assertRaisesRegex(ValueError, "multiple of 16"):
                 resolve_samples(samples, TILE_ROLES)
 
+    def test_state_experiment_inventory_and_balanced_orders(self):
+        def check_inventory():
+            names, roles = experiment(state_ab=True)
+            self.assertEqual(set(roles), {"original", "wy", "fla", "wy-tiled-state-output",
+                "wy-tiled-all", "wy-tiled-state-output-address", "wy-tiled-state-output-gates",
+                "wy-tiled-state-output-both"})
+            self.assertEqual(tuple(api.DELIVERIES[x] for x in names), (48, 56, 112, 176, 240))
+            self.assertEqual(roles, STATE_ROLES)
+            return roles
+        roles = check_inventory()
+        self.assertEqual(resolve_samples(None, roles), 16)
+        rows = [order(i, roles) for i in range(16)]
+        for column in zip(*rows):
+            for role in roles:
+                self.assertEqual(column.count(role), 2)
+        with patch.object(benchmark, "STATE_DELIVERIES", api.STATE_DELIVERIES[:-1]):
+            with self.assertRaises(AssertionError):
+                check_inventory()
+        for kwargs in (dict(delivery_ab=True), dict(tile_ab=True)):
+            with self.assertRaises(ValueError):
+                experiment(state_ab=True, **kwargs)
+        with self.assertRaises(ValueError):
+            resolve_samples(14, roles)
+
+    def test_state_option_bits_reach_the_actual_python_abi(self):
+        class Fake:
+            def forward(self, *args):
+                self.args = args
+                return torch.ones(1), torch.ones(1)
+        x, fake = torch.zeros(1), Fake()
+        for suffix, expected in (("address", 112), ("gates", 176), ("both", 240)):
+            delivery = f"tiled-state-output-{suffix}"
+            def check():
+                with patch.object(api, "_backend", return_value=fake):
+                    api.gdn_chunk_wy(x, x, x, x, x, delivery=delivery)
+                self.assertEqual(fake.args[-1], expected)
+            check()
+            # Dropping option bits keeps a numerically equal control; require
+            # the selection itself, not just its answer, to differ.
+            with patch.dict(api.DELIVERIES, {delivery: 48}):
+                with self.assertRaises(AssertionError):
+                    check()
+
+    def test_state_combined_candidate_compares_both_single_changes(self):
+        arms = {role: dict(samples_us=[500., 510.]) for role in STATE_ROLES}
+        arms["wy-tiled-state-output-both"]["samples_us"] = [400., 410.]
+        result = delivery_comparisons(arms, "tiled-state-output-both", state_ab=True)
+        self.assertEqual(set(result), set(STATE_ROLES) - {"wy-tiled-state-output-both"})
+        self.assertTrue(all(x['verdict'] == 'CANDIDATE-WINS' for x in result.values()))
+        arms["wy-tiled-state-output-both"]["samples_us"] = [400., 550.]
+        self.assertTrue(all(x['verdict'] == 'UNRESOLVED' for x in
+            delivery_comparisons(arms, "tiled-state-output-both", state_ab=True).values()))
+        del arms["wy-tiled-state-output-address"]
+        with self.assertRaises(KeyError):
+            delivery_comparisons(arms, "tiled-state-output-both", state_ab=True)
+
     def test_state_output_keeps_scalar_prepare_at_the_real_python_abi(self):
         class Fake:
             def forward(self, *args):
@@ -138,11 +194,14 @@ class Contracts(unittest.TestCase):
         want = (torch.ones(1), torch.ones(1))
         args = SimpleNamespace(delivery_ab=False, tile_ab=True, warmup=5, samples=16, launches=10)
         seen = []
-        def run(plant=False):
+        def run(plant=False, state_ab=False):
+            args.tile_ab = not state_ab
+            args.state_ab = state_ab
             def wy(*inputs, delivery="scalar"):
                 seen.append(delivery)
                 # Within the unchanged 2% gate, but not scalar raw equality.
-                return (want[0] + .001, want[1]) if plant and delivery == "tiled-state-output" else want
+                selected = "tiled-state-output-both" if state_ab else "tiled-state-output"
+                return (want[0] + .001, want[1]) if plant and delivery == selected else want
             with patch.object(benchmark.admission, "fixture", return_value=cpu), \
                     patch.object(benchmark.admission, "reference", return_value=want), \
                     patch.object(benchmark.admission, "gdn_chunk", return_value=want), \
@@ -161,6 +220,15 @@ class Contracts(unittest.TestCase):
         self.assertEqual(len(pair["versus"]), 5)
         with self.assertRaisesRegex(AssertionError, "wy-tiled-state-output output/state bits differ"):
             run(plant=True)
+        seen.clear()
+        result = run(state_ab=True)
+        self.assertEqual(set(result['arms']), set(STATE_ROLES))
+        for name in ("scalar", *api.STATE_DELIVERIES):
+            self.assertEqual(seen.count(name), 8 + 5 + 16 * 10)
+        self.assertEqual(result['arms']['wy-tiled-state-output-both']['delivery_mask'], 240)
+        self.assertEqual(len(result['arms']['wy-tiled-state-output-both']['versus']), 7)
+        with self.assertRaisesRegex(AssertionError, "wy-tiled-state-output-both output/state bits differ"):
+            run(plant=True, state_ab=True)
 
     def test_delivery_mask_is_consumed_not_silently_ignored(self):
         class Fake:

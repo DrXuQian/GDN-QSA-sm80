@@ -111,19 +111,19 @@ int reduction_order(int plant = 0) {
       w.check({0, 16, 32, 48}) + u.check({0, 16, 32, 48});
 }
 
-// Fixed independent denominators: selectors must enumerate 3 modes^3 stages,
-// not accept two implementations for one stage and silently choose one.
+// 3 modes^3 base stages plus 3 options x9 base masks with tiled state.
+// Options on non-tiled state must not be accepted and silently ignored.
 int selectors(int plant = 0) {
   int accepted = 0, bad = 0;
-  for (unsigned mask = 0; mask < 256; ++mask) {
-    bool expected = mask < 64;
+  for (unsigned mask = 0; mask < 512; ++mask) {
+    bool expected = mask < 256 && (!(mask & 192u) || (mask & 16u));
     for (int stage = 0; stage < 3; ++stage)
       expected &= !((mask & (1u << stage)) && (mask & (8u << stage)));
     bool const actual = plant == 7 ? mask < 64 : valid_delivery(mask);
     accepted += actual;
     bad += actual != expected;
   }
-  return bad + (accepted != 27) + valid_delivery(1u << 31);
+  return bad + (accepted != 54) + valid_delivery(1u << 31);
 }
 
 int main() {
@@ -138,5 +138,5 @@ int main() {
     if (!bad) throw std::runtime_error("tiled negative escaped");
     std::printf("[WY tiled negative] plant=%d bad=%d EXPECTED-RED/PASS\n", plant, bad);
   }
-  std::puts("[WY tiles] native H exchange=8192 reads; independent scalar-coordinate reduction order=34816 outputs (W/U counted separately); selectors=256/27 valid; PASS device_execution=NOT_RUN");
+  std::puts("[WY tiles] native H exchange=8192 reads; independent scalar-coordinate reduction order=34816 outputs (W/U counted separately); selectors=512/54 valid (old27+state-options27); PASS device_execution=NOT_RUN");
 }

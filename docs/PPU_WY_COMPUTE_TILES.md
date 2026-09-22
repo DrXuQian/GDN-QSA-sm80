@@ -163,3 +163,9 @@ The collector binds to `wy-tiled-state-output` in that run, never to
 fingerprints happen to match. `--wy-delivery tiled-all` remains available.
 Keep ACU times separate from
 the full-API benchmark. Check all three stage instruction/traffic costs.
+
+## Follow-up
+
+The admitted tile bodies are retained. The next opt-in experiment isolates
+[state address arithmetic and exact row-gate reuse](PPU_WY_STATE_ADDRESS.md)
+with `STATE_AB=1`; it does not change the `TILE_AB` inventory or routing.

@@ -24,8 +24,12 @@ from gdn_qsa_sm80.gdn_wy_interface import DELIVERIES
 
 
 def sha(path):
+    # Python >=3.9 is supported by this project; file_digest arrived in3.11.
+    digest = hashlib.sha256()
     with Path(path).open("rb") as stream:
-        return hashlib.file_digest(stream, "sha256").hexdigest()
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 def run(command, log, env, *, optional=False, console=True, timeout=None):
