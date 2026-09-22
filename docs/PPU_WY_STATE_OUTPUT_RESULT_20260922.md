@@ -1,5 +1,11 @@
 # State/output combination: reported result and next capture
 
+Update: the requested archive has now been received and independently
+verified, including the weak case and all three profiled stages. See
+[the verified ACU verdict](PPU_WY_STATE_OUTPUT_ACU_20260922.md). The text
+below preserves the pre-capture record and interpretation criteria; its
+"not yet supplied/verified" statements describe that earlier checkpoint.
+
 Evidence: user-pasted 16 samples per role from
 `/workspace/gdn-wy-fla-90eafeb-20260922T013928Z/comparison.json`.
 Medians and envelope decisions were checked against those samples. This is
