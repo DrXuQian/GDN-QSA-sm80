@@ -1,9 +1,23 @@
 # PPU original-structure port
 
-updated-at: 2026-09-22 13:19:42 UTC
-working-on: prepare row-factor experiments committed; ready for eight-role box admission
-blocked-on: no local PPU; full binding SKIP/environment (CPU-only local torch); device admission pending
-last-commit: 59c2dff (implementation and handoff; this checkpoint changes STATUS only)
+updated-at: 2026-09-22 13:39:18 UTC
+working-on: user-reported strong-gate prepare-row result reviewed; shared improves incumbent, no default promotion
+blocked-on: complete comparison JSON/device identities/numeric admission and weak-gate results not supplied
+last-commit: eed5ba2 (previous handoff; current checkpoint is documentation only)
+
+User-pasted g=-1.0: incumbent496 356.590 [355.552,357.508] us; shared1520
+352.192 [351.240,353.872]; warp2544 354.350 [352.660,357.468]; FLA494.490
+[478.012,522.352]. All8 roles have16 finite samples and matching recomputed
+printed medians. Shared vs496 CANDIDATE-WINS:4.398 us /1.233% lower latency,
+1.680 us disjoint-envelope margin. Warp vs496 UNRESOLVED; shared vswarp also
+UNRESOLVED, not a proven cache-mechanism ranking. Shared/FLA median ratio
+1.404x is full-public-API, not kernel-only. Original426.348 (BF16 final state),
+scalar WY705.266; final subject=wy verdict refers only to that old scalar.
+The pasted warp role spells row (singular), unlike the source's rows; do not
+treat this excerpt as a hash-verified raw JSON. No new kernel/default/route
+changes. Shared is a strong-gate experimental incumbent only; weak unknown.
+
+## Prior local prepare-row handoff
 
 Task worktree /workspace/gdn-wy-prepare-rows-20260922; pre-edit plan/evidence
 /workspace/gdn-wy-prepare-rows-evidence-20260922. User-reported strong medians:

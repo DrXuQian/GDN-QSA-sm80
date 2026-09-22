@@ -136,3 +136,35 @@ Results and identities are in the printed workspace's `comparison.log`,
 `[WY delivery verdict] candidate=wy-prepare-rows-* control=wy-stage-address-prepare`
 for this experiment. ACU reuse accepts the exact new role without rebuilding;
 equal output fingerprints never authorize rebinding a different role.
+
+## User-reported strong-gate result, 2026-09-22
+
+The returned excerpt contains all eight roles with16 finite samples each.
+Recomputed medians match the printed values to0.001 us. It does not include
+the complete comparison JSON, numerical admission log, source/binary/device
+identities or weak-gate result. The pasted warp label says
+`wy-prepare-row-warp` (singular), whereas this source emits
+`wy-prepare-rows-warp`; it is not treated as a verified raw result bundle.
+
+| Full-API role, g=-1.0 | Median us | Range us | Against incumbent496 |
+|---|---:|---:|---|
+| Prepare address,496 | 356.590 | 355.552–357.508 | Control |
+| Shared rows,1520 | 352.192 | 351.240–353.872 | CANDIDATE-WINS |
+| Warp rows,2544 | 354.350 | 352.660–357.468 | UNRESOLVED |
+| FLA | 494.490 | 478.012–522.352 | Reference |
+
+Shared saves4.398 us (1.233% latency reduction), with a1.680 us separation
+between its maximum and the incumbent's minimum. Shared versus warp is
+also **UNRESOLVED** because their ranges overlap: this is evidence for a
+gain against496, not proof that shared delivery beats warp delivery.
+Shared versus FLA has disjoint ranges; its1.404x median speedup is a full-API
+comparison (28.78% lower latency), not a kernel-only throughput claim.
+
+The older controls remain consistent in this cohort: original426.348,
+scalar WY705.266, mask48=437.158 and mask240=379.174 us. The final
+`subject=wy control=original ORIGINAL-WINS` describes scalar WY, not the
+new candidate. Shared is retained as a **strong-gate experimental** incumbent;
+default routing remains unchanged, and no weak-gate or global admission is
+inferred. Do not subtract older ACU stage durations from these API spans.
+The net4.4 us gain alone cannot attribute barrier, shared-read or shuffle
+costs; a current same-binary stage profile is needed for the next bottleneck.
