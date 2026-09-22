@@ -3,6 +3,7 @@
 #include "gdn_wy_common.cuh"
 #include "gdn_wy_state_copy.cuh"
 #include "gdn_qsa/ppu/wy_stage_address.cuh"
+#include "gdn_qsa/ppu/wy_prepare_rows.cuh"
 
 namespace gdn_qsa::wy {
 struct PrepareStorage {
@@ -17,8 +18,9 @@ struct PrepareStorage {
 
 // Shared arithmetic authority for legacy and tiled prepare variants.
 // Same four-warp solve, TF32 high/residual products and BF16 boundaries.
-template <bool Address = false>
+template <bool Address = false, int RowCache = 0>
 __device__ __forceinline__ int64_t prepare_inverse(Inputs const& p, Workspace const& ws, PrepareStorage& sm) {
+  static_assert(RowCache >= 0 && RowCache <= 2 && (!RowCache || Address));
   int const tid = int(threadIdx.x), warp = unsigned(threadIdx.x) >> 5, lane = unsigned(threadIdx.x) & 31;
   int const ct = int(blockIdx.x) % p.shape.chunks();
   int const bh = int(blockIdx.x) / p.shape.chunks();
@@ -115,6 +117,18 @@ __device__ __forceinline__ int64_t prepare_inverse(Inputs const& p, Workspace co
     }
     __syncthreads();
   }
+  // All inverse-merge readers have retired at the preceding CTA barrier.
+  // Reuse the dead temp scratch, not live prefix/beta/inverse storage.
+  float warp_rows[PrepareRowsPlan::Slots];
+  if constexpr (RowCache == 1) {
+    static_assert(sizeof(sm.temp[0]) >= Chunk * sizeof(float));
+    if (PrepareRowsPlan::shared_writer(unsigned(tid)))
+      sm.temp[0][tid] = expf(sm.prefix[tid]);
+  } else if constexpr (RowCache == 2) {
+    CUTE_UNROLL
+    for (unsigned slot = 0; slot < PrepareRowsPlan::Slots; ++slot)
+      warp_rows[slot] = expf(sm.prefix[PrepareRowsPlan::producer_row(unsigned(lane), slot)]);
+  }
   // lower is dead; reuse its storage for the BF16 inverse consumed by W/U.
   BF16* inv = reinterpret_cast<BF16*>(sm.lower);
   if constexpr (Address) {
@@ -124,11 +138,25 @@ __device__ __forceinline__ int64_t prepare_inverse(Inputs const& p, Workspace co
       unsigned const r = i / Chunk, c = i % Chunk;
       inv[state_shared_offset<Chunk, Chunk>(r, c)] = BF16(r >= c ? sm.inverse[i] : 0.0f);
     }
+    if constexpr (RowCache == 1) __syncthreads();  // row producers -> all K-column consumers
     #pragma unroll 1
     for (unsigned it = 0; it < PrepareElementPlan::ValueIterations; ++it) {
       unsigned const r = PrepareElementPlan::row(it), c = PrepareElementPlan::column(unsigned(tid));
       unsigned const at = state_shared_offset<Chunk, Dim>(r, c);
-      sm.k[at] = BF16(float(sm.k[at]) * sm.beta[r] * expf(sm.prefix[r]));
+      if constexpr (RowCache != 0) {
+        float factor;
+        if constexpr (RowCache == 1) factor = sm.temp[0][r];
+        else {
+          // All 32 lanes participate in every iteration. Selecting a register
+          // before the shuffle avoids a dynamically indexed register array.
+          float const owned = r < PrepareRowsPlan::Warp ? warp_rows[0] : warp_rows[1];
+          factor = __shfl_sync(PrepareRowsPlan::FullMask, owned, PrepareRowsPlan::lane(r));
+        }
+        // Do NOT precombine beta*factor: the old multiplication order matters.
+        sm.k[at] = BF16(float(sm.k[at]) * sm.beta[r] * factor);
+      } else {
+        sm.k[at] = BF16(float(sm.k[at]) * sm.beta[r] * expf(sm.prefix[r]));
+      }
       sm.v[at] = BF16(float(sm.v[at]) * sm.beta[r]);
     }
   } else {

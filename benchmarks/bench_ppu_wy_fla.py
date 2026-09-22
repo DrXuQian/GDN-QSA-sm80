@@ -15,19 +15,20 @@ sys.path.insert(0, str(ROOT))
 from bench_ppu_gdn_fla import admission, checked_pair, fla_call, load_fla, verdict
 from gdn_qsa_sm80 import gdn_chunk_wy
 from gdn_qsa_sm80.gdn_wy_interface import (DELIVERIES, PACKED_DELIVERIES, TILED_DELIVERIES,
-                                          STATE_DELIVERIES, STAGE_DELIVERIES)
+                                          STATE_DELIVERIES, STAGE_DELIVERIES, PREPARE_ROWS_DELIVERIES)
 
 
 DELIVERY_ROLES = ("original", "wy", "wy-prepare", "wy-state", "wy-output", "wy-all", "fla")
 TILE_ROLES = ("original", "wy", *(f"wy-{name}" for name in TILED_DELIVERIES), "fla")
 STATE_ROLES = ("original", "wy", *(f"wy-{name}" for name in STATE_DELIVERIES), "fla")
 STAGE_ROLES = ("original", "wy", *(f"wy-{name}" for name in STAGE_DELIVERIES), "fla")
+PREPARE_ROWS_ROLES = ("original", "wy", *(f"wy-{name}" for name in PREPARE_ROWS_DELIVERIES), "fla")
 
 
-def experiment(delivery_ab=False, tile_ab=False, state_ab=False, stage_ab=False):
-    if sum((delivery_ab, tile_ab, state_ab, stage_ab)) > 1:
+def experiment(delivery_ab=False, tile_ab=False, state_ab=False, stage_ab=False, prepare_rows_ab=False):
+    if sum((delivery_ab, tile_ab, state_ab, stage_ab, prepare_rows_ab)) > 1:
         raise ValueError("choose one balanced candidate family")
-    names = (STAGE_DELIVERIES if stage_ab else STATE_DELIVERIES if state_ab else
+    names = (PREPARE_ROWS_DELIVERIES if prepare_rows_ab else STAGE_DELIVERIES if stage_ab else STATE_DELIVERIES if state_ab else
              TILED_DELIVERIES if tile_ab else PACKED_DELIVERIES if delivery_ab else ())
     return names, ("original", "wy", *(f"wy-{name}" for name in names), "fla")
 
@@ -57,10 +58,16 @@ def order(sample, roles=("original", "wy", "fla")):
     return rows[sample % len(rows)]
 
 
-def delivery_comparisons(arms, delivery, state_ab=False, stage_ab=False):
+def delivery_comparisons(arms, delivery, state_ab=False, stage_ab=False, prepare_rows_ab=False):
     """Compare the new pair directly, without subtracting isolated stage costs."""
     controls = ("wy", "fla")
-    if stage_ab:
+    if prepare_rows_ab:
+        controls += tuple(role for role in ("original", "wy-tiled-state-output", "wy-tiled-state-output-both",
+                                            "wy-stage-address-prepare") if role != f"wy-{delivery}")
+        if delivery.startswith("prepare-rows-"):
+            other = "warp" if delivery.endswith("shared") else "shared"
+            controls += (f"wy-prepare-rows-{other}",)
+    elif stage_ab:
         controls += tuple(role for role in ("original", "wy-tiled-state-output", "wy-tiled-state-output-both")
                           if role != f"wy-{delivery}")
         if delivery == "stage-address-both":
@@ -103,7 +110,8 @@ def compare(fn, gate, args, device):
                  wy=lambda: gdn_chunk_wy(*inputs), fla=fla_call(fn, inputs, "native"))
     state_ab = getattr(args, "state_ab", False)
     stage_ab = getattr(args, "stage_ab", False)
-    names, roles = experiment(args.delivery_ab, args.tile_ab, state_ab, stage_ab)
+    prepare_rows_ab = getattr(args, "prepare_rows_ab", False)
+    names, roles = experiment(args.delivery_ab, args.tile_ab, state_ab, stage_ab, prepare_rows_ab)
     for delivery in names:
         calls[f"wy-{delivery}"] = lambda delivery=delivery: gdn_chunk_wy(*inputs, delivery=delivery)
     record = dict(g=gate, shape="B1/S2048/Hk16/Hv32/D128", input_sha=admission.digest(cpu), arms={})
@@ -164,7 +172,7 @@ def compare(fn, gate, args, device):
         for delivery in names:
             role = f"wy-{delivery}"
             candidate = record["arms"][role]
-            candidate["versus"] = delivery_comparisons(record["arms"], delivery, state_ab, stage_ab)
+            candidate["versus"] = delivery_comparisons(record["arms"], delivery, state_ab, stage_ab, prepare_rows_ab)
             for control, comparison in candidate["versus"].items():
                 label, speedup = comparison["verdict"], comparison["descriptive_speedup"]
                 print(f"[WY delivery verdict] g={gate} candidate={role} control={control} "
@@ -191,8 +199,10 @@ def main():
                         help="independent state address/gate reuse and combined arms; retain pair/all controls")
     family.add_argument("--stage-ab", action="store_true",
                         help="prepare/output address ablations on frozen state-both; retain old/new pair controls")
+    family.add_argument("--prepare-rows-ab", action="store_true",
+                        help="shared/warp exact row-factor reuse on frozen prepare-address; output unchanged")
     args = p.parse_args()
-    _, roles = experiment(args.delivery_ab, args.tile_ab, args.state_ab, args.stage_ab)
+    _, roles = experiment(args.delivery_ab, args.tile_ab, args.state_ab, args.stage_ab, args.prepare_rows_ab)
     try:
         args.samples = resolve_samples(args.samples, roles)
     except ValueError as exc:
@@ -214,8 +224,9 @@ def main():
                   qk_norm=False, scale="1/sqrt(128)", dtype="bf16", device=str(props),
                   torch=torch.__version__, fla=identity, samples=args.samples, launches=args.launches,
                   warmup=args.warmup, limit=admission.MAX_RELATIVE_ERROR,
-                  delivery_ab=args.delivery_ab or args.tile_ab or args.state_ab or args.stage_ab,
+                  delivery_ab=args.delivery_ab or args.tile_ab or args.state_ab or args.stage_ab or args.prepare_rows_ab,
                   tile_ab=args.tile_ab, state_ab=args.state_ab, stage_ab=args.stage_ab,
+                  prepare_rows_ab=args.prepare_rows_ab,
                   roles=roles, order_cycle_samples=2 * len(roles),
                   binary_sha256={str(x): hashlib.sha256(x.read_bytes()).hexdigest()
                                  for x in (args.extension, args.wy_extension)}, cases=[])

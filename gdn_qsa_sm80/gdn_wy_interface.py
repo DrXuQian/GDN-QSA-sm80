@@ -23,12 +23,15 @@ STATE_DELIVERIES = ("tiled-state-output", "tiled-all", "tiled-state-output-addre
                     "tiled-state-output-gates", "tiled-state-output-both")
 STAGE_DELIVERIES = ("tiled-state-output", "tiled-state-output-both", "stage-address-prepare",
                     "stage-address-output", "stage-address-both")
+PREPARE_ROWS_DELIVERIES = ("tiled-state-output", "tiled-state-output-both", "stage-address-prepare",
+                           "prepare-rows-shared", "prepare-rows-warp")
 DELIVERIES = {"scalar": 0, "prepare": 1, "state": 2, "output": 4, "all": 7,
               "tiled-prepare": 8, "tiled-state": 16, "tiled-output": 32,
               "tiled-state-output": 48, "tiled-all": 56,
               "tiled-state-output-address": 112, "tiled-state-output-gates": 176,
               "tiled-state-output-both": 240, "stage-address-prepare": 496,
-              "stage-address-output": 752, "stage-address-both": 1008}
+              "stage-address-output": 752, "stage-address-both": 1008,
+              "prepare-rows-shared": 1520, "prepare-rows-warp": 2544}
 
 
 def gdn_chunk_wy(q, k, v, g, beta, initial_state=None, output_final_state=True, *, delivery="scalar"):

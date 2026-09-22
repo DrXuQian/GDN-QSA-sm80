@@ -16,6 +16,24 @@ constexpr unsigned StateOptions = StateAddress | StateRowReuse;
 constexpr unsigned PrepareAddress = 256u;
 constexpr unsigned OutputAddress = 512u;
 constexpr unsigned StageAddressOptions = PrepareAddress | OutputAddress;
+constexpr unsigned PrepareRowsShared = 1024u;
+constexpr unsigned PrepareRowsWarp = 2048u;
+constexpr unsigned PrepareRowsOptions = PrepareRowsShared | PrepareRowsWarp;
+
+constexpr bool valid_prepare_rows(unsigned mask) {
+  unsigned const rows = mask & PrepareRowsOptions;
+  return rows != PrepareRowsOptions && (!rows || (mask & PrepareAddress));
+}
+
+// The same typed mode must select both the attribute target and actual launch.
+template <class Visitor>
+constexpr int visit_prepare_rows(unsigned options, Visitor visitor, int invalid) {
+  switch (options) {
+    case PrepareRowsShared: return visitor(std::integral_constant<int, 1>{});
+    case PrepareRowsWarp: return visitor(std::integral_constant<int, 2>{});
+    default: return invalid;
+  }
+}
 
 struct StageAddressSelection { bool prepare, output; };
 constexpr StageAddressSelection stage_address_selection(unsigned delivery) {
@@ -25,12 +43,13 @@ constexpr StageAddressSelection stage_address_selection(unsigned delivery) {
 // Each stage has mutually exclusive legacy-packed and tiled selectors.
 // State options require the tiled state; they are never silently ignored.
 // PrepareAddress extends scalar prepare, never overrides packed/tiled prepare.
-// OutputAddress requires the tiled output. Old masks0..255 keep their meaning.
+// OutputAddress requires the tiled output. Row caches require PrepareAddress
+// and are mutually exclusive. Old masks0..1023 keep their meaning.
 constexpr bool valid_delivery(unsigned mask) {
-  return mask < 1024 && ((mask & 7u) & ((mask >> 3) & 7u)) == 0 &&
+  return mask < 4096 && ((mask & 7u) & ((mask >> 3) & 7u)) == 0 &&
          (!(mask & StateOptions) || (mask & 16u)) &&
          (!(mask & PrepareAddress) || !(mask & 9u)) &&
-         (!(mask & OutputAddress) || (mask & 32u));
+         (!(mask & OutputAddress) || (mask & 32u)) && valid_prepare_rows(mask);
 }
 
 // One typed selector for BOTH resource configuration and the actual launch.

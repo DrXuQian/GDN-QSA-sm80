@@ -133,11 +133,14 @@ gdn_wy_address_output(Inputs p, Workspace ws, BF16* output) {
 }
 
 int configure_stage_address(unsigned options) {
-  if (!options || (options & ~StageAddressOptions)) return int(hggcErrorInvalidValue);
+  if (!options || (options & ~(StageAddressOptions | PrepareRowsOptions)) || !valid_prepare_rows(options))
+    return int(hggcErrorInvalidValue);
   auto const selection = stage_address_selection(options);
   if (selection.prepare) {
-    auto const status = hggcFuncSetAttribute(gdn_wy_address_prepare,
-        hggcFuncAttributeMaxDynamicSharedMemorySize, sizeof(PrepareStorage));
+    auto const status = options & PrepareRowsOptions
+        ? hggcError_t(configure_prepare_rows(options & PrepareRowsOptions))
+        : hggcFuncSetAttribute(gdn_wy_address_prepare,
+            hggcFuncAttributeMaxDynamicSharedMemorySize, sizeof(PrepareStorage));
     if (status != hggcSuccess) return int(status);
   }
   if (selection.output)

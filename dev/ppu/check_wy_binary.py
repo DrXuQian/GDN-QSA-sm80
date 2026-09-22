@@ -20,8 +20,8 @@ def kernel_sequences(isa):
 
 def compare_controls(before, after):
     old, new = kernel_sequences(before), kernel_sequences(after)
-    if len(old) != 12 or len(new) != 14:
-        raise AssertionError("control comparison must cover all12 old and all14 current images")
+    if len(old) != 14 or len(new) != 16:
+        raise AssertionError("control comparison must cover all14 old and all16 current images")
     for name, sequence in old.items():
         if new.get(name) != sequence:
             raise AssertionError(f"admitted control native instructions changed: {name}")
@@ -39,11 +39,119 @@ def plant_in_kernel(isa, marker, old, new):
     return "Disassembly of section ".join(sections)
 
 
+def conditioning_region(section):
+    """Locate actual native backedges between inverse MMA and W/U MMA.
+
+    Exactly two BF16 shared stores distinguish K/V conditioning from the
+    preceding one-store inverse conversion. No hard-coded PC/BB numbers.
+    """
+    labels = {name: int(pc, 16) for pc, name in re.findall(r"^\s*([0-9a-f]+) <([^>]+)>:", section, re.M)}
+    records = [(int(pc, 16), op) for pc, op in re.findall(
+        r"^\s*([0-9a-f]+):\s+(?:[0-9a-f]{2}\s+){8}\s*([^\n]+)", section, re.M)]
+    tf = [pc for pc, op in records if op.startswith("v.mma.f32.tf32")]
+    if not tf:
+        raise AssertionError("prepare CFG lost inverse arithmetic")
+    after = max(tf)
+    wu = [pc for pc, op in records if pc > after and op.startswith("v.mma.f32.bf16")]
+    if not wu:
+        raise AssertionError("prepare CFG lost W/U arithmetic")
+    before = min(wu)
+    backedges, regions = [], {}
+    for pc, op in records:
+        target = re.search(r"<([^>]+)>", op)
+        if not op.startswith("s.cbr") or not target:
+            continue
+        if target[1] not in labels:
+            raise AssertionError("native branch target label absent")
+        head = labels[target[1]]
+        if head <= pc:
+            backedges.append((head, pc))
+        if after < head <= pc < before:
+            body = [text for pos, text in records if head <= pos <= pc]
+            if sum(text.startswith("tsm.st.b16") for text in body) == 2:
+                regions[head] = max(pc, regions.get(head, pc))
+    if len(regions) != 1:
+        raise AssertionError(f"conditioning loop not uniquely identified: {regions}")
+    head, tail = next(iter(regions.items()))
+    repeated = [pc for pc, op in records if head <= pc <= tail and op.startswith("v.exp2.f32")]
+    hoisted = [pc for pc, op in records if after < pc < head and op.startswith("v.exp2.f32")]
+    return dict(head=head, tail=tail, wu=before, repeated=repeated, hoisted=hoisted,
+                records=records, backedges=backedges)
+
+
+def check_row_hoist(section, expected):
+    region = conditioning_region(section)
+    if region["repeated"] or len(region["hoisted"]) != expected:
+        raise AssertionError("prepare row exponent is missing or still inside the conditioning loop")
+    if any(lo <= pc <= hi for pc in region["hoisted"] for lo, hi in region["backedges"]):
+        raise AssertionError("row exponent moved into a different native backedge loop")
+    publication = [pc for pc, op in region["records"]
+                   if max(region["hoisted"]) < pc < region["head"] and op.startswith("s.blksyn.defer")]
+    shuffles = [pc for pc, op in region["records"]
+                if region["head"] <= pc <= region["tail"] and op.startswith("v.shuffle.idx.b32")]
+    if expected == 1:
+        if len(publication) != 1 or shuffles:
+            raise AssertionError("shared rows lack their pre-consumer publication barrier")
+        stores = [pc for pc, op in region["records"]
+                  if max(region["hoisted"]) < pc < publication[0] and op.startswith("tsm.st.b32")]
+        if len(stores) != 1:
+            raise AssertionError("shared row value is not stored before publication")
+    elif publication or len(shuffles) != 1:
+        raise AssertionError("warp rows lost indexed delivery or added a CTA publication barrier")
+    region["publication"] = publication
+    return region
+
+
+def swap_native_instructions(section, first, second):
+    """Validator-only ISA-text plant: move complete instructions, not mnemonics.
+
+    The opcode/operand multiset is unchanged. This is a parser negative, NOT
+    a modified device image; the displayed encoding bytes are not executed.
+    """
+    pattern = re.compile(r"^(\s*([0-9a-f]+):\s+(?:[0-9a-f]{2}\s+){8}\s*)([^\n]+)", re.M)
+    instructions = {int(m[2], 16): m[3] for m in pattern.finditer(section)}
+    if first == second or first not in instructions or second not in instructions:
+        raise AssertionError("native instruction swap targets are absent or not distinct")
+    replacements = {first: instructions[second], second: instructions[first]}
+    return pattern.sub(lambda m: m[1] + replacements.get(int(m[2], 16), m[3]), section)
+
+
+def plant_repeated_row_exp(isa):
+    """Preserve the total exp count but move one back inside conditioning."""
+    sections = isa.split("Disassembly of section ")
+    matches = [i for i, s in enumerate(sections) if s.startswith(".text.kernel.") and
+               "gdn_wy_rows_prepareILi1E" in s.splitlines()[0]]
+    if len(matches) != 1:
+        raise AssertionError("row-exp plant missing its exact target")
+    i = matches[0]
+    region = check_row_hoist(sections[i], 1)
+    exp_pc = region["hoisted"][0]
+    multiply = next(pc for pc, op in region["records"] if
+                    region["head"] <= pc <= region["tail"] and op.startswith("v.mul.f32"))
+    sections[i] = swap_native_instructions(sections[i], exp_pc, multiply)
+    return "Disassembly of section ".join(sections)
+
+
+def plant_late_row_barrier(isa):
+    """Keep all seven barriers, but move cache publication after consumption."""
+    sections = isa.split("Disassembly of section ")
+    matches = [i for i, s in enumerate(sections) if s.startswith(".text.kernel.") and
+               "gdn_wy_rows_prepareILi1E" in s.splitlines()[0]]
+    if len(matches) != 1:
+        raise AssertionError("publication plant missing its exact target")
+    i = matches[0]
+    region = check_row_hoist(sections[i], 1)
+    late_nop = next(pc for pc, op in region["records"] if
+                    region["tail"] < pc < region["wu"] and op.startswith("s.nop"))
+    sections[i] = swap_native_instructions(sections[i], region["publication"][0], late_nop)
+    return "Disassembly of section ".join(sections)
+
+
 def audit(isa, resources, symbols):
     funcs = re.findall(r"Func \d+ (\S+) RESOURCE INFO:\n(.*?)(?=Func \d+ \S+ RESOURCE INFO:|\Z)",
                        resources, flags=re.S)
-    if len(funcs) != 14:
-        raise AssertionError(f"WY image denominator must be 12 controls + 2 stage-address variants, got {len(funcs)}")
+    if len(funcs) != 16:
+        raise AssertionError(f"WY image denominator must be 14 controls + 2 prepare-row variants, got {len(funcs)}")
     rows = []
     mma_counts = {}
     for role, packed in ((role, packed) for role in ("prepare", "state", "output") for packed in (False, True)):
@@ -160,12 +268,42 @@ def audit(isa, resources, symbols):
         rows.append(dict(role=role, delivery="address", registers=regs, stack=stack,
                          static_instructions=len(ops), cp_async_sites=copies, exponent_sites=exponents,
                          bf16_mma_sites=bf16, tf32_mma_sites=tf32))
+    address_section = next(s for s in isa.split("Disassembly of section ") if
+                           s.startswith(".text.kernel.") and "gdn_wy_address_prepareE" in s.splitlines()[0])
+    address_loop = conditioning_region(address_section)
+    if len(address_loop["repeated"]) != 1 or address_loop["hoisted"]:
+        raise AssertionError("prepare-address before is not the registered rolled exponential control")
+    for mode in (1, 2):
+        matches = [(name, body) for name, body in funcs if f"gdn_wy_rows_prepareILi{mode}E" in name]
+        if len(matches) != 1:
+            raise AssertionError("missing/ambiguous prepare-row image")
+        name, body = matches[0]
+        stack = int(re.search(r"STACK SIZE:(\d+)", body)[1])
+        regs = int(re.search(r"vreg_number:(\d+)", body)[1])
+        if stack or name not in sequences:
+            raise AssertionError("prepare-row body missing or spilling")
+        ops = [line.split()[0] for line in sequences[name]]
+        actual = (sum(op.startswith("vmem.ld.tsm") for op in ops),
+                  ops.count("v.mma.f32.bf16.m16n16k16"), ops.count("v.mma.f32.tf32.m16n16k8"),
+                  ops.count("v.exp2.f32"), ops.count("s.blksyn.defer"), ops.count("v.shuffle.idx.b32"))
+        expected = (16, 16, 12, 8 + mode, 7 if mode == 1 else 6, int(mode == 2))
+        if actual != expected:
+            raise AssertionError(f"prepare-row arithmetic/cache/sync body changed: {actual} != {expected}")
+        section = next(s for s in isa.split("Disassembly of section ") if
+                       s.startswith(".text.kernel.") and name in s.splitlines()[0])
+        region = check_row_hoist(section, mode)
+        rows.append(dict(role="prepare", delivery="row-shared" if mode == 1 else "row-warp",
+                         registers=regs, stack=stack, static_instructions=len(ops),
+                         conditioning_loop=f"{region['head']:#x}..{region['tail']:#x}",
+                         loop_exponents=0, hoisted_exponent_pcs=[hex(pc) for pc in region['hoisted']],
+                         cache_publication_pcs=[hex(pc) for pc in region['publication']],
+                         cta_barrier_sites=actual[4], indexed_shuffle_sites=actual[5]))
     for name in ("gdn_wy_forward", "gdn_wy_forward_delivery"):
         if not re.search(rf"\b{name}$", symbols, re.M):
             raise AssertionError(f"WY launcher missing from linked library: {name}")
     for name in ("configure_tiled", "launch_tiled_prepare", "launch_tiled_state", "launch_tiled_output",
                  "configure_state_ab", "launch_state_ab", "configure_stage_address",
-                 "launch_address_prepare", "launch_address_output"):
+                 "launch_address_prepare", "launch_address_output", "configure_prepare_rows", "launch_prepare_rows"):
         if not re.search(rf"\b_ZN7gdn_qsa2wy\d+{name}E\S*$", symbols, re.M):
             raise AssertionError(f"tiled cross-TU launcher missing from linked library: {name}")
     return rows
@@ -203,6 +341,10 @@ def main():
                 "v.mma.f32.tf32.m16n16k8", "MISSING_TF32"), resources, symbols)),
             ("address-output-lost-copy", (plant_in_kernel(isa, "gdn_wy_address_output",
                 "vmem.ld.tsm", "MISSING_COPY"), resources, symbols)),
+            ("missing-row-image", (isa.replace("gdn_wy_rows_prepareILi1E", "MISSING_ROWS"), resources, symbols)),
+            ("missing-row-host-link", (isa, resources, symbols.replace("launch_prepare_rows", "MISSING_ROWS"))),
+            ("row-exp-back-in-loop-same-count", (plant_repeated_row_exp(isa), resources, symbols)),
+            ("row-shared-late-publication-same-count", (plant_late_row_barrier(isa), resources, symbols)),
         ):
             try:
                 audit(*texts)
@@ -220,7 +362,7 @@ def main():
                 print("[WY binary negative] changed-control EXPECTED-RED/PASS")
             else:
                 raise AssertionError("control-comparison negative escaped")
-        print("[WY binary controls] 12/12 native instruction+operand sequences IDENTICAL")
+        print("[WY binary controls] 14/14 native instruction+operand sequences IDENTICAL")
     print("[WY binary] PASS device_execution=NOT_RUN")
 
 

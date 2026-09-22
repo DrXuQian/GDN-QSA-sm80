@@ -1,5 +1,9 @@
 # Prepare/output addressing on the frozen state-both control
 
+Follow-up: [prepare row-factor reuse](PPU_WY_PREPARE_ROWS.md) records the
+user-reported result and retains prepare-address with old output as its
+incumbent. The table below remains this experiment's original prior evidence.
+
 ## Why this experiment
 
 The preceding state ablation has a **user-reported** strong-gate result:

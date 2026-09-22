@@ -14,7 +14,8 @@ sys.path[:0] = [str(ROOT), str(ROOT / "benchmarks")]
 from gdn_qsa_sm80 import gdn_wy_interface as api
 import bench_ppu_wy_fla as benchmark
 from bench_ppu_wy_fla import (comparison_summary, delivery_comparisons, order,
-                              DELIVERY_ROLES, TILE_ROLES, STATE_ROLES, STAGE_ROLES, experiment, resolve_samples)
+                              DELIVERY_ROLES, TILE_ROLES, STATE_ROLES, STAGE_ROLES,
+                              PREPARE_ROWS_ROLES, experiment, resolve_samples)
 from bench_ppu_gdn_fla import checked_pair, verdict
 
 
@@ -198,6 +199,64 @@ class Contracts(unittest.TestCase):
         with self.assertRaises(KeyError):
             delivery_comparisons(arms, "stage-address-both", stage_ab=True)
 
+    def test_prepare_rows_inventory_and_complete_balanced_cycle(self):
+        def inventory():
+            names, roles = experiment(prepare_rows_ab=True)
+            self.assertEqual(set(roles), {"original", "wy", "fla", "wy-tiled-state-output",
+                "wy-tiled-state-output-both", "wy-stage-address-prepare", "wy-prepare-rows-shared",
+                "wy-prepare-rows-warp"})
+            self.assertEqual(tuple(api.DELIVERIES[name] for name in names), (48,240,496,1520,2544))
+            self.assertEqual(roles, PREPARE_ROWS_ROLES)
+            return roles
+        roles = inventory()
+        self.assertEqual(resolve_samples(None, roles),16)
+        for column in zip(*(order(i,roles) for i in range(16))):
+            for role in roles:
+                self.assertEqual(column.count(role),2)
+        with patch.object(benchmark,"PREPARE_ROWS_DELIVERIES",api.PREPARE_ROWS_DELIVERIES[:-1]):
+            with self.assertRaises(AssertionError):
+                inventory()
+        for kwargs in (dict(delivery_ab=True),dict(tile_ab=True),dict(state_ab=True),dict(stage_ab=True)):
+            with self.assertRaises(ValueError):
+                experiment(prepare_rows_ab=True,**kwargs)
+        with self.assertRaises(ValueError):
+            resolve_samples(14,roles)
+
+    def test_prepare_rows_mode_bits_reach_real_abi_with_incumbent_intact(self):
+        class Fake:
+            def forward(self,*args):
+                self.mask=args[-1]
+                return torch.ones(1),torch.ones(1)
+        x,fake=torch.zeros(1),Fake()
+        for suffix,expected in (("shared",1520),("warp",2544)):
+            name=f"prepare-rows-{suffix}"
+            def check():
+                with patch.object(api,"_backend",return_value=fake):
+                    api.gdn_chunk_wy(x,x,x,x,x,delivery=name)
+                self.assertEqual(fake.mask,expected)
+                self.assertEqual(fake.mask & 1023,496)
+            check()
+            for wrong in (496,expected & ~256,expected | 512):
+                with patch.dict(api.DELIVERIES,{name:wrong}),self.assertRaises(AssertionError):
+                    check()
+
+    def test_prepare_rows_compare_incumbent_and_each_other(self):
+        arms={role:dict(samples_us=[400.,410.]) for role in PREPARE_ROWS_ROLES}
+        candidate=arms['wy-prepare-rows-shared']
+        candidate['samples_us']=[350.,360.]
+        result=delivery_comparisons(arms,'prepare-rows-shared',prepare_rows_ab=True)
+        self.assertEqual(set(result),set(PREPARE_ROWS_ROLES)-{'wy-prepare-rows-shared'})
+        self.assertTrue(all(x['verdict']=='CANDIDATE-WINS' for x in result.values()))
+        candidate['samples_us']=[350.,420.]
+        self.assertTrue(all(x['verdict']=='UNRESOLVED' for x in
+            delivery_comparisons(arms,'prepare-rows-shared',prepare_rows_ab=True).values()))
+        candidate['samples_us']=[420.,430.]
+        self.assertTrue(all(x['verdict']=='CONTROL-WINS' for x in
+            delivery_comparisons(arms,'prepare-rows-shared',prepare_rows_ab=True).values()))
+        del arms['wy-stage-address-prepare']
+        with self.assertRaises(KeyError):
+            delivery_comparisons(arms,'prepare-rows-shared',prepare_rows_ab=True)
+
     def test_state_output_keeps_scalar_prepare_at_the_real_python_abi(self):
         class Fake:
             def forward(self, *args):
@@ -252,14 +311,16 @@ class Contracts(unittest.TestCase):
         want = (torch.ones(1), torch.ones(1))
         args = SimpleNamespace(delivery_ab=False, tile_ab=True, warmup=5, samples=16, launches=10)
         seen = []
-        def run(plant=False, state_ab=False, stage_ab=False):
-            args.tile_ab = not (state_ab or stage_ab)
+        def run(plant=False, state_ab=False, stage_ab=False, prepare_rows_ab=False):
+            args.tile_ab = not (state_ab or stage_ab or prepare_rows_ab)
             args.state_ab = state_ab
             args.stage_ab = stage_ab
+            args.prepare_rows_ab = prepare_rows_ab
             def wy(*inputs, delivery="scalar"):
                 seen.append(delivery)
                 # Within the unchanged 2% gate, but not scalar raw equality.
-                selected = "stage-address-both" if stage_ab else "tiled-state-output-both" if state_ab else "tiled-state-output"
+                selected = ("prepare-rows-warp" if prepare_rows_ab else "stage-address-both" if stage_ab else
+                            "tiled-state-output-both" if state_ab else "tiled-state-output")
                 return (want[0] + .001, want[1]) if plant and delivery == selected else want
             with patch.object(benchmark.admission, "fixture", return_value=cpu), \
                     patch.object(benchmark.admission, "reference", return_value=want), \
@@ -298,6 +359,15 @@ class Contracts(unittest.TestCase):
         self.assertEqual(len(combined['versus']), 7)
         with self.assertRaisesRegex(AssertionError, "wy-stage-address-both output/state bits differ"):
             run(plant=True, stage_ab=True)
+        seen.clear()
+        result=run(prepare_rows_ab=True)
+        self.assertEqual(set(result['arms']),set(PREPARE_ROWS_ROLES))
+        for name in ('scalar',*api.PREPARE_ROWS_DELIVERIES):
+            self.assertEqual(seen.count(name),8+5+16*10)
+        self.assertEqual(result['arms']['wy-prepare-rows-warp']['delivery_mask'],2544)
+        self.assertEqual(len(result['arms']['wy-prepare-rows-warp']['versus']),7)
+        with self.assertRaisesRegex(AssertionError,'wy-prepare-rows-warp output/state bits differ'):
+            run(plant=True,prepare_rows_ab=True)
 
     def test_delivery_mask_is_consumed_not_silently_ignored(self):
         class Fake:

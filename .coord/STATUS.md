@@ -1,9 +1,34 @@
 # PPU original-structure port
 
-updated-at: 2026-09-22 12:26:41 UTC
-working-on: STAGE_AB handoff ready; awaiting device admission/timing, no default promotion
-blocked-on: no local PPU; full binding needs box CUDA torch, no local device result
-last-commit: 2b475fa (prepare/output address ablations and sealed local admission)
+updated-at: 2026-09-22 13:17:53 UTC
+working-on: local seal passed; committing prepare row-factor ablations and box handoff
+blocked-on: no local PPU; full binding SKIP/environment (CPU-only local torch); device admission pending
+last-commit: 402c614 (parent; no new default promotion)
+
+Task worktree /workspace/gdn-wy-prepare-rows-20260922; pre-edit plan/evidence
+/workspace/gdn-wy-prepare-rows-evidence-20260922. User-reported strong medians:
+prepare-address356.760 vs state-both379.088 us, disjoint envelopes; output
+380.480 / stage-both357.674 add no established benefit. FLA487.472,
+original425.572. Full identities/weak results not received. Keep old output.
+Next caches only expf(prefix[row]), not beta*exp or pairwise gate differences;
+shared vs warp modes independent, no change to TF32 solve or FP32 state.
+Both native variants compile/link, shared/warp regs86/84 stack0. All14 old
+native instruction+operand sequences IDENTICAL. Actual backward-branch CFG
+proves row exponents moved outside conditioning; shared store+publication
+must precede consumption. Same-opcode-count negatives move exponent back or
+publication after consumption and fail. Complete post-edit seal rc0:
+8/8 CTests,63 Python contracts,45 CPU algebra cases+5 negatives,305 original
+controls preserved; original and16-image WY native libraries compile/link.
+21 native negatives red, including same-count wrong-loop/wrong-barrier.
+Evidence sealed-local-r1.log SHA256:
+d85964093051c1dacd7b98f91e09b863c4be0cb747d9f95442a2bba5592d0ea5.
+WY DSO SHA256:
+0e55fc5236df8ea5b9ec728d839e64021ed10b07689dde7c8a46da6247abeee8.
+No new device result. Eight-role same-binary command is ready; full binding
+and raw-bit/replay/speed still require box. No routing/default changes.
+Handoff plan: docs/PPU_WY_PREPARE_ROWS.md, PREPARE_ROWS_AB eight-role family.
+
+## Prior stage-address handoff
 
 Task worktree /workspace/gdn-wy-stage-address-20260922, registered plan and
 resume /workspace/gdn-wy-stage-address-evidence-20260922. User-pasted strong

@@ -313,7 +313,7 @@ extern "C" int gdn_wy_forward_delivery(
   }
   auto status = hggcSuccess;
   if (delivery & StageAddressOptions) {
-    int const rc = configure_stage_address(delivery & StageAddressOptions);
+    int const rc = configure_stage_address(delivery & (StageAddressOptions | PrepareRowsOptions));
     if (rc) return rc;
   }
   if (!(delivery & 8) && !address.prepare) {
@@ -334,7 +334,9 @@ extern "C" int gdn_wy_forward_delivery(
     if (status != hggcSuccess) return int(status);
   }
   if (address.prepare) {
-    int const rc = launch_address_prepare(p, ws, stream);
+    int const rc = delivery & PrepareRowsOptions
+        ? launch_prepare_rows(p, ws, stream, delivery & PrepareRowsOptions)
+        : launch_address_prepare(p, ws, stream);
     if (rc) return rc;
   } else if (delivery & 8) {
     int const rc = launch_tiled_prepare(p, ws, stream);

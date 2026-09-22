@@ -45,6 +45,8 @@ int launch_state_ab(Inputs p, Workspace ws, float* final, gdn_arch::Stream strea
 int configure_stage_address(unsigned options);
 int launch_address_prepare(Inputs p, Workspace ws, gdn_arch::Stream stream);
 int launch_address_output(Inputs p, Workspace ws, BF16* output, gdn_arch::Stream stream);
+int configure_prepare_rows(unsigned options);
+int launch_prepare_rows(Inputs p, Workspace ws, gdn_arch::Stream stream, unsigned options);
 int launch_tiled_prepare(Inputs p, Workspace ws, gdn_arch::Stream stream);
 int launch_tiled_state(Inputs p, Workspace ws, float* final, gdn_arch::Stream stream, unsigned state_options);
 int launch_tiled_output(Inputs p, Workspace ws, BF16* output, gdn_arch::Stream stream);
