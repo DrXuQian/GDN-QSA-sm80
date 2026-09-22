@@ -1,6 +1,27 @@
 # GDN versus FLA: one-command counter bundle
 
-## Current WY follow-up: reuse the admitted comparison, no rebuild
+## Current: state/output combination from 90eafeb
+
+The reported strong-decay state/output result is 439.486 us. Reuse that exact
+comparison binary and select mask48, not scalar WY, old packed-all or tiled-all:
+
+```bash
+git pull --ff-only &&
+env -u OUT -u EXTENSION \
+  PPU_SDK=/usr/local/PPU_SDK ACU=/usr/local/PPU_SDK/asight/bin/acu DEVICE=0 \
+  bash tools/run_ppu_gdn_fla_acu_box.sh \
+  --wy-run /workspace/gdn-wy-fla-90eafeb-20260922T013928Z \
+  --wy-delivery tiled-state-output --gate -1.0
+```
+
+Use the same physical DEVICE as that comparison. This captures WY and FLA
+sequentially, all stages, with no rebuild. Upload the tar named by `UPLOAD=`;
+the previous full comparison JSON joins it, including the weak case if present.
+Read [the result and per-stage interpretation](PPU_WY_STATE_OUTPUT_RESULT_20260922.md).
+The pair wins versus same-run scalar/state/FLA, but pair-versus-all and
+pair-versus-original remain UNRESOLVED. No routing change follows.
+
+## Earlier scalar-only WY follow-up: reused binary, no rebuild
 
 For the `dd70e5d` WY comparison already run on the box:
 

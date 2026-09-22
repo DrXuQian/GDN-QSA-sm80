@@ -40,6 +40,11 @@ are rejected, not silently prioritized. Scalar/default remains zero.
 
 ## Next combination: scalar prepare + tiled state/output
 
+The follow-up device result and exact reuse command are now recorded in
+[the state/output result](PPU_WY_STATE_OUTPUT_RESULT_20260922.md). The reported
+pair is 439.486 us at g=-1.0; it wins against scalar/state/FLA but remains
+UNRESOLVED against all and original. The experiment design below is retained.
+
 `delivery="tiled-state-output"` selects **mask48 = 16 | 32**. Prepare stays
 scalar (neither bit1 nor bit8 set). These are existing device kernels and
 the existing C ABI; this follow-up changes only the Python named

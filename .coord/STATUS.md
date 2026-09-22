@@ -1,9 +1,28 @@
 # PPU original-structure port
 
-updated-at: 2026-09-21 22:44:05 UTC
-working-on: mask48 experiment complete; box handoff ready
-blocked-on: device timings pending; no local PPU; prior weak/raw comparison not supplied
-last-commit: 1b24b37 (experiment implementation; this follow-up is status-only; device kernels a712a7d)
+updated-at: 2026-09-22 07:59:10 UTC
+working-on: record mask48 device report; exact-binary three-stage ACU handoff ready
+blocked-on: new ACU bundle and weak result not supplied; current local Python lacks torch
+last-commit: 90eafeb (experiment handoff; device kernels a712a7d)
+
+User-reported /workspace/gdn-wy-fla-90eafeb-20260922T013928Z, g=-1.0:
+state+output 439.486 us [437.684,444.076], scalar 710.210, state458.998,
+all446.700, original478.898, FLA730.812 us. Pair wins versus scalar/state/
+FLA under unchanged envelopes; pair versus all and original UNRESOLVED.
+FLA range486.836–968.548 makes1.6629x descriptive, not stable speedup.
+Keep all/original/default routing and precision unchanged. Full raw JSON/
+binary/device identity not verified locally; weak not inferred from strong.
+
+Existing capture supports --wy-run /workspace/gdn-wy-fla-90eafeb-20260922T013928Z
+--wy-delivery tiled-state-output --gate -1.0, no rebuild. Expected kernels:
+scalar prepare<false>, tiled state, tiled output. Both WY/FLA reports plus
+full comparison JSON and identities join UPLOAD tar. All three stages must
+be compared, not just state; no subtraction of ACU sum from API time.
+Current local contract rerun ENVIRONMENT BLOCKED at import torch. Previous
+23-contract admission remains historical; no new PASS claimed. No collector,
+benchmark or device code changed. Report: docs/PPU_WY_STATE_OUTPUT_RESULT_20260922.md.
+
+## Prior experiment handoff
 
 Active worktree /workspace/gdn-wy-state-output-20260922, evidence and
 registered plan /workspace/gdn-wy-state-output-evidence-20260922.
