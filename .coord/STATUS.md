@@ -1,9 +1,39 @@
 # PPU original-structure port
 
-updated-at: 2026-09-22 07:59:10 UTC
-working-on: record mask48 device report; exact-binary three-stage ACU handoff ready
-blocked-on: new ACU bundle and weak result not supplied; current local Python lacks torch
-last-commit: 90eafeb (experiment handoff; device kernels a712a7d)
+updated-at: 2026-09-22 08:55:10 UTC
+working-on: mask48 ACU verdict complete; address/copy hot loop localized, implementation not changed
+blocked-on: none; next implementation is a separate state address/copy ablation
+last-commit: 6052ae5 (verified ACU report; measured binary source 90eafeb)
+
+New upload gdn-qsa-acu-20260922T080504Z-2605202.tar.gz: 542 regular
+files, all 541 checksums and exact manifest denominator PASS. Source90eafeb,
+empty source diff, exact loaded binding/library and preceding comparison
+verified. Actual kernels scalar prepare<false> + tiled state + tiled output;
+WY/FLA share inputs, UUID and 1.700 GHz measured CE frequency. No device run
+or kernel/default/routing changes. Native reports imported locally using a
+private compatible host runtime, without changing system libraries.
+
+Weak API result now supplied/verified: pair443.810 us versus scalar720.480,
+state458.826, all451.954, original952.442, FLA770.394. Pair wins against
+scalar/state/original/FLA; pair versus all UNRESOLVED. Strong prior verdicts
+confirmed. FLA API samples remain broad; median ratios are descriptive.
+ACU prepare/state/output161.331/199.598/63.963 us versus FLA math stages
+83.073/90.024/43.643 us (FLA fills6.504 us separate). All three still slower.
+State has same128x128 launch, about7.1 active warps/CU, same524288 BF16 MMA
+and98 MiB global-store request footprint, but34.386M versus10.040M total
+instructions. Occupancy and store volume no longer explain the relative gap.
+Measured per-PC opcode exports now close exactly for all ten kernels;
+omitted-PC negatives fail for all ten. State W-copy loop alone is50 static /
+6,537,216 dynamic instructions (19.11% of SASS sum), repeatedly decomposing
+signed tile coordinates around one cp.async. State exp2 count278528 versus
+49152 identifies a separate row-factor reuse target. Neither is a measured
+microsecond attribution. Next: state copy/address-only ablation, then same-
+expf row-factor reuse; preserve precision, recurrence and all stage controls.
+Report: docs/PPU_WY_STATE_OUTPUT_ACU_20260922.md. All native-import/parser
+evidence in /workspace/gdn-wy-state-output-acu-analysis-20260922. No API-minus-
+ACU overhead subtraction. No implementation, criterion or routing changes.
+
+## Prior pasted-result handoff (superseded by verified upload above)
 
 User-reported /workspace/gdn-wy-fla-90eafeb-20260922T013928Z, g=-1.0:
 state+output 439.486 us [437.684,444.076], scalar 710.210, state458.998,
