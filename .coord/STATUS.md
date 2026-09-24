@@ -1,9 +1,27 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 08:53:49 UTC
-working-on: residual B-layout local closure complete; ready for same-binary box ACU
-blocked-on: device RAW-BIT/BC/performance await box; no local blocker, routing unchanged
-last-commit: a20df27 (implementation; measured incumbent remains5a3ebc9)
+updated-at: 2026-09-24 09:13:33 UTC
+working-on: B-layout ACU analysis closed; no measured speed benefit, not promoted
+blocked-on: none; next V32/8-warp experiment is not implemented, routing unchanged
+last-commit: 3c7da09 (capture source; analysis checkpoint follows)
+
+Upload580e0df3 verified607files/606checks/131sources against3c7da09, same
+binary/fixture/device, all15 kernels1.700GHz.30residual+30B-layout cases x8,
+old16WY/32delivery admissions PASS. Complete ACU control230.67824 /
+B-layout232.22000 /FLA224.24999us. State130.48412->130.33353us; no gain.
+Unmodified stages add1.69235us; do not call whole-sum variation a source
+regression. BC6.930432M->5.357568M(-22.70%), read-18.18%/write-25.91%.
+KVD-to-TSM stays112MiB; shared loads/stores/MMA/converts unchanged. Native
+opcode sum-0.213%, exactly131072 transposed loads become nontransposed.
+Same242regs/0stack/45568B/grid128x128; eligiblewarps0.25unchanged.
+15native opcode totals close; omitted-PC checks red. Layout improvement
+is real, latency benefit is not established. Keep opt-in, not default.
+Next independent axis: V32/grid128/8warps, no K/P global duplication;
+shared-operand reads may grow and must be measured. Not implemented.
+Report docs/PPU_GDN_RESIDUAL_B_LAYOUT_ACU_20260924.md; condensedJSON in
+dev/ppu/results. Replay /workspace/gdn-residual-blayout-acu-analysis-20260924.
+
+## Previous local handoff (device-pending statements superseded above)
 
 New worktree /workspace/gdn-wy-residual-banks-20260924; contract/evidence
 /workspace/gdn-wy-residual-banks-evidence-20260924. User clarified zero-added

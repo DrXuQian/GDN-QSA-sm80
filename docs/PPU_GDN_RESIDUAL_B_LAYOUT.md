@@ -5,6 +5,11 @@ default routing, admitted residual, V16 and operand-prefetch arms are unchanged.
 Priority workload B1/S2048/Hk16/Hv32/K=V128/C64, V32/128threads/grid128.
 Both g=-0.1 and-1.0 need numeric admission; default capture is-1.0.
 
+Device follow-up on3c7da09: RAW-BIT passes, BC falls22.70%, but state
+130.484->130.334us and full ACU sum230.678->232.220us show no latency gain.
+Keep opt-in, no promotion. See [verified capture and interpretation](PPU_GDN_RESIDUAL_B_LAYOUT_ACU_20260924.md).
+The local handoff below remains historical compile evidence, not the verdict.
+
 ## Change and boundary
 
 Only `residual` and `scaled-V` change their physical shared placement.
