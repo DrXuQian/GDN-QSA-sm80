@@ -232,9 +232,10 @@ def main():
                   qk_norm=False, scale="1/sqrt(128)", dtype="bf16", device=str(props),
                   torch=torch.__version__, fla=identity, samples=args.samples, launches=args.launches,
                   warmup=args.warmup, limit=admission.MAX_RELATIVE_ERROR,
-                  delivery_ab=args.delivery_ab or args.tile_ab or args.state_ab or args.stage_ab or args.prepare_rows_ab,
+                  delivery_ab=roles != ("original", "wy", "fla"),
                   tile_ab=args.tile_ab, state_ab=args.state_ab, stage_ab=args.stage_ab,
                   prepare_rows_ab=args.prepare_rows_ab,
+                  aiu_ab=args.aiu_ab,
                   roles=roles, order_cycle_samples=2 * len(roles),
                   binary_sha256={str(x): hashlib.sha256(x.read_bytes()).hexdigest()
                                  for x in (args.extension, args.wy_extension)}, cases=[])

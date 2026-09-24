@@ -126,3 +126,7 @@ Next capture incumbent/AIU-both/FLA under matched ACU settings and compare
 prepare/state/output durations and dynamic instruction/traffic counts. Keep
 full-call timing as a separate integration metric: subtracting ACU replay
 sums from these API medians does not measure dispatch overhead.
+
+The [three-arm ACU command](PPU_GDN_ACU.md) reuses the completed AIU comparison
+binary and captures the two WY deliveries plus one FLA reference in a single
+archive. No rebuild or new API timing sweep is required.

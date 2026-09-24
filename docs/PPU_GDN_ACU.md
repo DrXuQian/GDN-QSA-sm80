@@ -1,6 +1,69 @@
 # GDN versus FLA: one-command counter bundle
 
-## Current: prepare shared-row candidate, mask1520
+## Current: same-binary shared-row / AIU-both / FLA capture
+
+User-reported API medians: shared-row354.364 us, AIU-both318.564 us,
+FLA492.188 us. These are not per-kernel ACU durations; see
+[the result scope](PPU_WY_AIU_PAIR.md). Keep that measured binary immutable.
+Use the just-completed `AIU_AB=1` run, not a freshly compiled library or the
+older shared-only run. Paste its `artifacts=` directory when prompted:
+
+```bash
+git pull --ff-only origin ppu-backend &&
+read -r -p 'Completed AIU comparison artifacts directory: ' WY_RUN &&
+env -u OUT -u EXTENSION \
+  DEVICE=0 PPU_SDK=/usr/local/PPU_SDK \
+  ACU=/usr/local/PPU_SDK/asight/bin/acu \
+  bash tools/run_ppu_gdn_fla_acu_box.sh \
+    --wy-run "$WY_RUN" \
+    --wy-control prepare-rows-shared \
+    --wy-delivery aiu-state-output --gate -1.0
+```
+
+Select the same physical `DEVICE` as the preceding run. This first capture
+explicitly chooses strong decay -1.0 for continuity with the previous ACU
+baseline; the user's unlabeled median table is not asserted to be that case.
+The copied comparison retains both gates. `--gate -0.1` selects a separate
+weak-decay capture when needed. Do not overlap profiling with timing workloads.
+
+No compile, installation or timing sweep. Three independent preflights run
+first, then direct `acu -f -o ... --set full` in this fixed order:
+
+| Capture | WY mask | Native reports inside the bundle |
+|---|---:|---|
+| old best: prepare-rows-shared |1520| `wy-control/wy-g-1.0.report[.acurep]` |
+| candidate: aiu-state-output |13808| `wy-g-1.0.report[.acurep]` |
+| FLA reference |not applicable| `fla-g-1.0.report[.acurep]` |
+
+FLA is captured once. The two WY arms must use the same binding/device DSO,
+input, physical-device receipt and raw output/state, differing only in the
+requested delivery. A missing arm, mask mismatch, changed loaded library,
+failed profiler or missing report keeps the bundle INCOMPLETE. Both preflight
+and subject must retain the selected delivery. Existing two-arm mode is
+unchanged when `--wy-control` is absent.
+
+Early AIU benchmark JSON has `delivery_ab=false` because that summary field
+omitted the new family. Its concrete arms and `delivery_mask` values remain
+valid evidence. The collector now checks those exact records and numerical
+fingerprints instead of trusting the summary boolean. **Do not edit the old
+comparison JSON or rerun the sweep to repair this metadata.** New runs record
+the family flag correctly. Non-scalar arms without an exact recorded mask
+are rejected, not inferred from identical output bits.
+
+Upload the single file printed as `UPLOAD=/workspace/...tar.gz`. It contains
+all three native reports, automatic text exports, receipts, loaded hashes,
+ISA/resources and the unchanged preceding comparison. No CSV copy/paste is
+required. All artifacts use a new directory, without overwriting old runs.
+
+Read prepare/state/output separately. Prepare is unchanged and serves as a
+control; state/output share the same math but use paired AIU/SWZL delivery.
+Inspect actual frequency, MMA work, native instructions, traffic and stalls
+before attributing a duration change. FLA preparation can span several
+kernels; retain fills and transforms separately. ACU replay times are
+diagnostic and cannot be subtracted from full-API medians as host overhead.
+Local mock capture/negative tests pass; no PPU capture has run locally.
+
+## Previous: prepare shared-row candidate, mask1520
 
 Capture completed: [verified stage/counter analysis](PPU_WY_SHARED_ACU_20260922.md).
 The following command is retained for reproduction, not a request to rerun.

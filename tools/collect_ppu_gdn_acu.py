@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Collect original/FLA or explicit WY/FLA ACU reports in an uploadable tar.gz.
+"""Collect original/FLA or explicit WY/control/FLA ACU reports in one tar.gz.
 
 No remote commands, installs, device clock changes, model data or full caches.
 Failed captures still get a clearly INCOMPLETE diagnostic archive.
@@ -17,10 +17,34 @@ import subprocess
 import sys
 import tarfile
 import traceback
+from typing import NamedTuple
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from gdn_qsa_sm80.gdn_wy_interface import DELIVERIES
+
+
+class CaptureArm(NamedTuple):
+    label: str
+    role: str
+    delivery: str
+    directory: Path
+
+
+def capture_arms(bundle, implementation, delivery, control=None):
+    """One FLA capture, optionally preceded by two explicitly selected WY arms."""
+    if implementation not in ("original", "wy") or delivery not in DELIVERIES:
+        raise ValueError("unknown capture implementation or delivery")
+    if implementation != "wy" and (delivery != "scalar" or control is not None):
+        raise ValueError("WY control/delivery requires --wy-run")
+    arms = []
+    if control is not None:
+        if control not in DELIVERIES or control == delivery:
+            raise ValueError("WY control must be a different supported delivery")
+        arms.append(CaptureArm("wy-control", "wy", control, bundle / "wy-control"))
+    role = "wy" if implementation == "wy" else "ours"
+    return tuple(arms + [CaptureArm(role, role, delivery, bundle),
+                         CaptureArm("fla", "fla", delivery, bundle)])
 
 
 def sha(path):
@@ -152,9 +176,18 @@ def validate_comparison(comparison, subject, fla):
     if comparison.get("device") != subject["device"].get("properties"):
         raise ValueError("capture device properties differ from the comparison")
     delivery = subject.get("wy_delivery", "scalar")
+    if delivery not in DELIVERIES:
+        raise ValueError(f"unknown WY delivery: {delivery}")
     role_name = "wy" if delivery == "scalar" else f"wy-{delivery}"
-    if delivery != "scalar" and not comparison.get("delivery_ab"):
+    # The actual selected arm is authoritative. Early AIU comparisons wrote
+    # delivery_ab=false despite recording all four arms and their masks. Never
+    # edit that old JSON or accept another raw-bit-identical arm in its place.
+    arm = cases[0].get("arms", {}).get(role_name, {})
+    if delivery != "scalar" and not arm:
         raise ValueError("selected delivery was not admitted in the preceding comparison")
+    if delivery != "scalar" or "delivery_mask" in arm:
+        if type(arm.get("delivery_mask")) is not int or arm["delivery_mask"] != DELIVERIES[delivery]:
+            raise ValueError(f"{role_name}: recorded delivery mask differs or is missing")
     for role, record in ((role_name, subject), ("fla", fla)):
         arm = cases[0].get("arms", {}).get(role, {})
         if arm.get("fingerprint") != record["output_sha"]:
@@ -200,6 +233,22 @@ def validate_pair(ours, fla, implementation="original"):
             raise ValueError(f"profile arms differ or lack identity: {key}")
 
 
+def validate_wy_control(control, subject):
+    """Same binary, device, fixture and raw answer; only delivery may differ."""
+    for record in (control, subject):
+        if (record.get("status") != "PASS" or record.get("role") != "wy"
+                or record.get("implementation") != "wy"):
+            raise ValueError("WY control requires two successful WY receipts")
+    if control.get("wy_delivery") == subject.get("wy_delivery"):
+        raise ValueError("WY control silently selected the candidate delivery")
+    for key in ("gate", "shape", "input_sha", "reference_sha", "output_sha", "device",
+                "torch", "torch_cuda", "initial_state", "output_final_state", "fla_heads",
+                "max_relative_error_limit", "protocol", "cache_control", "phase", "warmup",
+                "public_api_calls", "extension_sha256", "library_sha256", "output_dtype", "state_dtype"):
+        if key not in control or control[key] != subject.get(key):
+            raise ValueError(f"WY control differs from candidate: {key}")
+
+
 def validate_loaded_binary(receipt, extension, library):
     loaded = receipt.get("loaded_libraries", {})
     for binary in (extension, library):
@@ -242,9 +291,14 @@ def find_acu(sdk):
 def collect(args, bundle, env):
     implementation = "wy" if args.wy_run else "original"
     delivery = getattr(args, "wy_delivery", "scalar")
-    roles = ("wy" if implementation == "wy" else "ours", "fla")
     status = dict(status="INCOMPLETE", errors=[], probes={}, implementation=implementation, wy_delivery=delivery)
     try:
+        arms = capture_arms(bundle, implementation, delivery, getattr(args, "wy_control", None))
+        status["capture_order"] = [arm.label for arm in arms]
+        status["capture_arms"] = {arm.label: dict(role=arm.role, wy_delivery=arm.delivery,
+            directory=str(arm.directory.relative_to(bundle))) for arm in arms}
+        for arm in arms:
+            arm.directory.mkdir(exist_ok=True)
         for name, command in (
             ("git-head", ["git", "rev-parse", "HEAD"]),
             ("git-status", ["git", "status", "--porcelain=v1"]),
@@ -320,50 +374,63 @@ def collect(args, bundle, env):
                 [args.sdk / "bin/hgobjdump", "--arch=ppu1.0", option, library],
                 bundle / filename, env, optional=True, console=False, timeout=60)
 
-        for role in roles:
+        for arm in arms:
             try:
-                run(child_command(extension, role, args.gate, bundle, "preflight", implementation, delivery),
-                    bundle / f"{role}-preflight.log", env)
+                run(child_command(extension, arm.role, args.gate, arm.directory, "preflight", implementation, arm.delivery),
+                    arm.directory / f"{arm.role}-preflight.log", env)
             except Exception as exc:
-                status["errors"].append(f"{role} preflight: {type(exc).__name__}: {exc}")
+                status["errors"].append(f"{arm.label} preflight: {type(exc).__name__}: {exc}")
         if status["errors"]:
             return status
+        preflights = {arm.label: json.loads((arm.directory / f"{arm.role}-preflight.json").read_text())
+                      for arm in arms}
+        for arm in arms:
+            if preflights[arm.label].get("wy_delivery", "scalar") != arm.delivery:
+                raise ValueError(f"{arm.label}: preflight ignored selected delivery")
         if comparison is not None:
-            preflights = [json.loads((bundle / f"{role}-preflight.json").read_text()) for role in roles]
-            validate_comparison(comparison, *preflights)
+            for arm in arms[:-1]:
+                validate_comparison(comparison, preflights[arm.label], preflights["fla"])
+        if "wy-control" in preflights:
+            validate_wy_control(preflights["wy-control"], preflights["wy"])
 
-        for role in roles:
+        for arm in arms:
             try:
-                base = bundle / f"{role}-g{args.gate}.report"
-                command = acu_command(args.acu, base, extension, role, args.gate, bundle, implementation, delivery)
-                run(command, bundle / f"{role}-acu.log", env)
+                base = arm.directory / f"{arm.role}-g{args.gate}.report"
+                command = acu_command(args.acu, base, extension, arm.role, args.gate,
+                                      arm.directory, implementation, arm.delivery)
+                run(command, arm.directory / f"{arm.role}-acu.log", env)
                 report = report_file(base)
                 # Native reports remain the authority. Text exports make the tar
                 # inspectable without the GUI; no CSV/copy-paste required.
                 for page in ("details", "raw"):
-                    status["probes"][f"{role}-{page}"] = run(
+                    status["probes"][f"{arm.label}-{page}"] = run(
                         [args.acu, "--import", report, "--page", page],
-                        bundle / f"{role}-{page}.txt", env,
+                        arm.directory / f"{arm.role}-{page}.txt", env,
                         optional=True, console=False, timeout=120)
             except Exception as exc:
-                status["errors"].append(f"{role}: {type(exc).__name__}: {exc}")
+                status["errors"].append(f"{arm.label}: {type(exc).__name__}: {exc}")
                 print(f"[GDN ACU bundle] FAIL: {status['errors'][-1]}", flush=True)
         if smi:
             status["probes"]["device-after"] = run([smi, "-i", args.device, "-q"],
                 bundle / "device-after.txt", env, optional=True, console=False, timeout=20)
         if status["errors"]:
             return status
-        ours, fla = (json.loads((bundle / f"{role}.json").read_text()) for role in roles)
-        for subject in (ours, fla):
-            preflight = json.loads((bundle / f"{subject['role']}-preflight.json").read_text())
-            validate_preflight(preflight, subject)
+        receipts = {arm.label: json.loads((arm.directory / f"{arm.role}.json").read_text()) for arm in arms}
+        ours, fla = receipts[arms[-2].label], receipts["fla"]
+        for arm in arms:
+            validate_preflight(preflights[arm.label], receipts[arm.label])
         validate_pair(ours, fla, implementation)
+        if "wy-control" in receipts:
+            validate_wy_control(receipts["wy-control"], ours)
         if comparison is not None:
-            validate_comparison(comparison, ours, fla)
-        validate_loaded_binary(ours, extension, library)
-        if (ours["extension_sha256"] != status["binaries"][str(extension)]
-                or ours["library_sha256"] != status["binaries"][str(library)]):
-            raise ValueError("profiled binding/library differs from archived binary")
+            for arm in arms[:-1]:
+                validate_comparison(comparison, receipts[arm.label], fla)
+        for arm in arms[:-1]:
+            receipt = receipts[arm.label]
+            validate_loaded_binary(receipt, extension, library)
+            if (receipt["extension_sha256"] != status["binaries"][str(extension)]
+                    or receipt["library_sha256"] != status["binaries"][str(library)]):
+                raise ValueError("profiled binding/library differs from archived binary")
         for path, expected in status["binaries"].items():
             if sha(path) != expected:
                 raise ValueError(f"binary changed during capture: {path}")
@@ -381,11 +448,15 @@ def main():
     parser.add_argument("--wy-run", type=Path,
                         help="reuse this completed WY comparison directory; never compile")
     parser.add_argument("--wy-delivery", choices=tuple(DELIVERIES), default="scalar")
+    parser.add_argument("--wy-control", choices=tuple(DELIVERIES),
+                        help="also capture this same-binary WY control before the candidate; FLA runs once")
     args = parser.parse_args()
     if args.wy_run and args.extension:
         parser.error("--wy-run and --extension/EXTENSION are mutually exclusive")
     if args.wy_delivery != "scalar" and not args.wy_run:
         parser.error("--wy-delivery requires --wy-run with admitted comparison samples")
+    if args.wy_control is not None and (not args.wy_run or args.wy_control == args.wy_delivery):
+        parser.error("--wy-control requires --wy-run and a different --wy-delivery")
     if args.wy_run:
         args.wy_run = args.wy_run.resolve()
     args.sdk = Path(os.environ.get("PPU_SDK", "/usr/local/PPU_SDK")).resolve()

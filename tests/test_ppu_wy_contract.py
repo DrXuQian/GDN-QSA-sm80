@@ -3,9 +3,11 @@
 from pathlib import Path
 from contextlib import redirect_stdout
 import io
+import json
 import sys
 from types import SimpleNamespace
 import unittest
+from uuid import uuid4
 from unittest.mock import patch
 import torch
 
@@ -111,6 +113,28 @@ class Contracts(unittest.TestCase):
         del arms["wy-aiu-output"]
         with self.assertRaises(KeyError):
             delivery_comparisons(arms, "aiu-state-output", aiu_ab=True)
+
+    def test_aiu_main_serializes_complete_family_metadata(self):
+        directory = Path("/workspace") / f"gdn-wy-metadata-{uuid4().hex}"
+        directory.mkdir()
+        binding = directory / "synthetic.so"
+        binding.write_bytes(b"test identity only; never loaded")
+        output = directory / "comparison.json"
+        argv = ["bench_ppu_wy_fla.py", "--extension", str(binding), "--wy-extension", str(binding),
+                "--results", str(output), "--aiu-ab"]
+        props = SimpleNamespace(name="PPU synthetic")
+        with patch.object(sys, "argv", argv), patch.object(torch.cuda, "set_device"), \
+                patch.object(torch.cuda, "get_device_properties", return_value=props), \
+                patch.object(benchmark, "load_fla", return_value=(None, {})), \
+                patch.object(benchmark, "compare", side_effect=lambda fn, gate, args, device: dict(g=gate)), \
+                patch.dict("os.environ", {}, clear=True), redirect_stdout(io.StringIO()):
+            benchmark.main()
+        result = json.loads(output.read_text())
+        self.assertTrue(result["delivery_ab"])
+        self.assertTrue(result["aiu_ab"])
+        self.assertEqual(result["roles"], list(AIU_ROLES))
+        self.assertEqual(result["samples"], 14)
+        self.assertEqual([case["g"] for case in result["cases"]], [-.1, -1.])
 
     def test_sample_count_tracks_actual_family_and_rejects_old_fourteen(self):
         self.assertEqual(resolve_samples(None, experiment()[1]), 12)

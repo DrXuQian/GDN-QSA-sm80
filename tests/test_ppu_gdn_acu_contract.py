@@ -305,45 +305,45 @@ class ACUContract(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "not admitted"):
             collect.validate_comparison(comparison, packed, fla)
         comparison["delivery_ab"] = True
-        with self.assertRaisesRegex(ValueError, "output differs"):
+        with self.assertRaisesRegex(ValueError, "not admitted"):
             collect.validate_comparison(comparison, packed, fla)
-        comparison["cases"][0]["arms"]["wy-all"] = dict(fingerprint="output", state_dtype="torch.float32")
+        comparison["cases"][0]["arms"]["wy-all"] = dict(fingerprint="output", state_dtype="torch.float32", delivery_mask=7)
         collect.validate_comparison(comparison, packed, fla)
         # Identical numerical fingerprints must not let a legacy capture
         # impersonate the new compute-tile kernel family.
         tiled = ours | dict(wy_delivery="tiled-all")
-        with self.assertRaisesRegex(ValueError, "output differs"):
+        with self.assertRaisesRegex(ValueError, "not admitted"):
             collect.validate_comparison(comparison, tiled, fla)
-        comparison["cases"][0]["arms"]["wy-tiled-all"] = dict(fingerprint="output", state_dtype="torch.float32")
+        comparison["cases"][0]["arms"]["wy-tiled-all"] = dict(fingerprint="output", state_dtype="torch.float32", delivery_mask=56)
         collect.validate_comparison(comparison, tiled, fla)
         # Same numerical answer is not evidence that mask48 was measured:
         # neither all-tiled nor state-only is the new mixed-stage combination.
         pair = ours | dict(wy_delivery="tiled-state-output")
         comparison["cases"][0]["arms"]["wy-tiled-state"] = dict(fingerprint="output", state_dtype="torch.float32")
-        with self.assertRaisesRegex(ValueError, "output differs"):
+        with self.assertRaisesRegex(ValueError, "not admitted"):
             collect.validate_comparison(comparison, pair, fla)
-        comparison["cases"][0]["arms"]["wy-tiled-state-output"] = dict(fingerprint="output", state_dtype="torch.float32")
+        comparison["cases"][0]["arms"]["wy-tiled-state-output"] = dict(fingerprint="output", state_dtype="torch.float32", delivery_mask=48)
         collect.validate_comparison(comparison, pair, fla)
         for suffix in ("address", "gates", "both"):
             name = f"tiled-state-output-{suffix}"
             subject = ours | dict(wy_delivery=name)
-            with self.assertRaisesRegex(ValueError, "output differs"):
+            with self.assertRaisesRegex(ValueError, "not admitted"):
                 collect.validate_comparison(comparison, subject, fla)
-            comparison["cases"][0]["arms"][f"wy-{name}"] = dict(fingerprint="output", state_dtype="torch.float32")
+            comparison["cases"][0]["arms"][f"wy-{name}"] = dict(fingerprint="output", state_dtype="torch.float32", delivery_mask=collect.DELIVERIES[name])
             collect.validate_comparison(comparison, subject, fla)
         for suffix in ("prepare", "output", "both"):
             name = f"stage-address-{suffix}"
             subject = ours | dict(wy_delivery=name)
-            with self.assertRaisesRegex(ValueError, "output differs"):
+            with self.assertRaisesRegex(ValueError, "not admitted"):
                 collect.validate_comparison(comparison, subject, fla)
-            comparison["cases"][0]["arms"][f"wy-{name}"] = dict(fingerprint="output", state_dtype="torch.float32")
+            comparison["cases"][0]["arms"][f"wy-{name}"] = dict(fingerprint="output", state_dtype="torch.float32", delivery_mask=collect.DELIVERIES[name])
             collect.validate_comparison(comparison, subject, fla)
         for suffix in ("shared", "warp"):
             name = f"prepare-rows-{suffix}"
             subject = ours | dict(wy_delivery=name)
-            with self.assertRaisesRegex(ValueError, "output differs"):
+            with self.assertRaisesRegex(ValueError, "not admitted"):
                 collect.validate_comparison(comparison, subject, fla)
-            comparison["cases"][0]["arms"][f"wy-{name}"] = dict(fingerprint="output", state_dtype="torch.float32")
+            comparison["cases"][0]["arms"][f"wy-{name}"] = dict(fingerprint="output", state_dtype="torch.float32", delivery_mask=collect.DELIVERIES[name])
             collect.validate_comparison(comparison, subject, fla)
         for role, key, value in (("wy", "input_sha", "other"), ("wy", "output_sha", "other"),
                                   ("fla", "fla", dict(entry_sha256="changed")),
@@ -353,8 +353,8 @@ class ACUContract(unittest.TestCase):
                 collect.validate_comparison(comparison, ours | ({key: value} if role == "wy" else {}),
                                              fla | ({key: value} if role == "fla" else {}))
 
-    def test_complete_reused_wy_capture_never_builds_or_selects_original(self):
-        directory = self.directory()
+    def run_mock_capture(self, directory, control=None, plant=None):
+        """Run the real orchestration with synthetic tool receipts, not a GPU."""
         prior = directory / "preceding"
         prior.mkdir()
         binding, library = self.make_wy_run(prior)
@@ -371,11 +371,27 @@ class ACUContract(unittest.TestCase):
                           device=ours["device"]["properties"])
         comparison["cases"] = [dict(g=-0.1, input_sha="input", arms={
             role: dict(fingerprint="output", state_dtype="torch.float32") for role in ("wy", "fla")})]
+        delivery = "aiu-state-output" if control is not None else "scalar"
+        if control is not None:
+            # Reproduce the already-shipped AIU JSON exactly at the disputed
+            # boundary: generic flag false, no aiu_ab flag, correct arm masks.
+            comparison["delivery_ab"] = False
+            comparison["cases"][0]["arms"].update({f"wy-{name}": dict(
+                fingerprint="output", state_dtype="torch.float32", delivery_mask=mask)
+                for name, mask in (("prepare-rows-shared", 1520), ("aiu-state-output", 13808))})
+        if plant == "missing-comparison-arm":
+            del comparison["cases"][0]["arms"]["wy-prepare-rows-shared"]
+        if plant == "wrong-comparison-mask":
+            comparison["cases"][0]["arms"]["wy-aiu-state-output"]["delivery_mask"] = 1520
+        if plant == "missing-comparison-mask":
+            del comparison["cases"][0]["arms"]["wy-aiu-state-output"]["delivery_mask"]
         comparison_path.write_text(json.dumps(comparison))
+        original_comparison_hash = collect.sha(comparison_path)
         bundle = directory / "bundle"
         bundle.mkdir()
         args = SimpleNamespace(wy_run=prior, extension=None, sdk=directory,
-                               acu=Path(sys.executable), gate=-0.1, device="0")
+                               acu=Path(sys.executable), gate=-0.1, device="0",
+                               wy_delivery=delivery, wy_control=control)
         commands = []
         def fake_run(command, log, env, **kwargs):
             command = [str(x) for x in command]
@@ -386,18 +402,37 @@ class ACUContract(unittest.TestCase):
             if "--role" in command:
                 role = command[command.index("--role") + 1]
                 phase = command[command.index("--phase") + 1]
+                selected = command[command.index("--wy-delivery") + 1]
+                is_control = role == "wy" and selected == control
                 self.assertIn(role, ("wy", "fla"))
                 self.assertEqual(command[command.index("--implementation") + 1], "wy")
                 receipt = dict(ours if role == "wy" else fla)
+                receipt["wy_delivery"] = selected
                 if phase == "preflight":
                     receipt.update(phase=phase, warmup=5, public_api_calls=6)
+                if is_control and plant == "changed-control-device":
+                    receipt["device"] = ours["device"] | dict(uuid="different-card")
+                if is_control and plant == "ignored-control-delivery":
+                    receipt["wy_delivery"] = delivery
+                if is_control and phase == "subject":
+                    if plant == "failed-control-profile":
+                        raise RuntimeError("planted ACU failure")
+                    if plant == "wrong-control-loaded-library":
+                        receipt["loaded_libraries"] = {str(binding.resolve()): collect.sha(binding)}
+                    if plant == "changed-control-output":
+                        receipt["output_sha"] = "changed-output"
                 Path(command[command.index("--receipt") + 1]).write_text(json.dumps(receipt))
-                if "--set" in command:
+                if "--set" in command and not (is_control and plant == "missing-control-report"):
                     Path(command[command.index("-o") + 1] + ".acurep").write_bytes(b"synthetic report")
             return dict(status="COLLECTED", returncode=0)
         with patch.object(collect, "run", side_effect=fake_run), \
                 patch.object(collect.shutil, "which", return_value=None):
             status = collect.collect(args, bundle, {"PATH": ""})
+        self.assertEqual(collect.sha(comparison_path), original_comparison_hash)
+        return status, commands, bundle, library
+
+    def test_complete_reused_wy_capture_never_builds_or_selects_original(self):
+        status, commands, bundle, library = self.run_mock_capture(self.directory())
         self.assertEqual(status["status"], "PASS", status)
         self.assertEqual(status["implementation"], "wy")
         self.assertEqual(status["comparison_origin"]["source_sha"], "d" * 40)
@@ -405,6 +440,48 @@ class ACUContract(unittest.TestCase):
         self.assertTrue((bundle / "preceding-comparison/comparison.json").is_file())
         stages = [cmd[cmd.index("--phase") + 1] for cmd in commands if "--phase" in cmd]
         self.assertEqual(stages, ["preflight", "preflight", "subject", "subject"])
+
+    def test_three_arm_aiu_capture_accepts_measured_masks_despite_old_flag(self):
+        status, commands, bundle, library = self.run_mock_capture(
+            self.directory(), control="prepare-rows-shared")
+        self.assertEqual(status["status"], "PASS", status)
+        self.assertEqual(status["capture_order"], ["wy-control", "wy", "fla"])
+        calls = [cmd for cmd in commands if "--phase" in cmd]
+        self.assertEqual([cmd[cmd.index("--phase") + 1] for cmd in calls],
+                         ["preflight"] * 3 + ["subject"] * 3)
+        captures = [cmd for cmd in calls if "--set" in cmd]
+        self.assertEqual([(cmd[cmd.index("--role") + 1], cmd[cmd.index("--wy-delivery") + 1])
+                         for cmd in captures], [("wy", "prepare-rows-shared"),
+                         ("wy", "aiu-state-output"), ("fla", "aiu-state-output")])
+        reports = list(bundle.rglob("*.acurep"))
+        self.assertEqual(len(reports), 3)
+        self.assertEqual(len(set(cmd[cmd.index("--receipt") + 1] for cmd in calls)), 6)
+        self.assertTrue((bundle / "wy-control/wy.json").is_file())
+        archive = collect.pack(bundle, status)
+        with tarfile.open(archive) as tar:
+            self.assertEqual(len([name for name in tar.getnames() if name.endswith(".acurep")]), 3)
+
+    def test_three_arm_missing_wrong_mask_device_delivery_or_report_is_red(self):
+        directory = self.directory()
+        for plant in ("missing-comparison-arm", "wrong-comparison-mask", "missing-comparison-mask", "changed-control-device",
+                      "ignored-control-delivery", "failed-control-profile", "missing-control-report",
+                      "wrong-control-loaded-library", "changed-control-output"):
+            trial = directory / plant
+            trial.mkdir()
+            with self.subTest(plant=plant):
+                status, commands, _, _ = self.run_mock_capture(trial, "prepare-rows-shared", plant)
+                self.assertEqual(status["status"], "INCOMPLETE", status)
+                self.assertTrue(status["errors"])
+                if plant in ("missing-comparison-arm", "wrong-comparison-mask", "missing-comparison-mask", "changed-control-device",
+                             "ignored-control-delivery"):
+                    self.assertFalse(any("--set" in cmd for cmd in commands))
+
+    def test_control_inventory_rejects_duplicates_unknown_and_original(self):
+        directory = self.directory()
+        for implementation, delivery, control in (("wy", "aiu-state-output", "aiu-state-output"),
+                ("original", "scalar", "prepare-rows-shared"), ("wy", "aiu-state-output", "typo")):
+            with self.subTest(control=control), self.assertRaises(ValueError):
+                collect.capture_arms(directory, implementation, delivery, control)
 
     def test_report_extension_variants_missing_empty_ambiguous(self):
         directory = self.directory()
