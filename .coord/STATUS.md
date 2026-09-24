@@ -1,9 +1,32 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 08:23:57 UTC
-working-on: V16 ACU review closed; next design V32/8warps with separate mandatory BC work
-blocked-on: no analysis blocker; next device implementation not started; routing unchanged
-last-commit: 56129ca (V16 evidence/plan; captured source remains5a3ebc9)
+updated-at: 2026-09-24 08:53:49 UTC
+working-on: residual B-layout local closure complete; ready for same-binary box ACU
+blocked-on: device RAW-BIT/BC/performance await box; no local blocker, routing unchanged
+last-commit: a20df27 (implementation; measured incumbent remains5a3ebc9)
+
+New worktree /workspace/gdn-wy-residual-banks-20260924; contract/evidence
+/workspace/gdn-wy-residual-banks-evidence-20260924. User clarified zero-added
+work is a suggestion: performance decides; codegen cost is diagnostic.
+Chosen16x16 B-oriented intermediate uses paired nativeSWZL, same242regs,
+0stack/45568B, V32/grid128/128threads and arithmetic.5mapping negatives red.
+Wide-cube alternative +111sites/2regs is deferred, NOT measured losing.
+Current total static2092->2093sites, recurrence899/905->897/903; not dynamic
+counts or a speed claim. QUactlize native-pair audit covers every stage.
+Eight-warp occupancy branch intentionally separate. No new device result.
+
+Final full rerun final-local-complete.log exited0:16/16CTest,81hostcontracts,
+7dialecttests,45WY+61residualalgebra,305originalcontrols,27WY/15original
+images audited. All26 old native instruction+operand sequences IDENTICAL.
+6source+3native new plants red; no missing-backend fallback to scalar.
+Device-library SHA256 b93fb50a1645a5f8d43a47ac6a705145214419786d646e9bfb6724c6b6de4e4e.
+Run from repo: DEVICE=0 JOBS=16 CANDIDATE=residual-blayout
+bash tools/run_ppu_residual_delivery_acu_box.sh. SiteACU, all4/4/7 expected
+kernels,30devicecases x8/raw equality before profiling, upload printed tar.
+Docs PPU_GDN_RESIDUAL_B_LAYOUT.md and PPU_GDN_AIU_DELIVERY_AUDIT.md.
+Experience/clarified selection rule recorded in Quactlize skill ddc4b9c.
+
+## Previous V16 capture / initial plan (latest clarification above takes precedence)
 
 Upload4e66b340028d2a91abd5e671ed4b7a4d7a09aabc2388041ec11120c8cb5fd92d.
 603files/602hashes/127sources match5a3ebc9. Same-binary/fixture/device and
