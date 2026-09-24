@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 08:20:23 UTC
+updated-at: 2026-09-24 08:23:57 UTC
 working-on: V16 ACU review closed; next design V32/8warps with separate mandatory BC work
 blocked-on: no analysis blocker; next device implementation not started; routing unchanged
-last-commit: 5a3ebc9 (captured source and local handoff)
+last-commit: 56129ca (V16 evidence/plan; captured source remains5a3ebc9)
 
 Upload4e66b340028d2a91abd5e671ed4b7a4d7a09aabc2388041ec11120c8cb5fd92d.
 603files/602hashes/127sources match5a3ebc9. Same-binary/fixture/device and
@@ -24,8 +24,11 @@ shared45568B and112MiB logical input load while doubling launched warps.
 Native-CLayout host probe proves40960output/K-atom cells perCTA equal and
 three omitted-warp plants red. Device codegen/numerics/performance NOT_RUN.
 BC is mandatory separately:4/8warps x old/BC layout bounded2x2; no automatic
-promotion. Adjacent BF16 result columns occupy different lanes, so packed
-stores need proved native exchange/paired layout, not a free reinterpret cast.
+promotion. User now requires ZERO added work for BC: no runtime packing,
+shuffle, extra copy/barrier or unswizzle. Only compile-time shared swizzle
+and supported native matrix-load pairing, including AIU.swzl/ld.swzl.
+Check emitted address instructions, not just constexpr spelling; native
+result columns in different lanes make naive BF16 packing inadmissible.
 No kernel/default edits this turn. Full report docs/PPU_GDN_V16_ACU_20260924.md;
 replay/evidence /workspace/gdn-residual-v16-acu-analysis-20260924.
 
