@@ -11,6 +11,12 @@ Revision2026-09-24: separate demonstrated instruction/dataflow problems from
 unmeasured replacement hypotheses. The five-stage design below is a reference-
 aligned candidate, not a claim that five launches inherently beat three.
 
+Next implementation checkpoint: [structural split prepare](PPU_WY_SPLIT_PREPARE.md).
+Prefix/KKT-solve/WU are now separate opt-in kernels, locally compiled/proved;
+device admission and speed remain pending. User target is **FLA1.5x on all
+ACU kernels**, not merely parity and not a complete-API-event win. This takes
+precedence over historical implementation order/performance goals below.
+
 Implementation checkpoint: [matched native AIU/SWZL state/output candidate](PPU_WY_AIU_PAIR.md).
 It replaces manual global-input placement with paired bulk delivery and an
 explicit internal layout. It does not yet change the three-stage graph,
@@ -49,9 +55,9 @@ structural plan here, not another series of descriptor micro-ablations:
 Vector-only W/U publication is a useful causal control within the prepare
 rewrite, not a claim that one store change closes the whole gap. Preserve
 the current TF32 residual terms, BF16 boundaries, FP32 recurrence, independent
-numerical gate and old path. The existing five-stage plan has **not** already
-been delivered by the paired AIU patch. These priorities are design only;
-no structural kernel rewrite is made by this analysis checkpoint.
+numerical gate and old path. The AIU patch did not deliver the five-stage
+graph; the linked split-prepare candidate is its first implementation, still
+awaiting device evidence. State pipeline/joint output reuse remain open.
 
 ## Diagnosis ledger: what is established
 

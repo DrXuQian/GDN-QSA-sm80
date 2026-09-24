@@ -123,7 +123,7 @@ int selectors(int plant = 0) {
         if (expected[mask]) throw std::runtime_error("duplicate delivery combination");
         expected[mask] = true;
       }
-  for (unsigned mask : {5616u, 9712u, 13808u}) expected[mask] = true;
+  for (unsigned mask : {5616u, 9712u, 13808u, 30192u}) expected[mask] = true;
   int accepted = 0, bad = 0;
   int old27 = 0, old54 = 0, old96 = 0;
   for (unsigned mask = 0; mask < expected.size(); ++mask) {
@@ -134,7 +134,7 @@ int selectors(int plant = 0) {
     old96 += actual && mask < 1024;
     bad += actual != expected[mask];
   }
-  return bad + (accepted != 147) + (old27 != 27) + (old54 != 54) + (old96 != 96) + valid_delivery(1u << 31);
+  return bad + (accepted != 148) + (old27 != 27) + (old54 != 54) + (old96 != 96) + valid_delivery(1u << 31);
 }
 
 int main() {
@@ -149,5 +149,5 @@ int main() {
     if (!bad) throw std::runtime_error("tiled negative escaped");
     std::printf("[WY tiled negative] plant=%d bad=%d EXPECTED-RED/PASS\n", plant, bad);
   }
-  std::puts("[WY tiles] native H exchange=8192 reads; independent scalar-coordinate reduction order=34816 outputs (W/U counted separately); selectors=32768/147 valid (old27/54/96/144 preserved); PASS device_execution=NOT_RUN");
+  std::puts("[WY tiles] native H exchange=8192 reads; independent scalar-coordinate reduction order=34816 outputs (W/U counted separately); selectors=32768/148 valid (old27/54/96/144/147 preserved); PASS device_execution=NOT_RUN");
 }

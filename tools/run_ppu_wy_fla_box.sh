@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 families=0
-for flag in "${DELIVERY_AB:-0}" "${TILE_AB:-0}" "${STATE_AB:-0}" "${STAGE_AB:-0}" "${PREPARE_ROWS_AB:-0}" "${AIU_AB:-0}"; do
+for flag in "${DELIVERY_AB:-0}" "${TILE_AB:-0}" "${STATE_AB:-0}" "${STAGE_AB:-0}" "${PREPARE_ROWS_AB:-0}" "${AIU_AB:-0}" "${SPLIT_PREPARE_AB:-0}"; do
   if [[ "$flag" != 0 && "$flag" != 1 ]]; then
     echo "[WY box] FAIL: candidate family flags must be 0 or 1" >&2
     exit 1
@@ -10,7 +10,7 @@ for flag in "${DELIVERY_AB:-0}" "${TILE_AB:-0}" "${STATE_AB:-0}" "${STAGE_AB:-0}
   families=$((families + flag))
 done
 if (( families > 1 )); then
-  echo "[WY box] FAIL: choose only one of DELIVERY_AB / TILE_AB / STATE_AB / STAGE_AB / PREPARE_ROWS_AB / AIU_AB" >&2
+  echo "[WY box] FAIL: choose only one of DELIVERY_AB / TILE_AB / STATE_AB / STAGE_AB / PREPARE_ROWS_AB / AIU_AB / SPLIT_PREPARE_AB" >&2
   exit 1
 fi
 PPU_SDK_ROOT="${PPU_SDK:-/usr/local/PPU_SDK}"
@@ -42,6 +42,9 @@ sample_flags=()
 if [[ -n "${SAMPLES+x}" ]]; then
   sample_flags+=(--samples "$SAMPLES")
 fi
+if [[ "${ADMISSION_ONLY:-0}" == 1 ]]; then
+  sample_flags+=(--admission-only)
+fi
 if [[ "${DELIVERY_AB:-0}" == 1 ]]; then
   variant_flags+=(--delivery-ab)
 fi
@@ -59,6 +62,9 @@ if [[ "${PREPARE_ROWS_AB:-0}" == 1 ]]; then
 fi
 if [[ "${AIU_AB:-0}" == 1 ]]; then
   variant_flags+=(--aiu-ab)
+fi
+if [[ "${SPLIT_PREPARE_AB:-0}" == 1 ]]; then
+  variant_flags+=(--split-prepare-ab)
 fi
 python "$ROOT/tests/test_ppu_gdn_backend.py" --extension "${old[0]}" --device 0 2>&1 | tee "$OUT/original-correctness.log"
 python "$ROOT/tests/test_ppu_wy_backend.py" --wy-extension "${new[0]}" --device 0 "${variant_flags[@]}" 2>&1 | tee "$OUT/wy-correctness.log"

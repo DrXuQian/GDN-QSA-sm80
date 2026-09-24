@@ -18,7 +18,7 @@ import bench_ppu_wy_fla as benchmark
 from bench_ppu_wy_fla import (comparison_summary, delivery_comparisons, order,
                               DELIVERY_ROLES, TILE_ROLES, STATE_ROLES, STAGE_ROLES,
                               PREPARE_ROWS_ROLES, experiment, resolve_samples)
-from bench_ppu_wy_fla import AIU_ROLES
+from bench_ppu_wy_fla import AIU_ROLES, SPLIT_PREPARE_ROLES
 from bench_ppu_gdn_fla import checked_pair, verdict
 
 
@@ -97,6 +97,34 @@ class Contracts(unittest.TestCase):
         for name in ("delivery_ab", "tile_ab", "state_ab", "stage_ab", "prepare_rows_ab"):
             with self.assertRaises(ValueError):
                 experiment(aiu_ab=True, **{name: True})
+
+    def test_split_prepare_inventory_and_default_are_independent(self):
+        names, roles = experiment(split_prepare_ab=True)
+        self.assertEqual(names, ("aiu-state-output", "split-prepare"))
+        self.assertEqual(tuple(api.DELIVERIES[name] for name in names), (13808, 30192))
+        self.assertEqual(roles, SPLIT_PREPARE_ROLES)
+        self.assertEqual(len(roles), 5)
+        self.assertEqual(resolve_samples(None, roles), 10)
+        for column in zip(*(order(i, roles) for i in range(10))):
+            for role in roles:
+                self.assertEqual(column.count(role), 2)
+        self.assertEqual(experiment()[1], ("original", "wy", "fla"))
+        for flag in ("delivery_ab", "tile_ab", "state_ab", "stage_ab", "prepare_rows_ab", "aiu_ab"):
+            with self.assertRaises(ValueError):
+                experiment(split_prepare_ab=True, **{flag: True})
+
+    def test_split_prepare_verdict_never_substitutes_an_old_control(self):
+        arms = {role: dict(samples_us=[310., 315.]) for role in SPLIT_PREPARE_ROLES}
+        arms["wy-split-prepare"]["samples_us"] = [320., 325.]
+        result = delivery_comparisons(arms, "split-prepare", split_prepare_ab=True)
+        self.assertEqual(set(result), {"original", "wy", "fla", "wy-aiu-state-output"})
+        self.assertTrue(all(row["verdict"] == "CONTROL-WINS" for row in result.values()))
+        arms["wy-split-prepare"]["samples_us"] = [300., 312.]
+        self.assertTrue(all(row["verdict"] == "UNRESOLVED" for row in
+            delivery_comparisons(arms, "split-prepare", split_prepare_ab=True).values()))
+        del arms["wy-aiu-state-output"]
+        with self.assertRaises(KeyError):
+            delivery_comparisons(arms, "split-prepare", split_prepare_ab=True)
 
     def test_aiu_verdict_keeps_incumbent_and_both_single_changes(self):
         arms = {role: dict(samples_us=[500., 510.]) for role in AIU_ROLES}
@@ -360,7 +388,8 @@ class Contracts(unittest.TestCase):
         # are synthetic: this tests plumbing, not any device timing claim.
         class Event:
             def __init__(self, **kwargs):
-                pass
+                if getattr(args, "admission_only", False):
+                    raise AssertionError("numeric-only ACU admission created a timing event")
             def record(self):
                 pass
             def synchronize(self):
@@ -371,17 +400,20 @@ class Contracts(unittest.TestCase):
         want = (torch.ones(1), torch.ones(1))
         args = SimpleNamespace(delivery_ab=False, tile_ab=True, warmup=5, samples=16, launches=10)
         seen = []
-        def run(plant=False, state_ab=False, stage_ab=False, prepare_rows_ab=False, aiu_ab=False):
-            args.tile_ab = not (state_ab or stage_ab or prepare_rows_ab or aiu_ab)
+        def run(plant=False, state_ab=False, stage_ab=False, prepare_rows_ab=False, aiu_ab=False, split_prepare_ab=False,
+                admission_only=False):
+            args.tile_ab = not (state_ab or stage_ab or prepare_rows_ab or aiu_ab or split_prepare_ab)
             args.state_ab = state_ab
             args.stage_ab = stage_ab
             args.prepare_rows_ab = prepare_rows_ab
             args.aiu_ab = aiu_ab
-            args.samples = 14 if aiu_ab else 16
+            args.split_prepare_ab = split_prepare_ab
+            args.admission_only = admission_only
+            args.samples = 0 if admission_only else 10 if split_prepare_ab else 14 if aiu_ab else 16
             def wy(*inputs, delivery="scalar"):
                 seen.append(delivery)
                 # Within the unchanged 2% gate, but not scalar raw equality.
-                selected = ("aiu-state-output" if aiu_ab else "prepare-rows-warp" if prepare_rows_ab else "stage-address-both" if stage_ab else
+                selected = ("split-prepare" if split_prepare_ab else "aiu-state-output" if aiu_ab else "prepare-rows-warp" if prepare_rows_ab else "stage-address-both" if stage_ab else
                             "tiled-state-output-both" if state_ab else "tiled-state-output")
                 return (want[0] + .001, want[1]) if plant and delivery == selected else want
             with patch.object(benchmark.admission, "fixture", return_value=cpu), \
@@ -439,6 +471,28 @@ class Contracts(unittest.TestCase):
         self.assertEqual(len(result["arms"]["wy-aiu-state-output"]["versus"]), 6)
         with self.assertRaisesRegex(AssertionError, "wy-aiu-state-output output/state bits differ"):
             run(plant=True, aiu_ab=True)
+        seen.clear()
+        result = run(split_prepare_ab=True)
+        self.assertEqual(set(result["arms"]), set(SPLIT_PREPARE_ROLES))
+        for name in ("scalar", *api.SPLIT_PREPARE_DELIVERIES):
+            self.assertEqual(seen.count(name), 8 + 5 + 10 * 10)
+        self.assertEqual(result["arms"]["wy-split-prepare"]["delivery_mask"], 30192)
+        self.assertEqual(len(result["arms"]["wy-split-prepare"]["versus"]), 4)
+        with self.assertRaisesRegex(AssertionError, "wy-split-prepare output/state bits differ"):
+            run(plant=True, split_prepare_ab=True)
+        seen.clear()
+        result = run(split_prepare_ab=True, admission_only=True)
+        self.assertEqual(result["timing"], "NOT_RUN")
+        self.assertEqual(result["scope"], "NUMERICS_ONLY_PERFORMANCE_NOT_MEASURED")
+        for name in ("scalar", *api.SPLIT_PREPARE_DELIVERIES):
+            self.assertEqual(seen.count(name), 8 + 5)
+        for arm in result["arms"].values():
+            self.assertEqual(arm["admitted_repeats"], 8)
+            self.assertEqual(arm["samples_us"], [])
+            self.assertNotIn("median_us", arm)
+            self.assertNotIn("versus", arm)
+        with self.assertRaisesRegex(AssertionError, "wy-split-prepare output/state bits differ"):
+            run(plant=True, split_prepare_ab=True, admission_only=True)
 
     def test_delivery_mask_is_consumed_not_silently_ignored(self):
         class Fake:

@@ -20,8 +20,8 @@ def kernel_sequences(isa):
 
 def compare_controls(before, after):
     old, new = kernel_sequences(before), kernel_sequences(after)
-    if len(old) != 16 or len(new) != 18:
-        raise AssertionError("control comparison must cover all16 old and all18 current images")
+    if len(old) != 18 or len(new) != 21:
+        raise AssertionError("control comparison must cover all18 old and all21 current images")
     for name, sequence in old.items():
         if new.get(name) != sequence:
             raise AssertionError(f"admitted control native instructions changed: {name}")
@@ -150,8 +150,8 @@ def plant_late_row_barrier(isa):
 def audit(isa, resources, symbols):
     funcs = re.findall(r"Func \d+ (\S+) RESOURCE INFO:\n(.*?)(?=Func \d+ \S+ RESOURCE INFO:|\Z)",
                        resources, flags=re.S)
-    if len(funcs) != 18:
-        raise AssertionError(f"WY image denominator must be 16 controls + 2 AIU variants, got {len(funcs)}")
+    if len(funcs) != 21:
+        raise AssertionError(f"WY image denominator must be18 controls +3 split-prepare stages, got {len(funcs)}")
     rows = []
     mma_counts = {}
     for role, packed in ((role, packed) for role in ("prepare", "state", "output") for packed in (False, True)):
@@ -329,13 +329,46 @@ def audit(isa, resources, symbols):
         rows.append(dict(role=role, delivery="aiu-paired", registers=regs, stack=stack,
                          static_instructions=len(ops), aiu_sites=copies, bf16_mma_sites=mmas,
                          v2s_sites=ops.count("v.mov.v2s"), cta_barrier_sites=barriers))
+    # A compiled header or unchanged prepare kernel is not evidence that the
+    # three new device bodies were emitted. Pin each body's arithmetic and
+    # native delivery, not only the aggregate library mnemonic inventory.
+    for role, copies, bf16, tf32, exps, barriers, stores in (
+            ("prefix", 0, 0, 0, 0, 1, 0), ("solve", 2, 8, 12, 8, 5, 4),
+            ("wu", 5, 32, 0, 1, 4, 8)):
+        matches = [(name, body) for name, body in funcs if f"gdn_wy_split_{role}E" in name]
+        if len(matches) != 1:
+            raise AssertionError(f"missing/ambiguous split {role} image")
+        name, body = matches[0]
+        stack = int(re.search(r"STACK SIZE:(\d+)", body)[1])
+        regs = int(re.search(r"vreg_number:(\d+)", body)[1])
+        if stack or name not in sequences:
+            raise AssertionError(f"split {role} absent or spilling")
+        ops = [line.split()[0] for line in sequences[name]]
+        actual = (ops.count("vmem.aiu.ld.tsm.l0.t0.p0.s0.m0.2d.b16.kp1"),
+                  ops.count("v.mma.f32.bf16.m16n16k16"), ops.count("v.mma.f32.tf32.m16n16k8"),
+                  ops.count("v.exp2.f32"), ops.count("s.blksyn.defer"), ops.count("vmem.st.b32x4"))
+        if actual != (copies, bf16, tf32, exps, barriers, stores):
+            raise AssertionError(f"split {role} native arithmetic/delivery/lifetime differs: {actual}")
+        if any(op.startswith(("vmem.ld.tsm", "vmem.aiu.ld.tsm.l1", "tsm.ld.ncom")) for op in ops):
+            raise AssertionError(f"split {role} unmatched operand path")
+        if "vmem.st.b16" in ops:
+            raise AssertionError(f"split {role} scalar BF16 publication")
+        if role == "prefix" and (ops.count("v.shuffle.up.b32") != 5 or "vmem.st.b32" not in ops):
+            raise AssertionError("split prefix lost original scan order/publication")
+        if role != "prefix" and "tsm.ld.swzl.b32x4.s0.t1.trans0" not in ops:
+            raise AssertionError(f"split {role} native SWZL consumer missing")
+        if role == "wu" and "tsm.ld.swzl.b32x4.s0.t1.trans1" not in ops:
+            raise AssertionError("split WU transposed operand consumer missing")
+        rows.append(dict(role=role, delivery="split-prepare", registers=regs, stack=stack,
+                         static_instructions=len(ops), aiu_sites=copies, bf16_mma_sites=bf16,
+                         tf32_mma_sites=tf32, cta_barrier_sites=barriers, vector_store_sites=stores))
     for name in ("gdn_wy_forward", "gdn_wy_forward_delivery"):
         if not re.search(rf"\b{name}$", symbols, re.M):
             raise AssertionError(f"WY launcher missing from linked library: {name}")
     for name in ("configure_tiled", "launch_tiled_prepare", "launch_tiled_state", "launch_tiled_output",
                  "configure_state_ab", "launch_state_ab", "configure_stage_address",
                  "launch_address_prepare", "launch_address_output", "configure_prepare_rows", "launch_prepare_rows",
-                 "forward_aiu"):
+                 "forward_aiu", "configure_split_prepare", "launch_split_prepare"):
         if not re.search(rf"\b_ZN7gdn_qsa2wy\d+{name}E\S*$", symbols, re.M):
             raise AssertionError(f"tiled cross-TU launcher missing from linked library: {name}")
     return rows
@@ -383,6 +416,17 @@ def main():
                 "vmem.aiu.ld.tsm.l0", "vmem.aiu.ld.tsm.l1"), resources, symbols)),
             ("aiu-wrong-reader", (plant_in_kernel(isa, "gdn_wy_aiu_output",
                 "tsm.ld.swzl.b32x4.s0.t1.trans1", "tsm.ld.ncom.b32x4"), resources, symbols)),
+            ("split-missing-link", (isa, resources, symbols.replace("launch_split_prepare", "MISSING_split"))),
+            ("split-residual-missing", (plant_in_kernel(isa, "gdn_wy_split_solve",
+                "v.mma.f32.tf32.m16n16k8", "MISSING_RESIDUAL"), resources, symbols)),
+            ("split-wu-scalar-store", (plant_in_kernel(isa, "gdn_wy_split_wu",
+                "vmem.st.b32x4", "vmem.st.b16"), resources, symbols)),
+            ("split-wu-wrong-reader", (plant_in_kernel(isa, "gdn_wy_split_wu",
+                "tsm.ld.swzl.b32x4.s0.t1.trans1", "tsm.ld.ncom.b32x4"), resources, symbols)),
+            ("split-wu-missing-retirement", (plant_in_kernel(isa, "gdn_wy_split_wu",
+                "s.blksyn.defer", "MISSING_BARRIER"), resources, symbols)),
+            ("split-prefix-lost-shuffle", (plant_in_kernel(isa, "gdn_wy_split_prefix",
+                "v.shuffle.up.b32", "MISSING_SCAN"), resources, symbols)),
         ):
             try:
                 audit(*texts)
@@ -400,7 +444,7 @@ def main():
                 print("[WY binary negative] changed-control EXPECTED-RED/PASS")
             else:
                 raise AssertionError("control-comparison negative escaped")
-        print("[WY binary controls] 16/16 native instruction+operand sequences IDENTICAL")
+        print("[WY binary controls] 18/18 native instruction+operand sequences IDENTICAL")
     print("[WY binary] PASS device_execution=NOT_RUN")
 
 

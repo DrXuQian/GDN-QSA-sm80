@@ -231,8 +231,10 @@ int forward_aiu(Inputs p, Workspace ws, BF16* output, float* final,
   if (!aiu::Tile<Chunk, Dim>::admitted_stride(int64_t(p.shape.q_heads) * Dim) ||
       !aiu::Tile<Chunk, Dim>::admitted_stride(int64_t(p.shape.value_heads) * Dim))
     return int(hggcErrorInvalidValue);
-  return visit_aiu_options(options, [&](auto use_state, auto use_output) {
-    int rc = configure_prepare_rows(PrepareRowsShared);
+  bool const split = bool(options & SplitPrepare);
+  if (split && options != (SplitPrepare | AiuOptions)) return int(hggcErrorInvalidValue);
+  return visit_aiu_options(options & AiuOptions, [&](auto use_state, auto use_output) {
+    int rc = split ? configure_split_prepare() : configure_prepare_rows(PrepareRowsShared);
     if (rc) return rc;
     if constexpr (decltype(use_state)::value)
       rc = int(hggcFuncSetAttribute(aiu::gdn_wy_aiu_state,
@@ -246,7 +248,8 @@ int forward_aiu(Inputs p, Workspace ws, BF16* output, float* final,
     else
       rc = configure_tiled(32u);
     if (rc) return rc;
-    rc = launch_prepare_rows(p, ws, stream, PrepareRowsShared);
+    rc = split ? launch_split_prepare(p, ws, stream)
+               : launch_prepare_rows(p, ws, stream, PrepareRowsShared);
     if (rc) return rc;
     if constexpr (decltype(use_state)::value) {
       unsigned const grid = unsigned(int64_t(p.shape.batch) * p.shape.value_heads * (Dim / ValueTile));

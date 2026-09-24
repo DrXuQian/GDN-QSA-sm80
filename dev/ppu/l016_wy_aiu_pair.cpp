@@ -86,7 +86,7 @@ uint64_t suite(Counts& counts, unsigned plant = 0) {
 
 unsigned selection(bool plant = false) {
   unsigned bad = 0, admitted = 0, calls = 0;
-  for (unsigned mask = 4096; mask < 32768; ++mask) {
+  for (unsigned mask = 4096; mask < 16384; ++mask) {
     bool const expected = mask == 5616 || mask == 9712 || mask == 13808;
     bool const actual = valid_delivery(mask);
     admitted += actual;

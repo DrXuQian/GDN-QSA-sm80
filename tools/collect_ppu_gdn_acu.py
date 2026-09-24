@@ -130,9 +130,20 @@ def read_wy_run(directory):
     extension = candidates[0].resolve()
     library = extension.parent / "libgdn_wy_ppu.so"
     comparison = json.loads((directory / "comparison.json").read_text())
-    if (comparison.get("protocol") != "full-public-api-event-span"
+    if (comparison.get("protocol") not in ("full-public-api-event-span", "numeric-admission-for-acu")
             or not comparison.get("cases")):
-        raise ValueError("WY run lacks the original complete-API comparison")
+        raise ValueError("WY run lacks complete-API comparison or explicit ACU numeric admission")
+    if comparison["protocol"] == "numeric-admission-for-acu":
+        if comparison.get("samples") != 0:
+            raise ValueError("ACU numeric admission must not claim API timing")
+        for case in comparison["cases"]:
+            if case.get("timing") != "NOT_RUN" or not case.get("arms"):
+                raise ValueError("ACU numeric admission lacks its explicit untimed scope")
+            for role, arm in case["arms"].items():
+                if arm.get("admitted_repeats") != 8 or arm.get("samples_us") != []:
+                    raise ValueError("ACU numeric admission missing eight repeats or claiming timing")
+                if role.startswith("wy-") and arm.get("scalar_raw_bit_equal") is not True:
+                    raise ValueError("ACU candidate lacks scalar RAW-BIT admission")
     source_sha = (directory / "sha.txt").read_text().strip()
     if not re.fullmatch(r"[0-9a-f]{40}", source_sha):
         raise ValueError("WY run has no complete source SHA")
@@ -446,7 +457,7 @@ def main():
     parser.add_argument("--gate", type=float, choices=(-0.1, -1.0), default=-0.1)
     parser.add_argument("--extension", type=Path, default=os.environ.get("EXTENSION"))
     parser.add_argument("--wy-run", type=Path,
-                        help="reuse this completed WY comparison directory; never compile")
+                        help="reuse this admitted WY comparison/numeric-receipt directory; never compile")
     parser.add_argument("--wy-delivery", choices=tuple(DELIVERIES), default="scalar")
     parser.add_argument("--wy-control", choices=tuple(DELIVERIES),
                         help="also capture this same-binary WY control before the candidate; FLA runs once")
@@ -454,7 +465,7 @@ def main():
     if args.wy_run and args.extension:
         parser.error("--wy-run and --extension/EXTENSION are mutually exclusive")
     if args.wy_delivery != "scalar" and not args.wy_run:
-        parser.error("--wy-delivery requires --wy-run with admitted comparison samples")
+        parser.error("--wy-delivery requires --wy-run with an admitted WY receipt")
     if args.wy_control is not None and (not args.wy_run or args.wy_control == args.wy_delivery):
         parser.error("--wy-control requires --wy-run and a different --wy-delivery")
     if args.wy_run:
@@ -482,7 +493,7 @@ def main():
     status = collect(args, bundle, env)
     status.update(created_utc=stamp, gate=args.gate, physical_device=args.device,
                   sdk=str(args.sdk), acu=str(args.acu),
-                  scope="counters only; profiled time is not a new performance verdict")
+                  scope="ACU kernel durations and counters; not complete public-API event timing")
     pack(bundle, status)
     if status["errors"]:
         print("\n".join(status["errors"]), file=sys.stderr)

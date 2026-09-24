@@ -73,6 +73,12 @@ target_include_directories(l016_ppu_wy_aiu_pair PRIVATE
   ${PPU_SDK_ROOT}/CUDA_SDK/targets/x86_64-linux/include/cccl
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/actlize/include)
 target_link_libraries(l016_ppu_wy_aiu_pair PRIVATE gdn_qsa_backend_headers)
+add_executable(l018_ppu_wy_split_prepare dev/ppu/l018_wy_split_prepare.cpp)
+target_include_directories(l018_ppu_wy_split_prepare PRIVATE
+  ${PPU_SDK_ROOT}/include ${PPU_SDK_ROOT}/CUDA_SDK/targets/x86_64-linux/include
+  ${PPU_SDK_ROOT}/CUDA_SDK/targets/x86_64-linux/include/cccl
+  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/actlize/include)
+target_link_libraries(l018_ppu_wy_split_prepare PRIVATE gdn_qsa_backend_headers)
 
 if(BUILD_TESTING)
   add_test(NAME ppu_affine_pipeline COMMAND l004_ppu_affine_pipeline)
@@ -84,6 +90,7 @@ if(BUILD_TESTING)
   add_test(NAME ppu_wy_stage_address COMMAND l011_ppu_wy_stage_address)
   add_test(NAME ppu_wy_prepare_rows COMMAND l012_ppu_wy_prepare_rows)
   add_test(NAME ppu_wy_aiu_pair COMMAND l016_ppu_wy_aiu_pair)
+  add_test(NAME ppu_wy_split_prepare COMMAND l018_ppu_wy_split_prepare)
 endif()
 
 if(GDN_QSA_ENABLE_PPU)
@@ -198,7 +205,8 @@ if(GDN_QSA_ENABLE_PPU)
     ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_wy_state_ab_ppu.cu
     ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_wy_stage_ab_ppu.cu
     ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_wy_prepare_rows_ppu.cu
-    ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_wy_aiu_ppu.cu)
+    ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_wy_aiu_ppu.cu
+    ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_wy_split_prepare_ppu.cu)
   target_include_directories(gdn_wy_ppu PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
   target_link_libraries(gdn_wy_ppu PRIVATE CUTLASS ppu::runtime)
   get_target_property(_wy_objects gdn_wy_ppu SOURCES)
@@ -219,6 +227,7 @@ if(GDN_QSA_ENABLE_PPU)
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/wy_stage_address.cuh
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/wy_prepare_rows.cuh
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/wy_aiu.cuh
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/wy_split_prepare.cuh
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/shared_copy.cuh
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/fragment.cuh)
     endif()

@@ -289,6 +289,31 @@ class ACUContract(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "one reused WY"):
             collect.read_wy_run(directory)
 
+    def test_numeric_only_receipt_keeps_repeats_and_raw_bit_admission(self):
+        directory = self.directory()
+        self.make_wy_run(directory)
+        path = directory / "comparison.json"
+        record = json.loads(path.read_text())
+        record.update(protocol="numeric-admission-for-acu", samples=0)
+        record["cases"][0].update(timing="NOT_RUN", arms={
+            role: dict(admitted_repeats=8, samples_us=[], scalar_raw_bit_equal=True)
+            for role in ("wy", "wy-aiu-state-output", "wy-split-prepare", "fla")})
+        path.write_text(json.dumps(record))
+        _, accepted, _ = collect.read_wy_run(directory)
+        self.assertEqual(accepted["protocol"], "numeric-admission-for-acu")
+        for field, value in (("admitted_repeats", 7), ("samples_us", [10.]),
+                             ("scalar_raw_bit_equal", False)):
+            wrong = copy.deepcopy(record)
+            wrong["cases"][0]["arms"]["wy-split-prepare"][field] = value
+            path.write_text(json.dumps(wrong))
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                collect.read_wy_run(directory)
+        wrong = copy.deepcopy(record)
+        wrong["samples"] = 10
+        path.write_text(json.dumps(wrong))
+        with self.assertRaisesRegex(ValueError, "must not claim API timing"):
+            collect.read_wy_run(directory)
+
     def test_comparison_rebinding_rejects_changed_fla_input_or_output(self):
         ours, fla = self.records()
         ours.update(role="wy", implementation="wy")
