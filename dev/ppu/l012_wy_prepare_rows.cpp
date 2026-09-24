@@ -68,7 +68,7 @@ uint64_t reuse(Counts& count, unsigned plant=0) {
 uint64_t selectors(unsigned plant=0) {
   std::array<bool,8192> expected{};
   for (unsigned p : {0u,1u,8u,256u,1280u,2304u})
-    for (unsigned s : {0u,2u,16u,80u,144u,208u})
+    for (unsigned s : {0u,2u,16u,80u,144u,208u,4304u})
       for (unsigned o : {0u,4u,32u,544u}) expected[p|s|o]=true;
   unsigned bad=0,valid=0,cases=0,dispatches=0;
   for (unsigned mask=0; mask<8192; ++mask) {
@@ -81,7 +81,7 @@ uint64_t selectors(unsigned plant=0) {
     int const want=mask==1024 ? 1 : mask==2048 ? 2 : -1;
     bad += mode!=want || calls!=int(want!=-1); dispatches+=calls;
   }
-  return bad+(cases!=8192)+(valid!=144)+(dispatches!=2);
+  return bad+(cases!=8192)+(valid!=168)+(dispatches!=2);
 }
 
 int main() {
@@ -96,7 +96,7 @@ int main() {
     std::printf("[WY prepare-rows negative] plant=%u bad=%llu EXPECTED-RED/PASS\n",plant,
                 static_cast<unsigned long long>(bad));
   }
-  std::printf("[WY prepare-rows] chunks=%llu shared_producers=%llu warp_producers=%llu consumers=%llu selectors=8192/144 typed-dispatch=8192/2 FP32-factor+product/BF16-bits=PASS device_execution=NOT_RUN\n",
+  std::printf("[WY prepare-rows] chunks=%llu shared_producers=%llu warp_producers=%llu consumers=%llu selectors=8192/168 typed-dispatch=8192/2 FP32-factor+product/BF16-bits=PASS device_execution=NOT_RUN\n",
       static_cast<unsigned long long>(count.chunks),static_cast<unsigned long long>(count.shared),
       static_cast<unsigned long long>(count.warp),static_cast<unsigned long long>(count.consumers));
 }

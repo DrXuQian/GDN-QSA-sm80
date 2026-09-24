@@ -41,6 +41,8 @@ __device__ __forceinline__ float gate(Inputs const& p, int64_t i) {
 
 int configure_tiled(unsigned delivery);
 int configure_state_ab(unsigned options);
+int configure_state_operands();
+int launch_state_operands(Inputs p, Workspace ws, float* final, gdn_arch::Stream stream);
 int launch_state_ab(Inputs p, Workspace ws, float* final, gdn_arch::Stream stream, unsigned options);
 int configure_stage_address(unsigned options);
 int launch_address_prepare(Inputs p, Workspace ws, gdn_arch::Stream stream);

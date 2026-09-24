@@ -269,7 +269,8 @@ int configure_tiled(unsigned delivery) {
     if (status != hggcSuccess) return int(status);
   }
   if (delivery & 16) {
-    status = delivery & StateOptions ? hggcError_t(configure_state_ab(delivery & StateOptions)) :
+    status = state_operands_selected(delivery) ? hggcError_t(configure_state_operands()) :
+        delivery & StateOptions ? hggcError_t(configure_state_ab(delivery & StateOptions)) :
         hggcFuncSetAttribute(gdn_wy_tiled_state,
             hggcFuncAttributeMaxDynamicSharedMemorySize, sizeof(TiledStateStorage));
     if (status != hggcSuccess) return int(status);

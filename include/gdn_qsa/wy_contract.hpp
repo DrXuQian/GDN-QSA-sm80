@@ -19,6 +19,9 @@ constexpr unsigned StageAddressOptions = PrepareAddress | OutputAddress;
 constexpr unsigned PrepareRowsShared = 1024u;
 constexpr unsigned PrepareRowsWarp = 2048u;
 constexpr unsigned PrepareRowsOptions = PrepareRowsShared | PrepareRowsWarp;
+constexpr unsigned StateOperands = 4096u;
+
+constexpr bool state_operands_selected(unsigned delivery) { return (delivery & StateOperands) != 0; }
 
 constexpr bool valid_prepare_rows(unsigned mask) {
   unsigned const rows = mask & PrepareRowsOptions;
@@ -44,12 +47,14 @@ constexpr StageAddressSelection stage_address_selection(unsigned delivery) {
 // State options require the tiled state; they are never silently ignored.
 // PrepareAddress extends scalar prepare, never overrides packed/tiled prepare.
 // OutputAddress requires the tiled output. Row caches require PrepareAddress
-// and are mutually exclusive. Old masks0..1023 keep their meaning.
+// and are mutually exclusive. Operand offsets extend state-both only.
+// All old masks0..4095 keep their meaning.
 constexpr bool valid_delivery(unsigned mask) {
-  return mask < 4096 && ((mask & 7u) & ((mask >> 3) & 7u)) == 0 &&
+  return mask < 8192 && ((mask & 7u) & ((mask >> 3) & 7u)) == 0 &&
          (!(mask & StateOptions) || (mask & 16u)) &&
          (!(mask & PrepareAddress) || !(mask & 9u)) &&
-         (!(mask & OutputAddress) || (mask & 32u)) && valid_prepare_rows(mask);
+         (!(mask & OutputAddress) || (mask & 32u)) && valid_prepare_rows(mask) &&
+         (!state_operands_selected(mask) || (mask & (StateOptions | 16u)) == (StateOptions | 16u));
 }
 
 // One typed selector for BOTH resource configuration and the actual launch.

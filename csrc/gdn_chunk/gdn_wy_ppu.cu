@@ -351,7 +351,8 @@ extern "C" int gdn_wy_forward_delivery(
   }
   unsigned const state_grid = unsigned(int64_t(batch) * value_heads * (Dim / ValueTile));
   if (delivery & 16) {
-    int const rc = launch_tiled_state(p, ws, final, stream, delivery & StateOptions);
+    int const rc = state_operands_selected(delivery) ? launch_state_operands(p, ws, final, stream) :
+        launch_tiled_state(p, ws, final, stream, delivery & StateOptions);
     if (rc) return rc;
   } else {
     if (delivery & 2)

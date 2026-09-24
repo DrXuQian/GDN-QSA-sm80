@@ -1,9 +1,16 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 01:10:09 UTC
-working-on: analysis complete; starting isolated state shared-address/operand ablation
-blocked-on: none locally; new candidate has no device timing yet
-last-commit: 4267b28 (verified ACU analysis; checkpoint follows)
+updated-at: 2026-09-24 01:26:17 UTC
+working-on: WIP micro-ablation retained; user redirected priority to FLA-structured rewrite
+blocked-on: no local PPU; this branch is not a box handoff
+last-commit: e044704 (parent of this isolated unpromoted experiment)
+
+This branch is intentionally not integrated into ppu-backend. SDK native
+compile/link and l013 host coordinate/selector gate pass, but Python family,
+17-image codegen checker and complete regression seal are not implemented.
+Do not run the standard box runner from this WIP branch. No device result.
+Current production/experimental admitted controls remain unchanged on
+ppu-backend. Resume broader design in docs/PPU_WY_FLA_REWRITE.md there.
 
 New upload gdn-qsa-acu-20260922T225857Z-797428.tar.gz:553 files/552 hashes
 verify; clean eed5ba2 binary origin, shared1520 actual kernel, same physical
