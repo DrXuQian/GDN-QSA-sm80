@@ -7,6 +7,114 @@ and original strong-decay implementation remain controls, not deleted or
 silently replaced. This document is a design/feasibility checkpoint, not a
 completed rewrite or speed result.
 
+Revision2026-09-24: separate demonstrated instruction/dataflow problems from
+unmeasured replacement hypotheses. The five-stage design below is a reference-
+aligned candidate, not a claim that five launches inherently beat three.
+
+## Diagnosis ledger: what is established
+
+Counts below are measured warp executions from the verified native reports,
+not source lines or static instruction sites. Both state and output execute
+524,288 BF16 MMAs in each implementation.
+
+| Observed quantity | WY | FLA | What it establishes |
+|---|---:|---:|---|
+| State `v.madl.i32` | 3,167,744 | 75,264 | Much more integer multiply-add work around the same matrix arithmetic |
+| State `v.mov.v2s` | 756,736 | 0 | Scalar-address operand delivery costs absent from the reference |
+| State matrix-load instructions, all b32x4 families | 720,896 | 655,360 | 1.10x load instructions; not enough by itself to explain2.165x total instructions |
+| Output matrix-load instructions, all b32x4 families | 786,432 | 458,752 | 1.714x matrix loads at the same MMA count: reuse/delivery must change, not merely the opcode spelling |
+| Output `v.mov.v2s` | 851,968 | 0 | The same scalar-address seam affects output |
+| Prepare W/U useful output / KVD store traffic | 32 MiB /512 MiB | 32 MiB /32 MiB | Our scalar `vmem.st.b16` publication amplifies this interface16x; this is not16x HBM traffic |
+
+Native instruction neighborhoods show the WY vector-to-scalar base moves
+feeding SWZL loads, while FLA NCOM loads directly consume lane-address VGPRs.
+This is a demonstrated operand-form difference. It is not a claim that all
+v2s moves are avoidable without changing layouts or that removing their
+instruction count translates directly into a particular number of us.
+
+### SWZL address preparation is not post-load layout repair
+
+The local SDK2.1.1 [four-cell compile probe](../dev/ppu/l015_swzl_address_class_compile.cu)
+holds the load family fixed and changes only the variability of its cube base:
+
+| Load family | Cube base | Static `v.mov.v2s` sites | Actual load address |
+|---|---|---:|---|
+| SWZL | fixed | 0 | `[0x0] @sreg2` |
+| SWZL | varies with warp | 1 | `[sreg3] @sreg2` |
+| NCOM | fixed cube, lane-addressed rows | 0 | `[0x0 + vreg5 * 0x1]` |
+| NCOM | warp cube, lane-addressed rows | 0 | `[0x0 + vreg5 * 0x1]` |
+
+In the warp-base SWZL case, `v.mov.v2s sreg3, vreg5, 0x20` occurs
+**before** the load and its destination is the load's base-address register.
+It does not rearrange the loaded BF16 fragment. The fixed-base SWZL case
+disproves the blanket claim that SWZL necessarily requires a v2s move.
+Ordinary `v.mov.b32` and register-fragment conversions are separate costs;
+this probe does not classify them all. No cross-family numerical, bank-conflict
+or latency equivalence is claimed: the shared-layout contracts differ.
+
+The user's AIU pairing distinction is important. A correctly matched
+`AIU.swzl -> shared -> ld.swzl -> MMA` path need not perform a software
+unswizzle between the matrix load and MMA. AIU handles the write-side physical
+layout, while the matching load delivers its native operand fragment.
+Selecting a cube/stage and supplying its address/descriptor are still work;
+AIU input delivery alone does not prove those instructions disappear.
+
+The captured WY path is **not** that complete AIU pairing. `stage()` in
+`gdn_wy_common.cuh` and `state_stage()` in `gdn_wy_state_copy.cuh` use
+per-thread `gdn_arch::async_copy16` into software-computed swizzled shared
+addresses; `wy_mma.cuh::load()` then adjusts the cube base and calls SWZL.
+Register-produced snapshots/conditioned values also have explicit shared
+stores. These are three different questions: write-side placement, load-side
+address operand preparation, and any required accumulator-to-operand remap.
+Do not call all three SWZL overhead or unsupported-PTX emulation.
+
+Provenance is ours, not an upstream PPU optimization: upstream `aa04271`
+uses NVIDIA `cp.async` and SM75 LDSM atoms with its own shared layouts.
+Port commit `1af3d5c` introduced `shared_copy.cuh`'s AIU-swizzled physical
+layout and SWZL adapter while preserving the per-thread async-copy structure.
+Later WY helpers inherited that choice (`gdn_wy_common.cuh::stage` was
+factored in `a712a7d`). Correctly constructing the swizzled bytes in software
+can be numerically valid, but is not equivalent to using AIU to perform the
+placement. This delivery decision belongs in our optimization debt.
+
+Project rule: an AIU.swzl-written matrix tile must use a matching ld.swzl
+consumer. Keep cube geometry, pitches, transpose and fragment ownership
+bound together. Do not change a single endpoint to plain/NCOM on the same
+bytes. For eligible global input tiles the native AIU/SWZL pair is the
+starting design; a manual-copy alternative needs an explicit reason and
+complete delivery evidence, not just a compiling load atom.
+
+Consequently the delivery design must compare a properly matched AIU/SWZL
+path for eligible global input tiles against a proved lane-address NCOM
+path, not decree that every SWZL load should be replaced. Internal values
+born in registers cannot be turned into AIU global inputs for free; their
+store/consumer layout or register reuse must be designed separately. Preserve
+tails, GVA strides, transpose semantics and fragment ownership in either path.
+
+The saved address-only prototype gives one local causal check: replacing
+general shared-layout arithmetic reduces state static `v.madl.i32` sites
+297->107 and body instructions2300->2018, with all16 old bodies preserved
+in that initial compile. Its52 static v2s sites remain52, because it retains
+the same load family. That proves a removable address-arithmetic component,
+but is NOT a measured dynamic reduction or speed result. It also explains
+why address-only changes are not the entire structural solution.
+
+Three limits on attribution:
+
+- The existing SWZL instruction itself is **native**, not an observed
+  emulation sequence. We have not proved an unsupported-PTX compatibility
+  fallback is the cause of this captured performance gap. The user's warning
+  is a required audit, not permission to label all extra instructions emulation.
+- The70 KiB fused prepare and repeated output exchanges are verified structure;
+  their individual latency penalties are not isolated. Splitting prepare
+  and replacing output delivery are testable candidates, not already-measured wins.
+- Inverse TF32 residual arithmetic is an intentional precision difference.
+  It is not an instruction-usage bug and remains outside address/load savings.
+
+What is ruled out as a sufficient explanation: missing tensor-core use,
+extra state/output MMA work, a smaller state grid, or simply lower output
+occupancy. FLA also retains a sequential state recurrence across chunks.
+
 ## What is wrong with the present implementation
 
 The [verified uploaded profile](PPU_WY_SHARED_ACU_20260922.md) establishes
@@ -67,7 +175,7 @@ the actual target body, transfers, barriers, registers and spills; distinguish
 compatibility expansion from generic address arithmetic. Prefer the verified
 native SDK interface before restoring an unproved inline-PTX spelling.
 
-## Chosen architecture
+## Structural candidate and its discriminating checks
 
 Use an independent `fla_aligned` namespace/path, not more conditionals inside
 the current mixed experimental kernels. Proposed modules:
@@ -84,10 +192,33 @@ the current mixed experimental kernels. Proposed modules:
   resident state and tile-address invariants hoisted outside recurrence.
 - `csrc/gdn_chunk/gdn_fla_output_ppu.cu`: QH and QK scheduled together,
   followed by gated causal PV, without the current two-panel output exchange.
-- A thin C++ launcher/workspace contract: five math kernels in one stream,
+- A thin C++ launcher/workspace contract: initially five math kernels in one stream,
   no Python between stages, no host synchronization or decay heuristic.
   Allocation-owning public API and prepared-workspace entry remain separately
   measurable. Defaults/original routing remain unchanged.
+
+The rewrite has three independent acceptance questions:
+
+1. **State:** does changing ownership/layout plus native operand delivery
+   remove the large address/control excess while preserving the same update?
+   Verify the actual MMA inputs, not just a standalone NCOM probe. Merely
+   replacing SWZL with NCOM while retaining redundant conversions is insufficient.
+2. **Output:** does joint QH/QK scheduling and register reuse reduce the
+   measured786,432 matrix loads toward the reference458,752, at unchanged
+   524,288 MMA work? Q currently comes from shared first for QK and again in
+   each of two QH panels. That is not duplicate HBM Q loading. Other layout
+   conversions also contribute; do not attribute all40 extra loads/warp to Q.
+   A higher register count is acceptable if spill-free and faster end to end;
+   FLA already uses170 registers versus our98 while taking less kernel time.
+3. **Prepare:** can vector W/U publication close the demonstrated interface
+   amplification, and does a separate W/U resource budget pay for additional
+   inverse traffic/launches? Retain the existing fused prepare as the control.
+   A result with more kernels but worse complete latency must be rejected.
+
+Old paths need not be rewritten to conduct these checks. New layouts and
+interfaces live in the independent path. Compose only validated stages;
+do not conflate a new native atom, changed precision and a new scheduler
+in one un-attributable experiment.
 
 Internal workspace may use the reference's token-major W/U/Vnew and
 `[B,NT,Hv,K,V]` snapshots; it is not an external weight artifact. Its strides,
