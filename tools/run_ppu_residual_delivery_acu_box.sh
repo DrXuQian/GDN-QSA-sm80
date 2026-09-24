@@ -8,7 +8,7 @@ PPU_SDK_ROOT="${PPU_SDK:-${PPU_SDK_ROOT:-/usr/local/PPU_SDK}}"
 ACU="${ACU:-/sim/eec/shared/junfu.qx/asight/bin/acu}"
 CANDIDATE="${CANDIDATE:-residual-v16}"
 case "$CANDIDATE" in
-  residual-prefetch|residual-operands|residual-v16) DELIVERY="${CANDIDATE#residual-}" ;;
+  residual-prefetch|residual-operands|residual-v16|residual-blayout) DELIVERY="${CANDIDATE#residual-}" ;;
   *) echo "[residual delivery ACU] FAIL: unknown CANDIDATE=$CANDIDATE" >&2; exit 1 ;;
 esac
 if [[ -e "$RUN" || ! -x "$ACU" ]]; then
@@ -20,6 +20,13 @@ echo "[residual delivery ACU] metric=ALL-KERNEL-ACU-SUM admission=RAW-BIT+2%-ora
 env -u SAMPLES OUT="$RUN" PPU_SDK="$PPU_SDK_ROOT" PERF=0 STATE_PIPELINE_AB=1 \
   SPLIT_PREPARE_AB=0 AIU_AB=0 PREPARE_ROWS_AB=0 STAGE_AB=0 STATE_AB=0 TILE_AB=0 DELIVERY_AB=0 \
   bash "$ROOT/tools/run_ppu_wy_fla_box.sh"
+if [[ "$CANDIDATE" == residual-blayout ]]; then
+  cmake --build "$RUN/build" --target l024_wy_residual_blayout -j"${JOBS:-16}" \
+    | tee "$RUN/blayout-host-build.log"
+  "$RUN/build/l024_wy_residual_blayout" | tee "$RUN/blayout-layout.log"
+  python "$ROOT/dev/ppu/check_residual_blayout.py" --self-test --isa "$RUN/build/gdn_wy_ppu.isa" \
+    | tee "$RUN/blayout-native.log"
+fi
 extensions=("$RUN/build"/_gdn_wy_ppu*.so)
 if [[ ${#extensions[@]} != 1 || ! -f "${extensions[0]}" ]]; then
   echo "[residual delivery ACU] FAIL: unique WY extension missing" >&2

@@ -6,9 +6,11 @@ WY_MATH_CONTRACT = "materialized-wu-bf16-v1"
 # Profiling may select a new algorithm; the public WY delivery inventory
 # deliberately does not. None is NOT a secretly reused delivery mask.
 RESIDUAL_VARIANTS = {"residual": "scalar", "residual-prefetch": "prefetch",
-                     "residual-operands": "operands", "residual-v16": "v16"}
+                     "residual-operands": "operands", "residual-v16": "v16",
+                     "residual-blayout": "blayout"}
 RESIDUAL_ENTRYPOINTS = {"scalar": "residual", "prefetch": "residual_prefetch",
-                        "operands": "residual_operands", "v16": "residual_v16"}
+                        "operands": "residual_operands", "v16": "residual_v16",
+                        "blayout": "residual_blayout"}
 PROFILE_VARIANTS = {**DELIVERIES, **dict.fromkeys(RESIDUAL_VARIANTS)}
 
 

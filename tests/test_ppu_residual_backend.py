@@ -88,7 +88,7 @@ def admit(shape, gate, nonzero, *, stress=False, deliveries=()):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--extension", type=Path, required=True)
-    p.add_argument("--deliveries", nargs="+", choices=("prefetch", "operands", "v16"), default=[])
+    p.add_argument("--deliveries", nargs="+", choices=("prefetch", "operands", "v16", "blayout"), default=[])
     args = p.parse_args()
     if not args.extension.is_file():
         p.error("residual extension missing")

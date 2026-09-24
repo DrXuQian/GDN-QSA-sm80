@@ -97,7 +97,7 @@ target_include_directories(l021_ppu_wy_residual_prefetch PRIVATE
   ${PPU_SDK_ROOT}/CUDA_SDK/targets/x86_64-linux/include/cccl
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/actlize/include)
 target_link_libraries(l021_ppu_wy_residual_prefetch PRIVATE gdn_qsa_backend_headers)
-foreach(_check IN ITEMS l022_wy_residual_v16 l023_wy_residual_operands)
+foreach(_check IN ITEMS l022_wy_residual_v16 l023_wy_residual_operands l024_wy_residual_blayout)
   add_executable(${_check} dev/ppu/${_check}.cpp)
   target_include_directories(${_check} PRIVATE ${PPU_SDK_ROOT}/include
     ${PPU_SDK_ROOT}/CUDA_SDK/targets/x86_64-linux/include
@@ -243,6 +243,7 @@ if(GDN_QSA_ENABLE_PPU)
     ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_wy_residual_ppu.cu
     ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_wy_residual_operands_ppu.cu
     ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_wy_residual_v16_ppu.cu
+    ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_wy_residual_blayout_ppu.cu
     ${CMAKE_CURRENT_SOURCE_DIR}/csrc/gdn_chunk/gdn_wy_residual_prefetch_ppu.cu)
   target_include_directories(gdn_wy_ppu PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
   target_link_libraries(gdn_wy_ppu PRIVATE CUTLASS ppu::runtime)
@@ -270,6 +271,7 @@ if(GDN_QSA_ENABLE_PPU)
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/wy_residual_prefetch.cuh
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/wy_residual_operands.cuh
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/wy_residual_v16.cuh
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/wy_residual_blayout.cuh
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/shared_copy.cuh
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gdn_qsa/ppu/fragment.cuh)
     endif()

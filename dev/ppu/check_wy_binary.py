@@ -9,6 +9,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from check_state_pipeline import native_schedule
 from check_residual_prefetch import native_schedule as residual_prefetch_schedule, serialized_plant
+from check_residual_blayout import check_native as check_blayout_native
 
 
 def kernel_sequences(isa):
@@ -25,8 +26,8 @@ def kernel_sequences(isa):
 
 def compare_controls(before, after):
     old, new = kernel_sequences(before), kernel_sequences(after)
-    if len(old) != 23 or len(new) != 26:
-        raise AssertionError("control comparison must cover all23 old and all26 current images")
+    if len(old) != 26 or len(new) != 27:
+        raise AssertionError("control comparison must cover all26 old and all27 current images")
     for name, sequence in old.items():
         if new.get(name) != sequence:
             raise AssertionError(f"admitted control native instructions changed: {name}")
@@ -177,10 +178,11 @@ def plant_serialized_prefetch(isa):
 
 
 def audit(isa, resources, symbols):
+    check_blayout_native(isa)
     funcs = re.findall(r"Func \d+ (\S+) RESOURCE INFO:\n(.*?)(?=Func \d+ \S+ RESOURCE INFO:|\Z)",
                        resources, flags=re.S)
-    if len(funcs) != 26:
-        raise AssertionError(f"WY image denominator must be23 controls +3 residual delivery states, got {len(funcs)}")
+    if len(funcs) != 27:
+        raise AssertionError(f"WY image denominator must be26 controls +1 B-layout state, got {len(funcs)}")
     rows = []
     mma_counts = {}
     for role, packed in ((role, packed) for role in ("prepare", "state", "output") for packed in (False, True)):
@@ -440,7 +442,8 @@ def audit(isa, resources, symbols):
     for delivery, marker, expected, shared in (
             ("prefetch", "gdn_wy_residual_prefetch_stateE", (5,40,9,5,56), 45568),
             ("operands", "gdn_wy_residual_operands_stateE", (4,40,9,5,56), 45568),
-            ("v16", "gdn_wy_residual_v16_stateE", (4,20,5,5,36), 35328)):
+            ("v16", "gdn_wy_residual_v16_stateE", (4,20,5,5,36), 35328),
+            ("blayout", "gdn_wy_residual_blayout_stateE", (4,40,9,5,56), 45568)):
         matches=[(name,body) for name,body in funcs if marker in name]
         if len(matches)!=1: raise AssertionError(f"residual {delivery} image absent/ambiguous")
         name,body=matches[0]
@@ -468,7 +471,8 @@ def audit(isa, resources, symbols):
         if delivery=="prefetch": row["overlap"]=residual_prefetch_schedule(section)["overlap"]
         rows.append(row)
     for name in ("gdn_wy_forward", "gdn_wy_forward_delivery", "gdn_wy_forward_residual",
-                 "gdn_wy_forward_residual_prefetch", "gdn_wy_forward_residual_operands", "gdn_wy_forward_residual_v16"):
+                 "gdn_wy_forward_residual_prefetch", "gdn_wy_forward_residual_operands", "gdn_wy_forward_residual_v16",
+                 "gdn_wy_forward_residual_blayout"):
         if not re.search(rf"\b{name}$", symbols, re.M):
             raise AssertionError(f"WY launcher missing from linked library: {name}")
     for name in ("configure_tiled", "launch_tiled_prepare", "launch_tiled_state", "launch_tiled_output",
@@ -574,7 +578,7 @@ def main():
                 print("[WY binary negative] changed-control EXPECTED-RED/PASS")
             else:
                 raise AssertionError("control-comparison negative escaped")
-        print("[WY binary controls] 23/23 native instruction+operand sequences IDENTICAL")
+        print("[WY binary controls] 26/26 native instruction+operand sequences IDENTICAL")
     print("[WY binary] PASS device_execution=NOT_RUN")
 
 
