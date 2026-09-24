@@ -10,13 +10,18 @@ extern "C" int gdn_wy_forward(
 extern "C" int gdn_wy_forward_delivery(
     void const*, void const*, void const*, void const*, void const*, float const*,
     void*, float*, void*, void*, void*, void*, float*, int, int, int, int, bool, cudaStream_t, unsigned);
+extern "C" int gdn_wy_forward_residual(
+    void const*, void const*, void const*, void const*, void const*, float const*,
+    void*, float*, void*, void*, void*, float*, int, int, int, int, bool, cudaStream_t);
 
 namespace {
+template <bool Residual = false>
 std::vector<torch::Tensor> forward(torch::Tensor q, torch::Tensor k, torch::Tensor v,
     torch::Tensor g, torch::Tensor beta, c10::optional<torch::Tensor> initial,
     bool output_final_state, unsigned delivery) {
   using namespace gdn_qsa::wy;
   TORCH_CHECK(valid_delivery(delivery), "invalid or conflicting WY delivery mask");
+  TORCH_CHECK(!Residual || delivery == 0, "residual is an algorithm, not a WY delivery mask");
   TORCH_CHECK(q.dim() == 4 && q.size(3) == Dim && k.sizes() == q.sizes(),
               "WY q/k must have identical [B,S,Hk,128] shapes");
   TORCH_CHECK(v.dim() == 4 && v.size(0) == q.size(0) && v.size(1) == q.size(1) && v.size(3) == Dim,
@@ -35,7 +40,7 @@ std::vector<torch::Tensor> forward(torch::Tensor q, torch::Tensor k, torch::Tens
               "WY natural-log gate must be BF16 or FP32");
   TORCH_CHECK(B <= INT_MAX && S <= INT_MAX && Hv <= INT_MAX,
               "WY dimensions exceed 32-bit kernel extents");
-  TORCH_CHECK(!(delivery & AiuOptions) || Hv <= INT_MAX / Dim,
+  TORCH_CHECK(!(Residual || (delivery & AiuOptions)) || Hv <= INT_MAX / Dim,
               "WY AIU row pitch exceeds 32-bit element descriptor");
   int64_t const nt = (S - 1) / Chunk + 1;
   TORCH_CHECK(B <= INT_MAX / Hv && B * Hv <= INT_MAX / nt && B * Hv <= INT_MAX / 4,
@@ -50,22 +55,37 @@ std::vector<torch::Tensor> forward(torch::Tensor q, torch::Tensor k, torch::Tens
   auto out = torch::empty_like(v);
   auto final = output_final_state ? torch::empty({B, Hv, Dim, Dim}, q.options().dtype(torch::kFloat32))
                                   : torch::empty({0}, q.options().dtype(torch::kFloat32));
-  auto w = torch::empty({B * Hv * nt, Chunk, Dim}, q.options());
-  auto u = torch::empty_like(w), vn = torch::empty_like(w);
+  // Residual uses w as a separate padded inverse plane, never H snapshots.
+  // U is absent; do not allocate/materialize either old W or old U.
+  auto w = torch::empty({B * Hv * nt, Residual ? Dim : Chunk, Dim}, q.options());
+  auto u = Residual ? torch::empty({0}, q.options()) : torch::empty_like(w);
+  auto vn = torch::empty({B * Hv * nt, Chunk, Dim}, q.options());
   auto snapshots = torch::empty({B * Hv * nt, Dim, Dim}, q.options());
   auto gates = torch::empty({B * Hv * nt, Chunk}, q.options().dtype(torch::kFloat32));
-  int const rc = gdn_wy_forward_delivery(q.data_ptr(), k.data_ptr(), v.data_ptr(), g.data_ptr(), beta.data_ptr(),
+  int rc;
+  if constexpr (Residual) {
+    rc = gdn_wy_forward_residual(q.data_ptr(), k.data_ptr(), v.data_ptr(), g.data_ptr(), beta.data_ptr(),
+      initial.has_value() ? initial->data_ptr<float>() : nullptr, out.data_ptr(),
+      output_final_state ? final.data_ptr<float>() : nullptr, w.data_ptr(),
+      snapshots.data_ptr(), vn.data_ptr(), gates.data_ptr<float>(), int(B), int(S), int(Hk), int(Hv),
+      g.scalar_type() == torch::kFloat32, at::cuda::getCurrentCUDAStream().stream());
+  } else {
+    rc = gdn_wy_forward_delivery(q.data_ptr(), k.data_ptr(), v.data_ptr(), g.data_ptr(), beta.data_ptr(),
       initial.has_value() ? initial->data_ptr<float>() : nullptr, out.data_ptr(),
       output_final_state ? final.data_ptr<float>() : nullptr, w.data_ptr(), u.data_ptr(),
       snapshots.data_ptr(), vn.data_ptr(), gates.data_ptr<float>(), int(B), int(S), int(Hk), int(Hv),
       g.scalar_type() == torch::kFloat32, at::cuda::getCurrentCUDAStream().stream(), delivery);
+  }
   TORCH_CHECK(rc == 0, "PPU WY kernel launch failed: status=", rc);
   return {out, final};
 }
 }  // namespace
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-  m.def("forward", &forward, pybind11::arg("q"), pybind11::arg("k"), pybind11::arg("v"),
+  m.def("forward", &forward<false>, pybind11::arg("q"), pybind11::arg("k"), pybind11::arg("v"),
+        pybind11::arg("g"), pybind11::arg("beta"), pybind11::arg("initial_state") = pybind11::none(),
+        pybind11::arg("output_final_state") = true, pybind11::arg("delivery") = 0);
+  m.def("residual", &forward<true>, pybind11::arg("q"), pybind11::arg("k"), pybind11::arg("v"),
         pybind11::arg("g"), pybind11::arg("beta"), pybind11::arg("initial_state") = pybind11::none(),
         pybind11::arg("output_final_state") = true, pybind11::arg("delivery") = 0);
 }

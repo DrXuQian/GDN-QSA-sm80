@@ -153,6 +153,68 @@ class ACUContract(unittest.TestCase):
         for forbidden in ("PPUProfiler", "ProfilerStart", "ProfilerStop", "ctypes", "cuda.profiler"):
             self.assertNotIn(forbidden, source)
 
+    def test_residual_dispatch_is_new_api_not_a_delivery_alias(self):
+        inputs = (object(),) * 5
+        with patch("gdn_qsa_sm80.gdn_chunk_residual", return_value="new-algorithm") as new, \
+                patch("gdn_qsa_sm80.gdn_chunk_wy", side_effect=AssertionError("wrong math API")):
+            call, _ = profile.subject_call("wy", "wy", Path("/binding.so"), inputs, "residual")
+            self.assertEqual(call(), "new-algorithm")
+            new.assert_called_once_with(*inputs, output_final_state=True)
+        self.assertNotIn("residual", collect.DELIVERIES)
+        self.assertIsNone(collect.PROFILE_VARIANTS["residual"])
+
+    def test_residual_admission_cannot_fake_raw_equality_or_loosen_tolerance(self):
+        arm = dict(math_contract=collect.MATH_CONTRACT, delivery_mask=None,
+                   scalar_raw_bit_equal=None, errors=[.008, .004])
+        collect.validate_residual_admission(arm, .02)
+        for key, value in (("math_contract", "old"), ("delivery_mask", 62960),
+                           ("scalar_raw_bit_equal", True), ("errors", [.02, .004]),
+                           ("errors", [float("nan"), .004]), ("errors", [])):
+            with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                collect.validate_residual_admission(arm | {key: value}, .02)
+        for key in arm:
+            bad = arm.copy()
+            del bad[key]
+            with self.assertRaises(ValueError):
+                collect.validate_residual_admission(bad, .02)
+        with self.assertRaises(ValueError):
+            collect.validate_residual_admission(arm, .03)
+
+    def test_old_delivery_raw_gate_is_not_weakened_by_new_algorithm(self):
+        control, _ = self.records()
+        control.update(role="wy", implementation="wy", wy_delivery="split-prepare")
+        subject = control | dict(wy_delivery="state-pipeline", output_sha="different", errors=[.001, .001])
+        with self.assertRaisesRegex(ValueError, "output_sha"):
+            collect.validate_wy_control(control, subject)
+        for variant in (None, "scalar", "split-prepare"):
+            with self.assertRaises(ValueError):
+                collect.capture_arms(Path("/bundle"), "wy", "residual", variant)
+
+    def test_complete_residual_capture_allows_only_explicit_new_rounding(self):
+        status, commands, bundle, _ = self.run_mock_capture(
+            self.directory(), control="state-pipeline", subject_delivery="residual")
+        self.assertEqual(status["status"], "PASS", status["errors"])
+        self.assertEqual(status["capture_order"], ["wy-control", "wy", "fla"])
+        calls = [cmd for cmd in commands if "--set" in cmd]
+        self.assertEqual(len(calls), 3)
+        self.assertEqual([cmd[cmd.index("--wy-delivery")+1] for cmd in calls],
+                         ["state-pipeline", "residual", "residual"])
+        before = json.loads((bundle / "wy-control/wy.json").read_text())
+        after = json.loads((bundle / "wy.json").read_text())
+        self.assertNotEqual(before["output_sha"], after["output_sha"])
+        self.assertNotEqual(before["math_contract"], after["math_contract"])
+
+    def test_residual_bad_numeric_or_lost_contract_fails_before_profile(self):
+        root = self.directory()
+        for plant in ("residual-wrong-contract", "residual-bad-error"):
+            directory = root / plant
+            directory.mkdir()
+            status, commands, _, _ = self.run_mock_capture(
+                directory, control="state-pipeline", subject_delivery="residual", plant=plant)
+            self.assertEqual(status["status"], "INCOMPLETE")
+            self.assertTrue(status["errors"])
+            self.assertFalse(any("--set" in cmd for cmd in commands))
+
     def test_only_preflight_warms_up_and_comparison_runs_on_cpu(self):
         import torch
         want = (torch.tensor([1.0]), torch.tensor([2.0]))
@@ -413,7 +475,11 @@ class ACUContract(unittest.TestCase):
             comparison["delivery_ab"] = False
             comparison["cases"][0]["arms"].update({f"wy-{name}": dict(
                 fingerprint="output", state_dtype="torch.float32", delivery_mask=mask)
-                for name, mask in ((control, collect.DELIVERIES[control]), (delivery, collect.DELIVERIES[delivery]))})
+                for name, mask in ((control, collect.DELIVERIES[control]), (delivery, collect.PROFILE_VARIANTS[delivery]))})
+        if delivery == "residual":
+            comparison["cases"][0]["arms"]["wy-residual"].update(
+                fingerprint="residual-output", math_contract=collect.MATH_CONTRACT,
+                errors=[.008, .004], scalar_raw_bit_equal=None)
         if plant == "missing-comparison-arm":
             del comparison["cases"][0]["arms"]["wy-prepare-rows-shared"]
         if plant == "wrong-comparison-mask":
@@ -443,6 +509,15 @@ class ACUContract(unittest.TestCase):
                 self.assertEqual(command[command.index("--implementation") + 1], "wy")
                 receipt = dict(ours if role == "wy" else fla)
                 receipt["wy_delivery"] = selected
+                if delivery == "residual" and role == "wy":
+                    receipt.update(math_contract=collect.MATH_CONTRACT if selected == "residual" else collect.WY_MATH_CONTRACT,
+                                   errors=[.008, .004])
+                    if selected == "residual":
+                        receipt["output_sha"] = "residual-output"
+                        if plant == "residual-wrong-contract":
+                            receipt["math_contract"] = collect.WY_MATH_CONTRACT
+                        if plant == "residual-bad-error":
+                            receipt["errors"] = [.03, .004]
                 if phase == "preflight":
                     receipt.update(phase=phase, warmup=5, public_api_calls=6)
                 if is_control and plant == "changed-control-device":

@@ -17,6 +17,7 @@ import torch
 
 import bench_ppu_gdn_fla as bench
 from gdn_qsa_sm80.gdn_wy_interface import DELIVERIES
+from gdn_qsa_sm80.gdn_residual_interface import PROFILE_VARIANTS, math_contract
 
 
 def subject_call(role, implementation, extension, inputs, delivery="scalar"):
@@ -24,7 +25,7 @@ def subject_call(role, implementation, extension, inputs, delivery="scalar"):
     expected = "wy" if implementation == "wy" else "ours"
     if implementation not in ("original", "wy") or role not in (expected, "fla"):
         raise ValueError(f"role {role} does not belong to {implementation}/FLA comparison")
-    if delivery not in DELIVERIES or (implementation != "wy" and delivery != "scalar"):
+    if delivery not in PROFILE_VARIANTS or (implementation != "wy" and delivery != "scalar"):
         raise ValueError("delivery selection requires an explicit WY implementation")
     if role == "fla":
         fn, identity = bench.load_fla()
@@ -32,6 +33,9 @@ def subject_call(role, implementation, extension, inputs, delivery="scalar"):
     if role == "wy":
         from gdn_qsa_sm80 import gdn_chunk_wy
         os.environ["GDN_QSA_WY_EXTENSION"] = str(extension.resolve())
+        if delivery == "residual":
+            from gdn_qsa_sm80 import gdn_chunk_residual
+            return lambda: gdn_chunk_residual(*inputs, output_final_state=True), {}
         if delivery == "scalar":
             return lambda: gdn_chunk_wy(*inputs, output_final_state=True), {}
         return lambda: gdn_chunk_wy(*inputs, output_final_state=True, delivery=delivery), {}
@@ -139,7 +143,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--role", required=True, choices=("ours", "wy", "fla"))
     parser.add_argument("--implementation", choices=("original", "wy"), default="original")
-    parser.add_argument("--wy-delivery", choices=tuple(DELIVERIES), default="scalar")
+    parser.add_argument("--wy-delivery", choices=tuple(PROFILE_VARIANTS), default="scalar")
     parser.add_argument("--phase", required=True, choices=("preflight", "subject"))
     parser.add_argument("--extension", type=Path, required=True)
     parser.add_argument("--gate", type=float, choices=(-0.1, -1.0), default=-0.1)
@@ -190,6 +194,7 @@ def main():
     loaded = loaded_library_hashes()
     receipt = dict(status="PASS", role=args.role, phase=args.phase, gate=args.gate,
                    implementation=args.implementation, wy_delivery=args.wy_delivery,
+                   math_contract=math_contract(args.wy_delivery) if args.role == "wy" else "reference",
                    shape=dict(B=1, S=2048, Hk=16, Hv=32, K=128, V=128),
                    input_sha=input_hash, reference_sha=bench.admission.digest(want),
                    fixture_seed=0x6A09E667, gate_bf16=float(cpu[3].flatten()[0]),

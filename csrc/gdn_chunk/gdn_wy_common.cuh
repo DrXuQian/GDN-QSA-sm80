@@ -24,6 +24,11 @@ int configure_split_prepare();
 int launch_split_prepare(Inputs p, Workspace ws, gdn_arch::Stream stream);
 int configure_state_pipeline();
 int launch_state_pipeline(Inputs p, Workspace ws, float* final, gdn_arch::Stream stream);
+// Reuse admitted native solve/output bodies for the opt-in residual algorithm.
+// Inverse and state snapshots MUST be separate allocations.
+int launch_split_inverse(Inputs p, Workspace ws, gdn_arch::Stream stream);
+int configure_aiu_output();
+int launch_aiu_output(Inputs p, Workspace ws, BF16* output, gdn_arch::Stream stream);
 
 template <int Rows, int Cols, int Threads>
 __device__ void stage(BF16* dst, BF16 const* src, int64_t stride, int valid_rows) {

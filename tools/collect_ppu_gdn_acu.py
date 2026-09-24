@@ -8,6 +8,7 @@ import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -23,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ACU = Path("/sim/eec/shared/junfu.qx/asight/bin/acu")
 sys.path.insert(0, str(ROOT))
 from gdn_qsa_sm80.gdn_wy_interface import DELIVERIES
+from gdn_qsa_sm80.gdn_residual_interface import PROFILE_VARIANTS, MATH_CONTRACT, WY_MATH_CONTRACT
 
 
 class CaptureArm(NamedTuple):
@@ -34,10 +36,12 @@ class CaptureArm(NamedTuple):
 
 def capture_arms(bundle, implementation, delivery, control=None):
     """One FLA capture, optionally preceded by two explicitly selected WY arms."""
-    if implementation not in ("original", "wy") or delivery not in DELIVERIES:
+    if implementation not in ("original", "wy") or delivery not in PROFILE_VARIANTS:
         raise ValueError("unknown capture implementation or delivery")
     if implementation != "wy" and (delivery != "scalar" or control is not None):
         raise ValueError("WY control/delivery requires --wy-run")
+    if delivery == "residual" and control != "state-pipeline":
+        raise ValueError("residual requires the registered state-pipeline control")
     arms = []
     if control is not None:
         if control not in DELIVERIES or control == delivery:
@@ -46,6 +50,18 @@ def capture_arms(bundle, implementation, delivery, control=None):
     role = "wy" if implementation == "wy" else "ours"
     return tuple(arms + [CaptureArm(role, role, delivery, bundle),
                          CaptureArm("fla", "fla", delivery, bundle)])
+
+
+def validate_residual_admission(arm, limit):
+    """New arithmetic is explicit and independently checked, never fake RAW-BIT."""
+    if (limit != 0.02 or arm.get("math_contract") != MATH_CONTRACT or
+            "delivery_mask" not in arm or arm["delivery_mask"] is not None or
+            "scalar_raw_bit_equal" not in arm or arm["scalar_raw_bit_equal"] is not None):
+        raise ValueError("residual must declare its new rounding contract and non-RAW-BIT scope")
+    errors = arm.get("errors", [])
+    if len(errors) != 2 or any(type(e) not in (int, float) or not math.isfinite(e) or
+                               e < 0 or e >= limit for e in errors):
+        raise ValueError("residual lacks independent output/state 2% numerical admission")
 
 
 def sha(path):
@@ -143,7 +159,9 @@ def read_wy_run(directory):
             for role, arm in case["arms"].items():
                 if arm.get("admitted_repeats") != 8 or arm.get("samples_us") != []:
                     raise ValueError("ACU numeric admission missing eight repeats or claiming timing")
-                if role.startswith("wy-") and arm.get("scalar_raw_bit_equal") is not True:
+                if role == "wy-residual":
+                    validate_residual_admission(arm, comparison.get("limit"))
+                elif role.startswith("wy-") and arm.get("scalar_raw_bit_equal") is not True:
                     raise ValueError("ACU candidate lacks scalar RAW-BIT admission")
     source_sha = (directory / "sha.txt").read_text().strip()
     if not re.fullmatch(r"[0-9a-f]{40}", source_sha):
@@ -188,7 +206,7 @@ def validate_comparison(comparison, subject, fla):
     if comparison.get("device") != subject["device"].get("properties"):
         raise ValueError("capture device properties differ from the comparison")
     delivery = subject.get("wy_delivery", "scalar")
-    if delivery not in DELIVERIES:
+    if delivery not in PROFILE_VARIANTS:
         raise ValueError(f"unknown WY delivery: {delivery}")
     role_name = "wy" if delivery == "scalar" else f"wy-{delivery}"
     # The actual selected arm is authoritative. Early AIU comparisons wrote
@@ -197,7 +215,11 @@ def validate_comparison(comparison, subject, fla):
     arm = cases[0].get("arms", {}).get(role_name, {})
     if delivery != "scalar" and not arm:
         raise ValueError("selected delivery was not admitted in the preceding comparison")
-    if delivery != "scalar" or "delivery_mask" in arm:
+    if delivery == "residual":
+        validate_residual_admission(arm, comparison.get("limit"))
+        if subject.get("math_contract") != MATH_CONTRACT:
+            raise ValueError("capture lost residual numerical-contract identity")
+    elif delivery != "scalar" or "delivery_mask" in arm:
         if type(arm.get("delivery_mask")) is not int or arm["delivery_mask"] != DELIVERIES[delivery]:
             raise ValueError(f"{role_name}: recorded delivery mask differs or is missing")
     for role, record in ((role_name, subject), ("fla", fla)):
@@ -209,6 +231,8 @@ def validate_comparison(comparison, subject, fla):
 
 
 def validate_preflight(preflight, subject):
+    if preflight.get("math_contract") != subject.get("math_contract"):
+        raise ValueError("subject differs from preflight: math_contract")
     if preflight.get("wy_delivery", "scalar") != subject.get("wy_delivery", "scalar"):
         raise ValueError("subject differs from independent preflight: wy_delivery")
     if (preflight.get("status") != "PASS" or preflight.get("phase") != "preflight"
@@ -246,14 +270,29 @@ def validate_pair(ours, fla, implementation="original"):
 
 
 def validate_wy_control(control, subject):
-    """Same binary, device, fixture and raw answer; only delivery may differ."""
+    """Delivery requires RAW-BIT; one explicit new algorithm uses its oracle."""
     for record in (control, subject):
         if (record.get("status") != "PASS" or record.get("role") != "wy"
                 or record.get("implementation") != "wy"):
             raise ValueError("WY control requires two successful WY receipts")
     if control.get("wy_delivery") == subject.get("wy_delivery"):
         raise ValueError("WY control silently selected the candidate delivery")
-    for key in ("gate", "shape", "input_sha", "reference_sha", "output_sha", "device",
+    residual = subject.get("wy_delivery") == "residual"
+    if residual:
+        if (control.get("wy_delivery") != "state-pipeline" or
+                control.get("math_contract") != WY_MATH_CONTRACT or
+                subject.get("math_contract") != MATH_CONTRACT):
+            raise ValueError("residual comparison requires its explicit same-binary pipeline control")
+        for record in (control, subject):
+            errors = record.get("errors", [])
+            if (record.get("max_relative_error_limit") != 0.02 or len(errors) != 2 or
+                    any(type(e) not in (int,float) or not math.isfinite(e) or e < 0 or e >= .02 for e in errors)):
+                raise ValueError("algorithm comparison lacks independent 2% numerical admission")
+            if not record.get("output_sha"):
+                raise ValueError("algorithm comparison lacks output fingerprint")
+    elif not control.get("output_sha") or control.get("output_sha") != subject.get("output_sha"):
+        raise ValueError("WY control differs from candidate: output_sha")
+    for key in ("gate", "shape", "input_sha", "reference_sha", "device",
                 "torch", "torch_cuda", "initial_state", "output_final_state", "fla_heads",
                 "max_relative_error_limit", "protocol", "cache_control", "phase", "warmup",
                 "public_api_calls", "extension_sha256", "library_sha256", "output_dtype", "state_dtype"):
@@ -349,7 +388,7 @@ def collect(args, bundle, env):
             status["binary_source_binding"] = "reused-comparison; current sources are capture helpers, not binary origin"
             status["comparison_origin"] = origin
             status["prior_device_identity"] = "properties-only; previous comparison did not record a UUID"
-            for name in ("sha.txt", "source.diff", "binaries.sha256", "comparison.json", "comparison.log", "wy-correctness.log"):
+            for name in ("sha.txt", "source.diff", "binaries.sha256", "comparison.json", "comparison.log", "wy-correctness.log", "residual-correctness.log"):
                 if (args.wy_run / name).is_file():
                     copy_file(args.wy_run / name, bundle / "preceding-comparison" / name)
         elif extension is None:
@@ -454,7 +493,7 @@ def main():
     parser.add_argument("--extension", type=Path, default=os.environ.get("EXTENSION"))
     parser.add_argument("--wy-run", type=Path,
                         help="reuse this admitted WY comparison/numeric-receipt directory; never compile")
-    parser.add_argument("--wy-delivery", choices=tuple(DELIVERIES), default="scalar")
+    parser.add_argument("--wy-delivery", choices=tuple(PROFILE_VARIANTS), default="scalar")
     parser.add_argument("--wy-control", choices=tuple(DELIVERIES),
                         help="also capture this same-binary WY control before the candidate; FLA runs once")
     args = parser.parse_args()
@@ -464,6 +503,8 @@ def main():
         parser.error("--wy-delivery requires --wy-run with an admitted WY receipt")
     if args.wy_control is not None and (not args.wy_run or args.wy_control == args.wy_delivery):
         parser.error("--wy-control requires --wy-run and a different --wy-delivery")
+    if args.wy_delivery == "residual" and args.wy_control != "state-pipeline":
+        parser.error("residual algorithm requires --wy-control state-pipeline")
     if args.wy_run:
         args.wy_run = args.wy_run.resolve()
     args.sdk = Path(os.environ.get("PPU_SDK", "/usr/local/PPU_SDK")).resolve()

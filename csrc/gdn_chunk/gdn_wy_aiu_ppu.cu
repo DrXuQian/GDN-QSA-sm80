@@ -224,6 +224,15 @@ gdn_wy_aiu_output(Inputs p, Workspace ws, BF16* output) {
 }  // namespace gdn_qsa::wy::aiu
 
 namespace gdn_qsa::wy {
+int configure_aiu_output() {
+  return int(hggcFuncSetAttribute(aiu::gdn_wy_aiu_output,
+      hggcFuncAttributeMaxDynamicSharedMemorySize, sizeof(TiledOutputStorage)));
+}
+int launch_aiu_output(Inputs p, Workspace ws, BF16* output, gdn_arch::Stream stream) {
+  aiu::gdn_wy_aiu_output<<<unsigned(p.shape.groups()), OutputTile::Threads,
+                          sizeof(TiledOutputStorage), stream>>>(p, ws, output);
+  return int(hggcGetLastError());
+}
 int forward_aiu(Inputs p, Workspace ws, BF16* output, float* final,
                  gdn_arch::Stream stream, unsigned options) {
   // AIU descriptors have32-bit element pitches. Never silently truncate a

@@ -1,9 +1,31 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 05:50:18 UTC
-working-on: upload verdict and site-ACU delivery complete; W/U execution-structure proposal ready
-blocked-on: none for this delivery; FLA1.5x remains unmet; next candidate is W/U register conditioning
-last-commit: cc50611 (verified device verdict and site-profiler default; measured kernel remains8eaaa56)
+updated-at: 2026-09-24 06:31:59 UTC
+working-on: residual implementation and complete local gates closed; committing box handoff
+blocked-on: device numerical and ACU performance remain NOT_RUN; no default route change
+last-commit: 3641826 (parent; new algorithm not committed yet)
+
+Worktree /workspace/gdn-wy-residual-20260924; evidence/plan under
+/workspace/gdn-wy-residual-evidence-20260924. Explicit new BF16 rounding
+contract P[beta*(V-exp(g)*K@H)], no CP/reset/output fusion. Existing gated
+inverse and output native bodies reused. Independent inverse allocation
+prevents cross-V-CTA snapshot overwrite; padded old solve pitch retained.
+Old22 kernel bodies and RAW-BIT delivery gates must stay unchanged.
+SDK2.1.1 compile/link PASS:23 images, all22 controls native-identical;
+new242regs/stack0/45568B/40MMA static sites.61 CPU algebra cases PASS,
+max output/state error0.008878/0.004194,4semantic negatives red. l020
+real-trait ownership6144values/product163840cells/group-tail1064960cases,
+6negatives PASS.9source+4native new negatives red. Three-arm ACU contract
+explicitly distinguishes new rounding; old delivery RAW-BIT gate retained.
+Final full rerun PASS:12/12 CTest,74 Python contracts,7 compiler dialect
+tests,45 old WY algebra and61 new algebra,305 original source controls,
+23 WY images/22 native-identical controls,15 original kernel images.
+Runner: tools/run_ppu_residual_acu_box.sh; old RAW-BIT first,30 residual
+device cases,8-repeat both-gate admission,then same-binary pipeline/residual/
+FLA direct site ACU (default g=-1; GATE=-0.1 optional). API timing NOT_RUN.
+Local device library69145cfe11997f1fb05ad4519111eadb9e50efa6b56a06b4da65e363aa2ea3c9.
+Doc docs/PPU_GDN_RESIDUAL.md; reusable lesson published Quactlize65528be.
+No performance or PPU numerical PASS inferred from local proofs.
 
 Upload SHA256 a735ad2ad07a9390358664dbe88a1ad0036fb3961d8d7ae0007e0c3d3c30bc6f:
 580 files/579 hashes verify; clean8eaaa56, all17 kernels at1.700GHz,

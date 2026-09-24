@@ -9,6 +9,7 @@ _MODULES = {
     "gdn_chunk_reference": "gdn_chunk_interface",
     "gdn_chunk_twolevel": "gdn_chunk_interface",
     "gdn_chunk_wy": "gdn_wy_interface",
+    "gdn_chunk_residual": "gdn_residual_interface",
     "out_proj_gemm": "output_gate_interface",
     "out_proj_gemm_cutlass": "output_gate_interface",
     "rmsnorm_gated": "output_gate_interface",
@@ -35,6 +36,7 @@ __all__ = [
     "gdn_chunk",
     "gdn_chunk_twolevel",
     "gdn_chunk_wy",
+    "gdn_chunk_residual",
     "gdn_chunk_reference",
     # QSA indexer
     "qsa_indexer",

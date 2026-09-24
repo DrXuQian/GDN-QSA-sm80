@@ -219,14 +219,19 @@ int configure_split_prepare() {
   return int(hggcFuncSetAttribute(gdn_wy_split_wu,
       hggcFuncAttributeMaxDynamicSharedMemorySize, sizeof(WUStorage)));
 }
-int launch_split_prepare(Inputs p, Workspace ws, gdn_arch::Stream stream) {
+int launch_split_inverse(Inputs p, Workspace ws, gdn_arch::Stream stream) {
   using namespace split_prepare;
   unsigned const grid = unsigned(p.shape.groups());
   gdn_wy_split_prefix<<<grid, Plan::PrefixThreads, 0, stream>>>(p, ws);
   int rc = int(hggcGetLastError());
   if (rc) return rc;
   gdn_wy_split_solve<<<grid, Plan::SolveThreads, sizeof(SolveStorage), stream>>>(p, ws);
-  rc = int(hggcGetLastError());
+  return int(hggcGetLastError());
+}
+int launch_split_prepare(Inputs p, Workspace ws, gdn_arch::Stream stream) {
+  using namespace split_prepare;
+  unsigned const grid = unsigned(p.shape.groups());
+  int const rc = launch_split_inverse(p, ws, stream);
   if (rc) return rc;
   gdn_wy_split_wu<<<grid, Plan::WUThreads, sizeof(WUStorage), stream>>>(p, ws);
   return int(hggcGetLastError());
