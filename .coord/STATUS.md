@@ -1,9 +1,33 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 12:08:47 UTC
-working-on: eight-warp ACU verdict complete and pushed; ready for next isolated experiment
+updated-at: 2026-09-24 12:33:47 UTC
+working-on: static BC/transpose analysis complete; implementation intentionally unchanged
 blocked-on: none; no kernel/default-routing edits
-last-commit: bf42aeb (verified ACU report/result; implementation 1750cf1 unchanged)
+last-commit: 920e21c (eight-warp result checkpoint; implementation unchanged)
+
+New user scope: locate BC statically before modifying it; explain why trans
+exists and whether it can move to producers. Current source already emits
+native ldmatrix.trans (no software transpose kernel). Four trans consumers:
+H, residual, scaledV and K-transpose. K serves both KH and Kt-update; H has
+snapshot global publication; only residual/scaledV are internal-only.
+Read increment1048576 equals262144 additional trans instructions x4, but
+do not call this alone independent bank proof. Existing32x4B model does not
+explain all ACU accounting; address enumeration and empirical coefficients
+are separated. Analysis workspace/workspace/gdn-residual-bc-static-20260924.
+All7shared native opcode classes close from production maps and32chunks/
+128CTA. Source transcounts4->8warp: H131072->262144,R65536->131072,
+scaled65536->131072,K262144unchanged. Native trans is already used.
+Drop-trans negative: H3840/4096,R/scaled1920/2048 bad. Old4warp B producer
+on8warp:1536/2048wrong,1024OOB. No modified kernel ran.
+R/scaled can place directly in B orientation; H has canonical snapshot
+publisher; K usedboth orientations equally. AIU Trans=true wrapper is
+coordinate interface, not proof of physical data transposition.
+Empirical BC account fits6existing arms, but naive32x4B scalar-bank model
+gives SAME signatures for old/B-layout stores despite measured1048576
+writeBC delta. Missing layer: native TSM service phases/metric events,
+not present perPC in installed API. No universal4conflicts/trans claim.
+Report docs/PPU_GDN_RESIDUAL_BC_STATIC_20260924.md; newhost-onlyl026,
+condensedJSON and local verify.sh. No device rerun/layout/selector edits.
 
 Complete re-upload SHA256 b86b02f9ec67ffcc666f42945ff7e298a074f0b0651c7c588b93ed7b731cf612,
 3,703,105 B.611files/610hashes/135sources match dfe76c3. Same-binary/fixture/
