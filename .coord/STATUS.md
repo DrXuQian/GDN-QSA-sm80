@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 05:48:55 UTC
-working-on: uploaded state-pipeline verdict and site-ACU selection closed; final review and push
+updated-at: 2026-09-24 05:50:18 UTC
+working-on: upload verdict and site-ACU delivery complete; W/U execution-structure proposal ready
 blocked-on: none for this delivery; FLA1.5x remains unmet; next candidate is W/U register conditioning
-last-commit: 8eaaa56 (state-pipeline handoff measured by this upload)
+last-commit: cc50611 (verified device verdict and site-profiler default; measured kernel remains8eaaa56)
 
 Upload SHA256 a735ad2ad07a9390358664dbe88a1ad0036fb3961d8d7ae0007e0c3d3c30bc6f:
 580 files/579 hashes verify; clean8eaaa56, all17 kernels at1.700GHz,
@@ -25,6 +25,9 @@ fallback. Explicit override remains recorded.69 host contracts PASS; actual
 missing-site invocation returns rc1/INCOMPLETE before build/profile despite
 available SDK ACU. Existing upload retains actual SDK ACU provenance. Local
 report re-import only uses available local parser; no device execution.
+Reusable lessons recorded via skill-creator in Quactlize88f4efe; skill validator
+PASS. Code atom choice alone is not a tuned collective: WU equal MMA but1.716x
+instructions. Next change must remove proven excess without altering numerics.
 
 ## Prior state-pipeline handoff (device-pending claims superseded above)
 
