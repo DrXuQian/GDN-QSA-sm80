@@ -87,7 +87,12 @@ Compare each candidate to the contemporaneous incumbent, not only scalar
 WY. Preserve losses and overlapping envelopes as UNRESOLVED. A terminal
 PASS means numerics and measurement completed, not an admitted speedup.
 
-### Device status: 2026-09-24 UTC
+### Initial user report: 2026-09-24 UTC (superseded by verified upload)
+
+The [three-arm ACU and full-sample verification](PPU_WY_AIU_ACU_20260924.md)
+now closes binary identity, both-gate API envelope wins and real state/output
+kernel improvement. The initial report below is retained with its original
+evidence limits, not the current final verdict.
 
 User reports correctness PASS following the8340fc7 box handoff. Record this
 as **USER-REPORTED/PASS**; detailed per-arm logs and loaded binary identity

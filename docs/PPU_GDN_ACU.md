@@ -2,6 +2,9 @@
 
 ## Current: same-binary shared-row / AIU-both / FLA capture
 
+Capture completed and verified: [AIU phase/counter result](PPU_WY_AIU_ACU_20260924.md).
+The command below is retained for reproduction, not a request to repeat it.
+
 User-reported API medians: shared-row354.364 us, AIU-both318.564 us,
 FLA492.188 us. These are not per-kernel ACU durations; see
 [the result scope](PPU_WY_AIU_PAIR.md). Keep that measured binary immutable.
@@ -61,7 +64,8 @@ Inspect actual frequency, MMA work, native instructions, traffic and stalls
 before attributing a duration change. FLA preparation can span several
 kernels; retain fills and transforms separately. ACU replay times are
 diagnostic and cannot be subtracted from full-API medians as host overhead.
-Local mock capture/negative tests pass; no PPU capture has run locally.
+Local mock capture/negative tests pass. The user capture is now verified;
+no PPU kernel was run locally during the analysis.
 
 ## Previous: prepare shared-row candidate, mask1520
 
