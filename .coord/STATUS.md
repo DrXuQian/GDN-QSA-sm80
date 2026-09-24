@@ -1,9 +1,37 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 04:35:49 UTC
-working-on: uploaded split-prepare ACU verdict complete; next state/WU structural candidate
-blocked-on: no analysis blocker; FLA1.5x not achieved; state/WU structural work remains
-last-commit: f5afe46 (verified split-prepare ACU report; no default promotion)
+updated-at: 2026-09-24 05:07:48 UTC
+working-on: state-pipeline local closure complete; three-arm ACU handoff ready
+blocked-on: box numeric/performance NOT_RUN for62960; FLA1.5x not yet achieved
+last-commit: 6e05041 (opt-in state pipeline, lifetime/native gates and runner)
+
+New worktree /workspace/gdn-wy-state-pipeline-20260924, parent5ec469f;
+plan/ledger /workspace/gdn-wy-state-pipeline-evidence-20260924. Hypothesis:
+stage current K/U under W@H and next W into its dead shared plane under
+current state update. Same49408B storage, same arithmetic/FP32 state;
+barrier changes require per-warp lifetime and native schedule proof. Keep
+split30192/all21 old kernels; one new opt-in, no production routing change.
+First real SDK compile/link: new state230 regs vs234 control, stack0,
+same49408B.21/21 prior native instruction+operand sequences identical.
+Actual CFG: K/U overlaps12 PROJECT MMAs before wait; next W crosses16 UPDATE
+MMAs before next-loop wait.32 math sites retained; native barrier sites5->4
+(4->3 per loop). Same-opcode-count early-wait negative red. Host lifetime
+proof66 schedules/30,275,476 conflicting-pair candidates,270,532,608 tail
+cells,9 plants red.11 source negatives red. Final complete regression PASS:
+11/11 CTest,68 Python contracts,7 HGCC contracts,45 algebra cases,305
+original structure controls;22 WY/15 original native images audited. New
+same-binary capture contract tested, including missing/ignored delivery and
+raw-bit drift negatives. Libraries/hash manifest and final-local.log preserved.
+No device numeric/performance claim. One explicit62960 arm; default unchanged.
+
+One command after pull: DEVICE=0 PPU_SDK=/usr/local/PPU_SDK JOBS=16
+bash tools/run_ppu_wy_state_pipeline_acu_box.sh. Use the working SDK path.
+Build+numeric admission precede direct sequential ACU split30192/new62960/FLA;
+all kernels, API_TIMING=NOT_RUN. Upload printed /workspace/.../acu.tar.gz.
+Docs: docs/PPU_WY_STATE_PIPELINE.md. Skill0c96847 retains CFG/async-lifetime
+lesson, no unmeasured speed claim. Next separate candidate is W/U conditioning.
+
+## Previous split-prepare device verdict
 
 New upload /root/acu.tar.gz SHA256
 9c1802c922dd18aa7262fb786e96b4d10b192484ee31ba3f9ead6931e541ad71:
@@ -28,7 +56,7 @@ with the prior task-local Python/Torch environment, GPUs hidden. Default
 Python lacks Torch; no system installation changed. Phase/identity/resource
 claims cross-checked with parsed native reports. Skill lesson6699c07 pushed
 to Quactlize; unrelated dirty files untouched. Next implementation is not
-started by this upload-analysis checkpoint. Current kernel SHA remainsc2bdb5c.
+started by that upload-analysis checkpoint. Its measured kernel SHA isc2bdb5c.
 
 ## Prior local handoff (device-pending statements superseded above)
 
