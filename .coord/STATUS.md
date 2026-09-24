@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 06:31:59 UTC
-working-on: residual implementation and complete local gates closed; committing box handoff
+updated-at: 2026-09-24 06:33:56 UTC
+working-on: residual local delivery complete; box handoff ready on ppu-backend
 blocked-on: device numerical and ACU performance remain NOT_RUN; no default route change
-last-commit: 3641826 (parent; new algorithm not committed yet)
+last-commit: 4cc7762 (residual implementation + full local regression; device verdict pending)
 
 Worktree /workspace/gdn-wy-residual-20260924; evidence/plan under
 /workspace/gdn-wy-residual-evidence-20260924. Explicit new BF16 rounding
