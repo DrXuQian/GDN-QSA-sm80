@@ -1,9 +1,35 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 07:51:18 UTC
-working-on: local residual-delivery handoff complete; V16 first box experiment
-blocked-on: PPU numerical/performance verdict pending user box; no local PPU; routing unchanged
-last-commit: d20da7b (implementation; this checkpoint only records status)
+updated-at: 2026-09-24 08:20:23 UTC
+working-on: V16 ACU review closed; next design V32/8warps with separate mandatory BC work
+blocked-on: no analysis blocker; next device implementation not started; routing unchanged
+last-commit: 5a3ebc9 (captured source and local handoff)
+
+Upload4e66b340028d2a91abd5e671ed4b7a4d7a09aabc2388041ec11120c8cb5fd92d.
+603files/602hashes/127sources match5a3ebc9. Same-binary/fixture/device and
+30 V16 RAW-BIT cases x8 verified; both gates numeric, g=-1 only captured.
+Complete ACU sums residual226.02824 /V16 224.41118 /FLA225.67471us;
+state124.68529->122.12588us, achievedwarps7.08->14.12. All15kernels1.700GHz.
+Near-parity, no stable win/promotion;1.5x goal150.44981us remains NOT_MET.
+KVD->TSM112->224MiB; logicalK/P96->192MiB explains96of112MiB increment.
+Residual16MiB consistent with V16 transaction granularity, not per-plane proven.
+ReadBC2.883584M->3.932160M, writeBC4.046848M->3.981312M; transposed shared
+loads+50%, usefulMMA655360 unchanged. Per-PC opcode sum+5.90%, distinct PU
+counter+8.98%; do not mix them. All15 per-PC sums close, omitted-PC plants red.
+Extra1024 conversion is a zero-constant V16 prologue, not a rounding change.
+No claim BC alone explains lost speedup; ratios are not wall-time shares.
+
+Next preferred design V32/grid128 with256threads instead of128: preserve
+shared45568B and112MiB logical input load while doubling launched warps.
+Native-CLayout host probe proves40960output/K-atom cells perCTA equal and
+three omitted-warp plants red. Device codegen/numerics/performance NOT_RUN.
+BC is mandatory separately:4/8warps x old/BC layout bounded2x2; no automatic
+promotion. Adjacent BF16 result columns occupy different lanes, so packed
+stores need proved native exchange/paired layout, not a free reinterpret cast.
+No kernel/default edits this turn. Full report docs/PPU_GDN_V16_ACU_20260924.md;
+replay/evidence /workspace/gdn-residual-v16-acu-analysis-20260924.
+
+## Previous local residual-delivery handoff
 
 Three independent candidates from old residual: next-inverse prefetch,
 shared-register operand prefetch, V16 geometry. No combination or math change.
