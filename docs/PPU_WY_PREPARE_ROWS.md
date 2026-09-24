@@ -139,6 +139,10 @@ equal output fingerprints never authorize rebinding a different role.
 
 ## User-reported strong-gate result, 2026-09-22
 
+Superseded evidence status: the [verified ACU/comparison bundle](PPU_WY_SHARED_ACU_20260922.md)
+now includes both gates, complete numeric admission and exact binary/device
+bindings. The paragraph below preserves the earlier excerpt-only review.
+
 The returned excerpt contains all eight roles with16 finite samples each.
 Recomputed medians match the printed values to0.001 us. It does not include
 the complete comparison JSON, numerical admission log, source/binary/device

@@ -2,6 +2,9 @@
 
 ## Current: prepare shared-row candidate, mask1520
 
+Capture completed: [verified stage/counter analysis](PPU_WY_SHARED_ACU_20260922.md).
+The following command is retained for reproduction, not a request to rerun.
+
 The latest user-reported strong-gate full-API median is352.192 us, versus
 356.590 us for prepare-address and494.490 us for FLA. Capture the **same
 measured binary**, not a new build or the older mask48. The exact run
