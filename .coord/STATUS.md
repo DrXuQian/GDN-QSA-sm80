@@ -1,9 +1,27 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 01:10:09 UTC
-working-on: analysis complete; starting isolated state shared-address/operand ablation
-blocked-on: none locally; new candidate has no device timing yet
-last-commit: 4267b28 (verified ACU analysis; checkpoint follows)
+updated-at: 2026-09-24 01:32:13 UTC
+working-on: structural FLA rewrite planned; SDK NCOM load reachability proved, next layout/numerical gate
+blocked-on: no local PPU; full rewrite and device admission remain pending
+last-commit: dc79c83 (FLA rewrite design + compile-only native SDK probe)
+
+User redirected from micro-tuning to structural alignment. Architecture:
+prefix, KKT+solve, W/U, state, output; pure C++/actlize, forward only, retain
+current mask1520/original and arithmetic contract. No routing changes.
+Read docs/PPU_WY_FLA_REWRITE.md before implementing. Local exact l014 probe
+compiles to one NCOM / mt1616 NCOM load,0 v.mov.v2s,32 vregs,0 stack per
+body. Three validator negatives pass. This is not device mapping admission
+or a speed result. Evidence /workspace/gdn-fla-rewrite-evidence-20260924.
+
+Address-only prototype preserved in unmerged branch
+wy-state-operands-20260924 at794b2e7. Native library and l013 host gate pass;
+Python family, extended binary audit and full regression seal NOT CLOSED.
+That WIP branch is not box-ready; do not run it as the next experiment.
+
+Skill update pushed to Quactlize develop5cb8583: compatibility PTX lowering
+must be checked in native code, API/kernel timing scopes kept separate,
+checkpoint lessons retained with evidence and limits. No unrelated files
+in that dirty worktree were staged.
 
 New upload gdn-qsa-acu-20260922T225857Z-797428.tar.gz:553 files/552 hashes
 verify; clean eed5ba2 binary origin, shared1520 actual kernel, same physical
