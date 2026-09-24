@@ -1,9 +1,22 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 02:52:15 UTC
-working-on: AIU/SWZL user-reported API medians recorded; next paired ACU kernel attribution
-blocked-on: raw sample envelopes, gate value, loaded binary identity and current ACU not yet received; no local PPU
-last-commit: 0189860 (user-reported AIU pair device correctness pass)
+updated-at: 2026-09-24 03:02:26 UTC
+working-on: same-binary incumbent/AIU-both/FLA ACU collector complete; box command ready
+blocked-on: awaiting new device ACU bundle and complete prior comparison; no local PPU
+last-commit: 7a49ad5 (three-arm capture and exact measured-mask binding)
+
+Current helper adds optional --wy-control prepare-rows-shared alongside
+--wy-delivery aiu-state-output --wy-run EXISTING_COMPARISON --gate -1.0.
+No rebuild or sweep; three independent preflights then three sequential
+captures; FLA once, one /workspace tar. Both WY DSOs/inputs/device/raw bits
+must match, with separately checked delivery choices. No kernel/router edits.
+Found old AIU comparison metadata delivery_ab=false; collector now binds
+actual arm/mask rather than that summary flag. Old JSON remains immutable;
+future benchmark summary fixes the AIU family flag. Missing/wrong masks fail.
+62 Python contracts and7 HGGC contracts PASS;9 three-arm fault plants red,
+old two-arm lifecycle preserved. Shell syntax/diff checks PASS. This is
+host synthetic validation, not a profiler or device timing result. Evidence
+/workspace/gdn-wy-aiu-acu-evidence-20260924; command docs/PPU_GDN_ACU.md.
 
 User reports correctness PASS after the8340fc7 handoff. This is a user device
 report, not an independently hash-verified receipt: no per-arm log, case
