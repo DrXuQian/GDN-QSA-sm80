@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 12:08:26 UTC
-working-on: eight-warp ACU verdict closed; recording measured experimental winner
+updated-at: 2026-09-24 12:08:47 UTC
+working-on: eight-warp ACU verdict complete and pushed; ready for next isolated experiment
 blocked-on: none; no kernel/default-routing edits
-last-commit: c61906b (truncated-upload checkpoint; implementation 1750cf1 unchanged)
+last-commit: bf42aeb (verified ACU report/result; implementation 1750cf1 unchanged)
 
 Complete re-upload SHA256 b86b02f9ec67ffcc666f42945ff7e298a074f0b0651c7c588b93ed7b731cf612,
 3,703,105 B.611files/610hashes/135sources match dfe76c3. Same-binary/fixture/
@@ -22,7 +22,7 @@ Keep as experimental control, no default promotion. Weakgate performance
 and8warp+B-layout combination NOT_MEASURED. Replay and summary under
 /workspace/gdn-residual-warps8-acu-analysis-20260924; report
 docs/PPU_GDN_RESIDUAL_WARPS8_ACU_20260924.md and condensedJSON dev/ppu/results.
-No kernel/runner/selector changes this analysis. Skills lesson updated.
+No kernel/runner/selector changes this analysis. Skills lesson fa7c92f pushed.
 
 ## Superseded incomplete-upload checkpoint
 
