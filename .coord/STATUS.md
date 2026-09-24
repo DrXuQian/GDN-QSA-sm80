@@ -1,9 +1,33 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 06:33:56 UTC
-working-on: residual local delivery complete; box handoff ready on ppu-backend
-blocked-on: device numerical and ACU performance remain NOT_RUN; no default route change
-last-commit: 4cc7762 (residual implementation + full local regression; device verdict pending)
+updated-at: 2026-09-24 07:03:43 UTC
+working-on: residual/control/FLA ACU analysis complete; no kernel or routing edits
+blocked-on: no blocker to analysis; FLA1.5x target NOT_MET; weak-gate ACU NOT_RUN
+last-commit: 1a843eb (profiled source; this checkpoint has no kernel or routing change)
+
+Latest upload d1f0c05aacf91bb01005475adcb0f8a334f72fe9644f6483a2e7a5843d001151:
+591 files/590 checks/115 source files verify against1a843eb. Tracked sources
+clean; one untracked wy-g-1.0.report.acurep is recorded, not a build input.
+Same PPU-ZW81072CU, all16 kernels1.700GHz; capture uses requested site ACU.
+Control/candidate/FLA inventories5/4/7, complete kernel sums255.22647 /
+230.58412 /224.30883us. Candidate2.80% slower than FLA;1.5x requires149.53922us.
+Thirty residual device cases x8 repeats PASS, both gates numerically admitted;
+g=-1 profiled only. Native report reimport/per-PC sums close all16 kernels;
+omitted-PC negative fails. Host parser is local SDK, not the site capture tool.
+Solve52.69412 vsFLA44.88118us: BF16 MMA81920 equal, TF32 MMA98304 vs32768
+(explicit x3 residual products vs single TF32). Diagonal native interval has
+5,013,504 executed instructions,196608 indirect ivreg reads and466944 pipe_flush.
+Not all moves are layout conversion; no blanket attribution of waits to barriers.
+Residual state's129.64353us replaces WU+state, not only FLA's90.27529us state;
+FLA combined126.47588us. Source/binary verified, no kernel edit or promotion.
+State grid128 x128 gives7.09warps/CU (grid ceiling7.111; resource limit16),
+same asFLA7.10; common underfill, not unique causal explanation. Shared-bank
+conflicts6.93M vsFLA8.55M do not establish a conflict-dominated gap.1.31072M
+BF16 converts close on H/residual/Vnew/scaledV, with no duplicate-value mystery.
+Full report docs/PPU_GDN_RESIDUAL_ACU_20260924.md; retained artifacts and replay
+/workspace/gdn-residual-acu-analysis-20260924. Old WY16 cases+32delivery gates
+verified as well. Skill records precision-scope and indirect-register lessons.
+Read-only kernel investigation complete; proposed optimizations remain unimplemented.
 
 Worktree /workspace/gdn-wy-residual-20260924; evidence/plan under
 /workspace/gdn-wy-residual-evidence-20260924. Explicit new BF16 rounding

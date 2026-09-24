@@ -5,6 +5,10 @@ reset/scan dispatch and every WY delivery remain unchanged. New public entry:
 `gdn_chunk_residual`, backed by `_gdn_wy_ppu.residual`, not another WY mask.
 PPU device correctness/performance are **NOT RUN** at local implementation.
 
+Device follow-up: [same-binary residual/control/FLA ACU analysis](PPU_GDN_RESIDUAL_ACU_20260924.md).
+Numerics PASS; all-kernel sums230.58412us residual vs255.22647us control and
+224.30883us FLA. The1.5x target is NOT MET; default routing remains unchanged.
+
 ## Reference and exact scope
 
 [FlashQLA pinned reference](https://github.com/QwenLM/FlashQLA/tree/a97c9783bbcc42fa8fbfe895dfc674131e376b5c/flash_qla/ops/gated_delta_rule/chunk)
