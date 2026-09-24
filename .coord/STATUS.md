@@ -1,15 +1,23 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 02:41:44 UTC
-working-on: AIU/SWZL device correctness USER-REPORTED/PASS; awaiting same-run performance results
-blocked-on: detailed device log/binary identity and performance samples not yet received; no local PPU
-last-commit: 8340fc7 (locally closed AIU pair experiment and box handoff)
+updated-at: 2026-09-24 02:52:15 UTC
+working-on: AIU/SWZL user-reported API medians recorded; next paired ACU kernel attribution
+blocked-on: raw sample envelopes, gate value, loaded binary identity and current ACU not yet received; no local PPU
+last-commit: 0189860 (user-reported AIU pair device correctness pass)
 
 User reports correctness PASS after the8340fc7 handoff. This is a user device
 report, not an independently hash-verified receipt: no per-arm log, case
-counts or loaded binary hash supplied yet. Performance remains UNKNOWN.
-Next judge state/output/both against contemporaneous prepare-rows-shared
-at both gates; keep default routing unchanged. No device execution locally.
+counts or loaded binary hash supplied yet. User now supplies API medians:
+AIU both318.564/state332.100/output339.696 vs shared354.364 us;
+original422.000, scalar WY716.770, FLA492.188 us. Both is10.103% lower
+latency than shared and35.276% lower than FLA, DESCRIPTIVE_MEDIANS_ONLY.
+Gate/shape/device/SHA and sample ranges are not included in the table;
+do not infer both gates passed speed admission. The pasted ailu spelling is
+treated as a label typo, not a verified runtime role. subject=wy/FLA-WINS
+is scalar716.770 vs FLA492.188, not a verdict against the AIU candidate.
+The runner separately emits WY delivery verdict for every candidate/control.
+Next paired ACU of incumbent/AIU-both/FLA, without subtracting profile sums
+from API spans. Default routing unchanged; no local device execution.
 
 Worktree /workspace/gdn-wy-aiu-20260924, branch wy-aiu-pair-20260924.
 Artifacts /workspace/gdn-wy-aiu-evidence-20260924, explicit plan/ledger.
@@ -30,7 +38,8 @@ existing CUDA Torch wheel; no global interpreter or installed Torch changed.
 Ready command: AIU_AB=1 DEVICE=0 PPU_SDK=/usr/local/PPU_SDK JOBS=16
 bash tools/run_ppu_wy_fla_box.sh.7 roles,14 balanced samples,2 gates;16-case
 raw-bit/oracle/replay/GVA/output-only admission first. Device correctness
-now USER-REPORTED/PASS as above; no latency result or speed admission yet.
+now USER-REPORTED/PASS; API medians supplied, no envelope or kernel-speed
+admission yet. Detailed result scope is recorded above and in the AIU doc.
 This closes the delivery candidate, not the entire five-stage FLA rewrite.
 
 ## Pre-implementation diagnosis

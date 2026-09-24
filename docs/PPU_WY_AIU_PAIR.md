@@ -94,6 +94,35 @@ as **USER-REPORTED/PASS**; detailed per-arm logs and loaded binary identity
 have not yet been received, so no specific case/repeat counts are claimed
 as verified results. No device code was run locally.
 
-Performance is still pending. Compare AIU-state/output/both to the same-run
-`prepare-rows-shared` control at both decay values before selecting a winner.
-No default routing change or speedup admission follows from correctness alone.
+The subsequent user table reports these complete-public-API event medians:
+
+| Role | Median (us) |
+|---|---:|
+| wy-aiu-state-output | 318.564 |
+| wy-aiu-state | 332.100 |
+| wy-aiu-output | 339.696 |
+| wy-prepare-rows-shared | 354.364 |
+| original | 422.000 |
+| fla | 492.188 |
+| wy (scalar) | 716.770 |
+
+The supplied labels spell `ailu`; this table normalizes that apparent typo
+to the source's `aiu` labels, not a hash-verified runtime identity. The pasted
+table does not include gate value, shape/device receipt, source/binary hash,
+or sample envelopes. Do not assign these medians to both decay cases.
+
+Descriptively, both reduces latency by35.800 us /10.103% against shared,
+24.511% against original, and35.276% against FLA (1.545x median speedup).
+These are **USER-REPORTED/DESCRIPTIVE_MEDIANS_ONLY**, not an observed-envelope
+speed admission and not per-kernel ACU timings. Routing remains unchanged.
+
+`[WY verdict] subject=wy control=fla verdict=FLA-WINS` compares the old scalar
+716.770 us arm with FLA492.188 us; it says nothing about the AIU candidate.
+The runner also emits `[WY delivery verdict]` for each candidate against
+FLA, original, the incumbent and other candidates. It does not have a single
+all-candidate winner verdict. Raw samples are required to check those verdicts.
+
+Next capture incumbent/AIU-both/FLA under matched ACU settings and compare
+prepare/state/output durations and dynamic instruction/traffic counts. Keep
+full-call timing as a separate integration metric: subtracting ACU replay
+sums from these API medians does not measure dispatch overhead.
