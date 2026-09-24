@@ -1,9 +1,39 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 07:03:43 UTC
-working-on: residual/control/FLA ACU analysis complete; no kernel or routing edits
-blocked-on: no blocker to analysis; FLA1.5x target NOT_MET; weak-gate ACU NOT_RUN
-last-commit: 1a843eb (profiled source; this checkpoint has no kernel or routing change)
+updated-at: 2026-09-24 07:51:18 UTC
+working-on: local residual-delivery handoff complete; V16 first box experiment
+blocked-on: PPU numerical/performance verdict pending user box; no local PPU; routing unchanged
+last-commit: d20da7b (implementation; this checkpoint only records status)
+
+Three independent candidates from old residual: next-inverse prefetch,
+shared-register operand prefetch, V16 geometry. No combination or math change.
+V16 at B1/S2048/Hk16/Hv32/D128/C64 gives128->256CTAs, still128threads,
+registers242->98 and shared45568->35328B, zero stack. K/P duplicate loads
+increase; this is a compile resource result, NOT an occupancy or speed claim.
+Inverse-prefetch244regs,16 UPDATE MMAs before next wait. Operand244regs;
+control already pipelines shared loads, UPDATE lookahead unchanged, KH/PR
+reordered. Three arms opt-in; no new default production selection.
+
+Final complete local rerun PASS:15/15 compiled host tests,80 Python contracts,
+7 HGCC dialect tests,45 WY+61 residual algebra,305 original controls,
+26 WY images and15 original images. Old23/23 WY native instructions+operands
+identical. Missing wait/retirement/fragment/grid/K atom, serialized-prefetch,
+missing ACU and wrong selector negative controls all fail as required.
+Local evidence /workspace/gdn-wy-residual-prefetch-evidence-20260924;
+verify_local.sh and final-local-complete.log are the final authority.
+Device library f0d918f03877d79806531f52258881ad21e8599459ecc9c438d702e22fed93cc.
+
+Command from repo: DEVICE=0 JOBS=16 CANDIDATE=residual-v16
+bash tools/run_ppu_residual_delivery_acu_box.sh. Matching installed SDK,
+old gates then30 candidate cases x8/raw-byte equality, both-gate numerical
+admission then sequential residual/V16/FLA site-ACU captures (4/4/7 expected).
+API_TIMING=NOT_RUN. Upload printed /workspace/.../acu/acu.tar.gz.
+Optional independent arms CANDIDATE=residual-operands/residual-prefetch.
+BC elimination explicitly NEXT in docs/PPU_GDN_RESIDUAL_DELIVERY.md:
+per-PC bank mapping, paired AIU/SWZL writer-reader proof, no layout change now.
+Skills updated and pushed Quactlize d3f7b88; unrelated dirty files preserved.
+
+## Prior residual ACU analysis (before current delivery candidates)
 
 Latest upload d1f0c05aacf91bb01005475adcb0f8a334f72fe9644f6483a2e7a5843d001151:
 591 files/590 checks/115 source files verify against1a843eb. Tracked sources
