@@ -8,7 +8,7 @@ from pathlib import Path
 import torch
 from bench_ppu_gdn_fla import admission, checked_pair, fla_call, load_fla
 from gdn_qsa_sm80 import gdn_chunk_wy, gdn_chunk_residual
-from gdn_qsa_sm80.gdn_residual_interface import MATH_CONTRACT, WY_MATH_CONTRACT
+from gdn_qsa_sm80.gdn_residual_interface import RESIDUAL_ENTRYPOINTS, MATH_CONTRACT, WY_MATH_CONTRACT
 from gdn_qsa_sm80.gdn_wy_interface import DELIVERIES
 
 
@@ -17,7 +17,7 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--extension", type=Path, required=True)
     p.add_argument("--results", type=Path, required=True)
-    p.add_argument("--deliveries", nargs="+", choices=("prefetch", "operands", "v16", "blayout"), default=[])
+    p.add_argument("--deliveries", nargs="+", choices=tuple(k for k in RESIDUAL_ENTRYPOINTS if k != "scalar"), default=[])
     args = p.parse_args()
     if not args.extension.is_file():
         p.error("WY extension missing")

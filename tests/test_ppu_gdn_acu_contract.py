@@ -59,11 +59,11 @@ class ACUContract(unittest.TestCase):
         from unittest.mock import Mock
         inputs=tuple(torch.zeros(1) for _ in range(5))
         backend=SimpleNamespace(**{name:Mock(return_value=('out','state')) for name in
-            ('residual','residual_prefetch','residual_operands','residual_v16','residual_blayout')})
+            ('residual','residual_prefetch','residual_operands','residual_v16','residual_blayout','residual_warps8')})
         with patch.object(api,'_backend',return_value=backend):
             for delivery,name in (('scalar','residual'),('prefetch','residual_prefetch'),
                                   ('operands','residual_operands'),('v16','residual_v16'),
-                                  ('blayout','residual_blayout')):
+                                  ('blayout','residual_blayout'),('warps8','residual_warps8')):
                 self.assertEqual(api.gdn_chunk_residual(*inputs,delivery=delivery),('out','state'))
                 getattr(backend,name).assert_called_once()
             with self.assertRaises(ValueError): api.gdn_chunk_residual(*inputs,delivery='unknown')
@@ -81,7 +81,7 @@ class ACUContract(unittest.TestCase):
     def test_residual_runner_rejects_bad_selector_or_missing_acu_before_build(self):
         directory = self.directory()
         runner = ROOT / 'tools/run_ppu_residual_delivery_acu_box.sh'
-        for candidate in ('not-a-candidate', 'residual-v16', 'residual-blayout'):
+        for candidate in ('not-a-candidate', 'residual-v16', 'residual-blayout', 'residual-warps8'):
             out = directory / candidate
             env = os.environ | {'CANDIDATE': candidate, 'OUT': str(out),
                                 'ACU': str(directory / 'missing-site-acu')}
@@ -99,6 +99,16 @@ class ACUContract(unittest.TestCase):
         backend=SimpleNamespace(residual=Mock(return_value=('out','state')))
         with patch.object(api,'_backend',return_value=backend),self.assertRaises(AttributeError):
             api.gdn_chunk_residual(*inputs,delivery='blayout')
+        backend.residual.assert_not_called()
+
+    def test_warps8_cannot_silently_use_scalar_backend(self):
+        import torch
+        from unittest.mock import Mock
+        from gdn_qsa_sm80 import gdn_residual_interface as api
+        inputs=tuple(torch.zeros(1) for _ in range(5))
+        backend=SimpleNamespace(residual=Mock(return_value=('out','state')))
+        with patch.object(api,'_backend',return_value=backend),self.assertRaises(AttributeError):
+            api.gdn_chunk_residual(*inputs,delivery='warps8')
         backend.residual.assert_not_called()
 
     @classmethod

@@ -9,7 +9,7 @@ import torch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from gdn_qsa_sm80 import gdn_chunk_residual
-from gdn_qsa_sm80.gdn_residual_interface import MATH_CONTRACT
+from gdn_qsa_sm80.gdn_residual_interface import RESIDUAL_ENTRYPOINTS, MATH_CONTRACT
 from test_ppu_gdn_backend import fixture, digest, assert_pair, print_failure
 from test_ppu_wy_backend import oracle
 
@@ -88,7 +88,7 @@ def admit(shape, gate, nonzero, *, stress=False, deliveries=()):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--extension", type=Path, required=True)
-    p.add_argument("--deliveries", nargs="+", choices=("prefetch", "operands", "v16", "blayout"), default=[])
+    p.add_argument("--deliveries", nargs="+", choices=tuple(k for k in RESIDUAL_ENTRYPOINTS if k != "scalar"), default=[])
     args = p.parse_args()
     if not args.extension.is_file():
         p.error("residual extension missing")

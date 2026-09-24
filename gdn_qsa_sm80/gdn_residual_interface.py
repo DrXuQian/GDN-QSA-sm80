@@ -7,10 +7,10 @@ WY_MATH_CONTRACT = "materialized-wu-bf16-v1"
 # deliberately does not. None is NOT a secretly reused delivery mask.
 RESIDUAL_VARIANTS = {"residual": "scalar", "residual-prefetch": "prefetch",
                      "residual-operands": "operands", "residual-v16": "v16",
-                     "residual-blayout": "blayout"}
+                     "residual-blayout": "blayout", "residual-warps8": "warps8"}
 RESIDUAL_ENTRYPOINTS = {"scalar": "residual", "prefetch": "residual_prefetch",
                         "operands": "residual_operands", "v16": "residual_v16",
-                        "blayout": "residual_blayout"}
+                        "blayout": "residual_blayout", "warps8": "residual_warps8"}
 PROFILE_VARIANTS = {**DELIVERIES, **dict.fromkeys(RESIDUAL_VARIANTS)}
 
 
