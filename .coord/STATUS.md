@@ -1,9 +1,36 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 04:06:39 UTC
-working-on: split prepare local handoff complete; ready same-binary ACU comparison
-blocked-on: box numerical admission and timing NOT_RUN; FLA1.5x not achieved yet
-last-commit: 3e94030 (three-stage prepare + ACU-only handoff; no default promotion)
+updated-at: 2026-09-24 04:35:49 UTC
+working-on: uploaded split-prepare ACU verdict complete; next state/WU structural candidate
+blocked-on: no analysis blocker; FLA1.5x not achieved; state/WU structural work remains
+last-commit: f5afe46 (verified split-prepare ACU report; no default promotion)
+
+New upload /root/acu.tar.gz SHA256
+9c1802c922dd18aa7262fb786e96b4d10b192484ee31ba3f9ead6931e541ad71:
+575 files/574 hashes verify. Clean c2bdb5c, same device/input/loaded binaries;
+all15 kernels at1.700 GHz, actual symbols/grids verified. Device16 cases x2
+deliveries x8 repeats pass original2% oracle and scalar raw equality. Both
+gates numerical admission PASS; performance capture g=-1 only, API not timed.
+Native per-PC counts close all15 kernels; omitted-PC negative red in each.
+
+ACU sums: incumbent304.99471 -> split269.30589 us (-11.7015%); FLA223.58294
+us including two fills. Still20.4501% slower than FLA; same-run1.5x target
+149.05529 us, another120.25060 us/44.652% reduction required. Prepare
+136.34118 ->101.56589 us; WU KVD store amplification512->32 MiB removed.
+Split adds inverse traffic; prepare DRAM reads24.27->40.91 MiB, not a claim
+all traffic falls. State/output bodies and dynamic counts unchanged. State
+120.93294 vs FLA90.40765 us is now58.5% of matched-math excess; next inspect
+operand staging/wait schedule, then WU conditioning/shared roundtrip. No
+kernel/default/routing edits; no local device execution or weak-gate speed claim.
+Evidence: /workspace/gdn-wy-split-acu-analysis-20260924.
+Report: docs/PPU_WY_SPLIT_ACU_20260924.md. All65 host contracts rerun PASS
+with the prior task-local Python/Torch environment, GPUs hidden. Default
+Python lacks Torch; no system installation changed. Phase/identity/resource
+claims cross-checked with parsed native reports. Skill lesson6699c07 pushed
+to Quactlize; unrelated dirty files untouched. Next implementation is not
+started by this upload-analysis checkpoint. Current kernel SHA remainsc2bdb5c.
+
+## Prior local handoff (device-pending statements superseded above)
 
 User goal now1.5x FLA:222.86413/1.5=148.57609us. Not yet achieved.
 State+output168.19412us already exceeds target; prepare split is a bounded
