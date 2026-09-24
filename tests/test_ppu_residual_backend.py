@@ -14,7 +14,7 @@ from test_ppu_gdn_backend import fixture, digest, assert_pair, print_failure
 from test_ppu_wy_backend import oracle
 
 
-def admit(shape, gate, nonzero, *, stress=False):
+def admit(shape, gate, nonzero, *, stress=False, deliveries=()):
     cpu = list(fixture(*shape, gate))
     if nonzero:
         cpu[3] = cpu[3].float()
@@ -37,6 +37,20 @@ def admit(shape, gate, nonzero, *, stress=False):
     if got[0].dtype != torch.bfloat16 or got[1].dtype != torch.float32:
         raise AssertionError("residual output/state precision changed")
     fingerprint = digest(got)
+    for delivery in deliveries:
+        for _ in range(8):
+            candidate = gdn_chunk_residual(*inputs, initial_state=state, delivery=delivery)
+            assert_pair(candidate, want)
+            if not all(torch.equal(a.view(torch.uint8), b.view(torch.uint8)) for a,b in zip(candidate,got)):
+                raise AssertionError(f"residual {delivery} is not RAW-BIT equal to residual control")
+        expanded_inputs = (inputs[0].repeat_interleave(shape[3]//shape[2],2),
+                           inputs[1].repeat_interleave(shape[3]//shape[2],2), *inputs[2:])
+        expanded_candidate = gdn_chunk_residual(*expanded_inputs, initial_state=state, delivery=delivery)
+        if digest(expanded_candidate) != fingerprint:
+            raise AssertionError(f"{delivery} GVA differs from control")
+        output, absent = gdn_chunk_residual(*inputs, initial_state=state, delivery=delivery, output_final_state=False)
+        if absent is not None or not torch.equal(output.view(torch.uint8),got[0].view(torch.uint8)):
+            raise AssertionError(f"{delivery} output-only differs from control")
     for _ in range(7):
         repeat = gdn_chunk_residual(*inputs, initial_state=state)
         assert_pair(repeat, want)
@@ -65,12 +79,16 @@ def admit(shape, gate, nonzero, *, stress=False):
     print(f"[residual device] shape={shape} g={gate} initial={nonzero} stress={stress} "
           f"errors={errs} contract={MATH_CONTRACT} fingerprint={fingerprint} repeat=8/8 "
           "GVA/output-only=RAW-BIT old-WY-equality=NOT_REQUIRED_NUMERICALLY_REASSOCIATED NUMERIC/PASS", flush=True)
+    for delivery in deliveries:
+        print(f"[residual delivery device] delivery={delivery} shape={shape} g={gate} initial={nonzero} stress={stress} "
+              "control=residual byte-equal=PASS repeat=8/8 GVA/output-only=RAW-BIT/PASS", flush=True)
 
 
 @torch.inference_mode()
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--extension", type=Path, required=True)
+    p.add_argument("--deliveries", nargs="+", choices=("prefetch", "operands", "v16"), default=[])
     args = p.parse_args()
     if not args.extension.is_file():
         p.error("residual extension missing")
@@ -83,13 +101,13 @@ def main():
     for length in (1, 16, 63, 64, 65, 129):
         for gate in (-.1, -1.):
             for state in (False, True):
-                admit((2, length, 1, 2), gate, state)
+                admit((2, length, 1, 2), gate, state, deliveries=args.deliveries)
                 count += 1
     for gate in (0., -.001, -.1, -1.):
-        admit((1, 2048, 16, 32), gate, False)
+        admit((1, 2048, 16, 32), gate, False, deliveries=args.deliveries)
         count += 1
-    admit((1, 2048, 16, 64), -.1, False)
-    admit((1, 129, 2, 4), -.01, True, stress=True)
+    admit((1, 2048, 16, 64), -.1, False, deliveries=args.deliveries)
+    admit((1, 129, 2, 4), -.01, True, stress=True, deliveries=args.deliveries)
     count += 2
     if count != 30:
         raise AssertionError("residual device coverage denominator changed")

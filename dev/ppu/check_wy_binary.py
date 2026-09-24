@@ -8,6 +8,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from check_state_pipeline import native_schedule
+from check_residual_prefetch import native_schedule as residual_prefetch_schedule, serialized_plant
 
 
 def kernel_sequences(isa):
@@ -24,8 +25,8 @@ def kernel_sequences(isa):
 
 def compare_controls(before, after):
     old, new = kernel_sequences(before), kernel_sequences(after)
-    if len(old) != 22 or len(new) != 23:
-        raise AssertionError("control comparison must cover all22 old and all23 current images")
+    if len(old) != 23 or len(new) != 26:
+        raise AssertionError("control comparison must cover all23 old and all26 current images")
     for name, sequence in old.items():
         if new.get(name) != sequence:
             raise AssertionError(f"admitted control native instructions changed: {name}")
@@ -178,8 +179,8 @@ def plant_serialized_prefetch(isa):
 def audit(isa, resources, symbols):
     funcs = re.findall(r"Func \d+ (\S+) RESOURCE INFO:\n(.*?)(?=Func \d+ \S+ RESOURCE INFO:|\Z)",
                        resources, flags=re.S)
-    if len(funcs) != 23:
-        raise AssertionError(f"WY image denominator must be22 controls +1 residual state, got {len(funcs)}")
+    if len(funcs) != 26:
+        raise AssertionError(f"WY image denominator must be23 controls +3 residual delivery states, got {len(funcs)}")
     rows = []
     mma_counts = {}
     for role, packed in ((role, packed) for role in ("prepare", "state", "output") for packed in (False, True)):
@@ -436,7 +437,38 @@ def audit(isa, resources, symbols):
     rows.append(dict(role="state", algorithm="residual", registers=regs, stack=stack,
                      static_instructions=len(ops), aiu_sites=4, bf16_mma_sites=40,
                      cta_barrier_sites=5, shared_bytes=45568, rounding="NEW-EXPLICIT"))
-    for name in ("gdn_wy_forward", "gdn_wy_forward_delivery", "gdn_wy_forward_residual"):
+    for delivery, marker, expected, shared in (
+            ("prefetch", "gdn_wy_residual_prefetch_stateE", (5,40,9,5,56), 45568),
+            ("operands", "gdn_wy_residual_operands_stateE", (4,40,9,5,56), 45568),
+            ("v16", "gdn_wy_residual_v16_stateE", (4,20,5,5,36), 35328)):
+        matches=[(name,body) for name,body in funcs if marker in name]
+        if len(matches)!=1: raise AssertionError(f"residual {delivery} image absent/ambiguous")
+        name,body=matches[0]
+        regs=int(re.search(r"vreg_number:(\d+)",body)[1])
+        stack=int(re.search(r"STACK SIZE:(\d+)",body)[1])
+        if stack or regs>256 or name not in sequences:
+            raise AssertionError(f"residual {delivery} spills or lacks native body")
+        ops=[line.split()[0] for line in sequences[name]]
+        counts=(ops.count("vmem.aiu.ld.tsm.l0.t0.p0.s0.m0.2d.b16.kp1"),
+                ops.count("v.mma.f32.bf16.m16n16k16"),ops.count("v.exp2.f32"),
+                ops.count("s.blksyn.defer"),sum(op.startswith("tsm.ld.swzl") for op in ops))
+        if counts!=expected or sum("commit_group(0)" in line for line in sequences[name])!=1:
+            raise AssertionError(f"residual {delivery} native inventory differs: {counts}")
+        if any(op.startswith(("vmem.ld.tsm","vmem.aiu.ld.tsm.l1","tsm.ld.ncom")) for op in ops):
+            raise AssertionError("residual delivery lost matched AIU/SWZL pair")
+        if any("ivreg" in line for line in sequences[name]):
+            raise AssertionError("residual register-slot selection became indirect")
+        if "vmem.st.b32x4" not in ops or "vmem.st.b16" in ops:
+            raise AssertionError("residual delivery lost vector publication")
+        row=dict(role="state",algorithm="residual",delivery=delivery,registers=regs,stack=stack,
+                 static_instructions=len(ops),aiu_sites=counts[0],bf16_mma_sites=counts[1],
+                 cta_barrier_sites=5,shared_bytes=shared,rounding="RESIDUAL-UNCHANGED")
+        section=next(s for s in isa.split("Disassembly of section ") if
+                     s.startswith(".text.kernel.") and name in s.splitlines()[0])
+        if delivery=="prefetch": row["overlap"]=residual_prefetch_schedule(section)["overlap"]
+        rows.append(row)
+    for name in ("gdn_wy_forward", "gdn_wy_forward_delivery", "gdn_wy_forward_residual",
+                 "gdn_wy_forward_residual_prefetch", "gdn_wy_forward_residual_operands", "gdn_wy_forward_residual_v16"):
         if not re.search(rf"\b{name}$", symbols, re.M):
             raise AssertionError(f"WY launcher missing from linked library: {name}")
     for name in ("configure_tiled", "launch_tiled_prepare", "launch_tiled_state", "launch_tiled_output",
@@ -520,6 +552,11 @@ def main():
                 "s.blksyn.defer","MISSING_BARRIER"),resources,symbols)),
             ("residual-missing-wait", (plant_in_kernel(isa,"gdn_wy_residual_state",
                 "commit_group(0)","MISSING_WAIT"),resources,symbols)),
+            ("prefetch-serialized-same-opcodes", (serialized_plant(isa),resources,symbols)),
+            ("operands-missing-mma", (plant_in_kernel(isa,"gdn_wy_residual_operands_state",
+                "v.mma.f32.bf16.m16n16k16","MISSING_MMA"),resources,symbols)),
+            ("v16-wrong-reader", (plant_in_kernel(isa,"gdn_wy_residual_v16_state",
+                "tsm.ld.swzl","tsm.ld.ncom"),resources,symbols)),
         ):
             try:
                 audit(*texts)
@@ -537,7 +574,7 @@ def main():
                 print("[WY binary negative] changed-control EXPECTED-RED/PASS")
             else:
                 raise AssertionError("control-comparison negative escaped")
-        print("[WY binary controls] 22/22 native instruction+operand sequences IDENTICAL")
+        print("[WY binary controls] 23/23 native instruction+operand sequences IDENTICAL")
     print("[WY binary] PASS device_execution=NOT_RUN")
 
 

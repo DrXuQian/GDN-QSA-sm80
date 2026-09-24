@@ -17,7 +17,7 @@ import torch
 
 import bench_ppu_gdn_fla as bench
 from gdn_qsa_sm80.gdn_wy_interface import DELIVERIES
-from gdn_qsa_sm80.gdn_residual_interface import PROFILE_VARIANTS, math_contract
+from gdn_qsa_sm80.gdn_residual_interface import PROFILE_VARIANTS, RESIDUAL_VARIANTS, math_contract
 
 
 def subject_call(role, implementation, extension, inputs, delivery="scalar"):
@@ -33,9 +33,10 @@ def subject_call(role, implementation, extension, inputs, delivery="scalar"):
     if role == "wy":
         from gdn_qsa_sm80 import gdn_chunk_wy
         os.environ["GDN_QSA_WY_EXTENSION"] = str(extension.resolve())
-        if delivery == "residual":
+        if delivery in RESIDUAL_VARIANTS:
             from gdn_qsa_sm80 import gdn_chunk_residual
-            return lambda: gdn_chunk_residual(*inputs, output_final_state=True), {}
+            return lambda: gdn_chunk_residual(*inputs, output_final_state=True,
+                                              delivery=RESIDUAL_VARIANTS[delivery]), {}
         if delivery == "scalar":
             return lambda: gdn_chunk_wy(*inputs, output_final_state=True), {}
         return lambda: gdn_chunk_wy(*inputs, output_final_state=True, delivery=delivery), {}

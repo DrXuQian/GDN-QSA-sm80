@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 import tarfile
 from types import SimpleNamespace
@@ -22,6 +23,73 @@ spec.loader.exec_module(collect)
 
 
 class ACUContract(unittest.TestCase):
+    def test_residual_delivery_capture_requires_matching_control(self):
+        for delivery in sorted(collect.RESIDUAL_DELIVERIES):
+            with self.subTest(delivery=delivery):
+                arms=collect.capture_arms(Path('/bundle'),'wy',delivery,'residual')
+                self.assertEqual([a.delivery for a in arms],['residual',delivery,delivery])
+                for wrong in (None,'scalar','state-pipeline',delivery):
+                    with self.assertRaises(ValueError):
+                        collect.capture_arms(Path('/bundle'),'wy',delivery,wrong)
+
+    def test_residual_delivery_numeric_close_is_not_raw_bit_admission(self):
+        baseline=dict(math_contract=collect.MATH_CONTRACT,delivery_mask=None,
+                      scalar_raw_bit_equal=None,errors=[.008,.004],fingerprint='same')
+        candidate=baseline | dict(residual_raw_bit_equal=True,residual_fingerprint='same')
+        collect.validate_residual_delivery_admission(candidate,baseline,.02)
+        for field,value in (('fingerprint','different'),('residual_raw_bit_equal',False),
+                            ('residual_fingerprint','different'),('math_contract','old')):
+            with self.subTest(field=field),self.assertRaises(ValueError):
+                collect.validate_residual_delivery_admission(candidate|{field:value},baseline,.02)
+
+    def test_complete_residual_deliveries_and_changed_output_negative(self):
+        directory=self.directory()
+        for delivery in sorted(collect.RESIDUAL_DELIVERIES):
+            d=directory/delivery;d.mkdir()
+            status,commands,bundle,_=self.run_mock_capture(d,control='residual',subject_delivery=delivery)
+            self.assertEqual(status['status'],'PASS',status['errors'])
+            d=directory/(delivery+'-bad');d.mkdir()
+            status,_,_,_=self.run_mock_capture(d,control='residual',subject_delivery=delivery,
+                                              plant='changed-control-output')
+            self.assertEqual(status['status'],'INCOMPLETE')
+
+    def test_residual_public_entrypoints_are_distinct_and_default_is_old(self):
+        import torch
+        from gdn_qsa_sm80 import gdn_residual_interface as api
+        from unittest.mock import Mock
+        inputs=tuple(torch.zeros(1) for _ in range(5))
+        backend=SimpleNamespace(**{name:Mock(return_value=('out','state')) for name in
+            ('residual','residual_prefetch','residual_operands','residual_v16')})
+        with patch.object(api,'_backend',return_value=backend):
+            for delivery,name in (('scalar','residual'),('prefetch','residual_prefetch'),
+                                  ('operands','residual_operands'),('v16','residual_v16')):
+                self.assertEqual(api.gdn_chunk_residual(*inputs,delivery=delivery),('out','state'))
+                getattr(backend,name).assert_called_once()
+            with self.assertRaises(ValueError): api.gdn_chunk_residual(*inputs,delivery='unknown')
+
+    def test_residual_default_accepts_legacy_backend_without_candidates(self):
+        import torch
+        from unittest.mock import Mock
+        from gdn_qsa_sm80 import gdn_residual_interface as api
+        inputs = tuple(torch.zeros(1) for _ in range(5))
+        backend = SimpleNamespace(residual=Mock(return_value=('out', 'state')))
+        with patch.object(api, '_backend', return_value=backend):
+            self.assertEqual(api.gdn_chunk_residual(*inputs), ('out', 'state'))
+        backend.residual.assert_called_once()
+
+    def test_residual_runner_rejects_bad_selector_or_missing_acu_before_build(self):
+        directory = self.directory()
+        runner = ROOT / 'tools/run_ppu_residual_delivery_acu_box.sh'
+        for candidate in ('not-a-candidate', 'residual-v16'):
+            out = directory / candidate
+            env = os.environ | {'CANDIDATE': candidate, 'OUT': str(out),
+                                'ACU': str(directory / 'missing-site-acu')}
+            run = subprocess.run(['bash', str(runner)], env=env, text=True,
+                                 capture_output=True, timeout=10)
+            self.assertNotEqual(run.returncode, 0)
+            self.assertIn('FAIL:', run.stderr)
+            self.assertFalse(out.exists(), 'failed admission still entered build')
+
     @classmethod
     def setUpClass(cls):
         # Small synthetic artifacts are retained, entirely under /workspace.
@@ -159,7 +227,7 @@ class ACUContract(unittest.TestCase):
                 patch("gdn_qsa_sm80.gdn_chunk_wy", side_effect=AssertionError("wrong math API")):
             call, _ = profile.subject_call("wy", "wy", Path("/binding.so"), inputs, "residual")
             self.assertEqual(call(), "new-algorithm")
-            new.assert_called_once_with(*inputs, output_final_state=True)
+            new.assert_called_once_with(*inputs, output_final_state=True, delivery="scalar")
         self.assertNotIn("residual", collect.DELIVERIES)
         self.assertIsNone(collect.PROFILE_VARIANTS["residual"])
 
@@ -475,11 +543,18 @@ class ACUContract(unittest.TestCase):
             comparison["delivery_ab"] = False
             comparison["cases"][0]["arms"].update({f"wy-{name}": dict(
                 fingerprint="output", state_dtype="torch.float32", delivery_mask=mask)
-                for name, mask in ((control, collect.DELIVERIES[control]), (delivery, collect.PROFILE_VARIANTS[delivery]))})
+                for name, mask in ((control, collect.PROFILE_VARIANTS[control]), (delivery, collect.PROFILE_VARIANTS[delivery]))})
         if delivery == "residual":
             comparison["cases"][0]["arms"]["wy-residual"].update(
                 fingerprint="residual-output", math_contract=collect.MATH_CONTRACT,
                 errors=[.008, .004], scalar_raw_bit_equal=None)
+        if delivery in collect.RESIDUAL_DELIVERIES:
+            for variant in ("residual",delivery):
+                comparison["cases"][0]["arms"][f"wy-{variant}"].update(
+                    fingerprint="residual-output",math_contract=collect.MATH_CONTRACT,
+                    errors=[.008,.004],scalar_raw_bit_equal=None)
+            comparison["cases"][0]["arms"][f"wy-{delivery}"].update(
+                residual_raw_bit_equal=True,residual_fingerprint="residual-output")
         if plant == "missing-comparison-arm":
             del comparison["cases"][0]["arms"]["wy-prepare-rows-shared"]
         if plant == "wrong-comparison-mask":
@@ -518,6 +593,8 @@ class ACUContract(unittest.TestCase):
                             receipt["math_contract"] = collect.WY_MATH_CONTRACT
                         if plant == "residual-bad-error":
                             receipt["errors"] = [.03, .004]
+                if delivery in collect.RESIDUAL_DELIVERIES and role == "wy":
+                    receipt.update(math_contract=collect.MATH_CONTRACT,errors=[.008,.004],output_sha="residual-output")
                 if phase == "preflight":
                     receipt.update(phase=phase, warmup=5, public_api_calls=6)
                 if is_control and plant == "changed-control-device":

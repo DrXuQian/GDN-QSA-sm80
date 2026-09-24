@@ -17,6 +17,7 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--extension", type=Path, required=True)
     p.add_argument("--results", type=Path, required=True)
+    p.add_argument("--deliveries", nargs="+", choices=("prefetch", "operands", "v16"), default=[])
     args = p.parse_args()
     if not args.extension.is_file():
         p.error("WY extension missing")
@@ -40,6 +41,9 @@ def main():
                  "wy-state-pipeline": lambda: gdn_chunk_wy(*inputs, delivery="state-pipeline"),
                  "wy-residual": lambda: gdn_chunk_residual(*inputs),
                  "fla": fla_call(fn, inputs, "native")}
+        for delivery in args.deliveries:
+            calls[f"wy-residual-{delivery}"] = lambda delivery=delivery: gdn_chunk_residual(*inputs, delivery=delivery)
+        residual_pair = None
         record = dict(g=gate, input_sha=admission.digest(cpu), timing="NOT_RUN", arms={})
         for role, call in calls.items():
             got = call()
@@ -53,9 +57,17 @@ def main():
                     raise AssertionError(f"{role}: replay changed")
             arm = dict(errors=errors, fingerprint=fingerprint, state_dtype=str(got[1].dtype),
                        samples_us=[], admitted_repeats=8)
-            if role == "wy-residual":
+            if role == "wy-residual" or role.startswith("wy-residual-"):
                 arm.update(math_contract=MATH_CONTRACT, delivery_mask=None, scalar_raw_bit_equal=None,
                            scalar_fingerprint_equal=fingerprint == record["arms"]["wy"]["fingerprint"])
+                if role == "wy-residual":
+                    residual_pair = got
+                else:
+                    if residual_pair is None or not all(torch.equal(a.view(torch.uint8),b.view(torch.uint8))
+                                                        for a,b in zip(got,residual_pair)):
+                        raise AssertionError(f"{role} changed residual output/state bits")
+                    arm.update(residual_raw_bit_equal=True,
+                               residual_fingerprint=record["arms"]["wy-residual"]["fingerprint"])
             elif role.startswith("wy"):
                 if role != "wy" and fingerprint != record["arms"]["wy"]["fingerprint"]:
                     raise AssertionError("old pipeline delivery lost scalar RAW-BIT equality")

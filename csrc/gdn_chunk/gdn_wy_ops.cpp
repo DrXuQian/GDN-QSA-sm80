@@ -13,13 +13,23 @@ extern "C" int gdn_wy_forward_delivery(
 extern "C" int gdn_wy_forward_residual(
     void const*, void const*, void const*, void const*, void const*, float const*,
     void*, float*, void*, void*, void*, float*, int, int, int, int, bool, cudaStream_t);
+extern "C" int gdn_wy_forward_residual_prefetch(
+    void const*, void const*, void const*, void const*, void const*, float const*,
+    void*, float*, void*, void*, void*, float*, int, int, int, int, bool, cudaStream_t);
+extern "C" int gdn_wy_forward_residual_operands(
+    void const*, void const*, void const*, void const*, void const*, float const*,
+    void*, float*, void*, void*, void*, float*, int, int, int, int, bool, cudaStream_t);
+extern "C" int gdn_wy_forward_residual_v16(
+    void const*, void const*, void const*, void const*, void const*, float const*,
+    void*, float*, void*, void*, void*, float*, int, int, int, int, bool, cudaStream_t);
 
 namespace {
-template <bool Residual = false>
+template <bool Residual = false, unsigned Variant = 0>
 std::vector<torch::Tensor> forward(torch::Tensor q, torch::Tensor k, torch::Tensor v,
     torch::Tensor g, torch::Tensor beta, c10::optional<torch::Tensor> initial,
     bool output_final_state, unsigned delivery) {
   using namespace gdn_qsa::wy;
+  static_assert(Variant <= 3 && (!Variant || Residual), "invalid residual-only delivery");
   TORCH_CHECK(valid_delivery(delivery), "invalid or conflicting WY delivery mask");
   TORCH_CHECK(!Residual || delivery == 0, "residual is an algorithm, not a WY delivery mask");
   TORCH_CHECK(q.dim() == 4 && q.size(3) == Dim && k.sizes() == q.sizes(),
@@ -43,7 +53,8 @@ std::vector<torch::Tensor> forward(torch::Tensor q, torch::Tensor k, torch::Tens
   TORCH_CHECK(!(Residual || (delivery & AiuOptions)) || Hv <= INT_MAX / Dim,
               "WY AIU row pitch exceeds 32-bit element descriptor");
   int64_t const nt = (S - 1) / Chunk + 1;
-  TORCH_CHECK(B <= INT_MAX / Hv && B * Hv <= INT_MAX / nt && B * Hv <= INT_MAX / 4,
+  constexpr int slices = Variant == 3 ? 8 : 4;
+  TORCH_CHECK(B <= INT_MAX / Hv && B * Hv <= INT_MAX / nt && B * Hv <= INT_MAX / slices,
               "WY launch grid overflow");
   if (initial.has_value()) {
     auto const& h = *initial;
@@ -64,11 +75,21 @@ std::vector<torch::Tensor> forward(torch::Tensor q, torch::Tensor k, torch::Tens
   auto gates = torch::empty({B * Hv * nt, Chunk}, q.options().dtype(torch::kFloat32));
   int rc;
   if constexpr (Residual) {
-    rc = gdn_wy_forward_residual(q.data_ptr(), k.data_ptr(), v.data_ptr(), g.data_ptr(), beta.data_ptr(),
-      initial.has_value() ? initial->data_ptr<float>() : nullptr, out.data_ptr(),
-      output_final_state ? final.data_ptr<float>() : nullptr, w.data_ptr(),
-      snapshots.data_ptr(), vn.data_ptr(), gates.data_ptr<float>(), int(B), int(S), int(Hk), int(Hv),
-      g.scalar_type() == torch::kFloat32, at::cuda::getCurrentCUDAStream().stream());
+    if constexpr (Variant != 0) {
+      constexpr auto launch = Variant == 1 ? gdn_wy_forward_residual_prefetch :
+                              Variant == 2 ? gdn_wy_forward_residual_operands : gdn_wy_forward_residual_v16;
+      rc = launch(q.data_ptr(), k.data_ptr(), v.data_ptr(), g.data_ptr(), beta.data_ptr(),
+        initial.has_value() ? initial->data_ptr<float>() : nullptr, out.data_ptr(),
+        output_final_state ? final.data_ptr<float>() : nullptr, w.data_ptr(),
+        snapshots.data_ptr(), vn.data_ptr(), gates.data_ptr<float>(), int(B), int(S), int(Hk), int(Hv),
+        g.scalar_type() == torch::kFloat32, at::cuda::getCurrentCUDAStream().stream());
+    } else {
+      rc = gdn_wy_forward_residual(q.data_ptr(), k.data_ptr(), v.data_ptr(), g.data_ptr(), beta.data_ptr(),
+        initial.has_value() ? initial->data_ptr<float>() : nullptr, out.data_ptr(),
+        output_final_state ? final.data_ptr<float>() : nullptr, w.data_ptr(),
+        snapshots.data_ptr(), vn.data_ptr(), gates.data_ptr<float>(), int(B), int(S), int(Hk), int(Hv),
+        g.scalar_type() == torch::kFloat32, at::cuda::getCurrentCUDAStream().stream());
+    }
   } else {
     rc = gdn_wy_forward_delivery(q.data_ptr(), k.data_ptr(), v.data_ptr(), g.data_ptr(), beta.data_ptr(),
       initial.has_value() ? initial->data_ptr<float>() : nullptr, out.data_ptr(),
@@ -86,6 +107,15 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         pybind11::arg("g"), pybind11::arg("beta"), pybind11::arg("initial_state") = pybind11::none(),
         pybind11::arg("output_final_state") = true, pybind11::arg("delivery") = 0);
   m.def("residual", &forward<true>, pybind11::arg("q"), pybind11::arg("k"), pybind11::arg("v"),
+        pybind11::arg("g"), pybind11::arg("beta"), pybind11::arg("initial_state") = pybind11::none(),
+        pybind11::arg("output_final_state") = true, pybind11::arg("delivery") = 0);
+  m.def("residual_prefetch", &forward<true, 1>, pybind11::arg("q"), pybind11::arg("k"), pybind11::arg("v"),
+        pybind11::arg("g"), pybind11::arg("beta"), pybind11::arg("initial_state") = pybind11::none(),
+        pybind11::arg("output_final_state") = true, pybind11::arg("delivery") = 0);
+  m.def("residual_operands", &forward<true, 2>, pybind11::arg("q"), pybind11::arg("k"), pybind11::arg("v"),
+        pybind11::arg("g"), pybind11::arg("beta"), pybind11::arg("initial_state") = pybind11::none(),
+        pybind11::arg("output_final_state") = true, pybind11::arg("delivery") = 0);
+  m.def("residual_v16", &forward<true, 3>, pybind11::arg("q"), pybind11::arg("k"), pybind11::arg("v"),
         pybind11::arg("g"), pybind11::arg("beta"), pybind11::arg("initial_state") = pybind11::none(),
         pybind11::arg("output_final_state") = true, pybind11::arg("delivery") = 0);
 }

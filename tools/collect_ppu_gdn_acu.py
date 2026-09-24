@@ -24,7 +24,9 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ACU = Path("/sim/eec/shared/junfu.qx/asight/bin/acu")
 sys.path.insert(0, str(ROOT))
 from gdn_qsa_sm80.gdn_wy_interface import DELIVERIES
-from gdn_qsa_sm80.gdn_residual_interface import PROFILE_VARIANTS, MATH_CONTRACT, WY_MATH_CONTRACT
+from gdn_qsa_sm80.gdn_residual_interface import PROFILE_VARIANTS, RESIDUAL_VARIANTS, MATH_CONTRACT, WY_MATH_CONTRACT
+
+RESIDUAL_DELIVERIES = set(RESIDUAL_VARIANTS) - {"residual"}
 
 
 class CaptureArm(NamedTuple):
@@ -42,9 +44,11 @@ def capture_arms(bundle, implementation, delivery, control=None):
         raise ValueError("WY control/delivery requires --wy-run")
     if delivery == "residual" and control != "state-pipeline":
         raise ValueError("residual requires the registered state-pipeline control")
+    if delivery in RESIDUAL_DELIVERIES and control != "residual":
+        raise ValueError("residual delivery requires its unchanged residual control")
     arms = []
     if control is not None:
-        if control not in DELIVERIES or control == delivery:
+        if control not in PROFILE_VARIANTS or control == delivery:
             raise ValueError("WY control must be a different supported delivery")
         arms.append(CaptureArm("wy-control", "wy", control, bundle / "wy-control"))
     role = "wy" if implementation == "wy" else "ours"
@@ -62,6 +66,15 @@ def validate_residual_admission(arm, limit):
     if len(errors) != 2 or any(type(e) not in (int, float) or not math.isfinite(e) or
                                e < 0 or e >= limit for e in errors):
         raise ValueError("residual lacks independent output/state 2% numerical admission")
+
+
+def validate_residual_delivery_admission(arm, baseline, limit):
+    validate_residual_admission(arm, limit)
+    validate_residual_admission(baseline, limit)
+    fingerprint = baseline.get("fingerprint")
+    if (arm.get("residual_raw_bit_equal") is not True or not fingerprint or
+            arm.get("fingerprint") != fingerprint or arm.get("residual_fingerprint") != fingerprint):
+        raise ValueError("residual delivery lacks residual-control RAW-BIT admission")
 
 
 def sha(path):
@@ -161,6 +174,8 @@ def read_wy_run(directory):
                     raise ValueError("ACU numeric admission missing eight repeats or claiming timing")
                 if role == "wy-residual":
                     validate_residual_admission(arm, comparison.get("limit"))
+                elif role.removeprefix("wy-") in RESIDUAL_DELIVERIES:
+                    validate_residual_delivery_admission(arm, case["arms"].get("wy-residual", {}), comparison.get("limit"))
                 elif role.startswith("wy-") and arm.get("scalar_raw_bit_equal") is not True:
                     raise ValueError("ACU candidate lacks scalar RAW-BIT admission")
     source_sha = (directory / "sha.txt").read_text().strip()
@@ -215,8 +230,10 @@ def validate_comparison(comparison, subject, fla):
     arm = cases[0].get("arms", {}).get(role_name, {})
     if delivery != "scalar" and not arm:
         raise ValueError("selected delivery was not admitted in the preceding comparison")
-    if delivery == "residual":
+    if delivery in RESIDUAL_VARIANTS:
         validate_residual_admission(arm, comparison.get("limit"))
+        if delivery in RESIDUAL_DELIVERIES:
+            validate_residual_delivery_admission(arm,cases[0]["arms"].get("wy-residual", {}),comparison.get("limit"))
         if subject.get("math_contract") != MATH_CONTRACT:
             raise ValueError("capture lost residual numerical-contract identity")
     elif delivery != "scalar" or "delivery_mask" in arm:
@@ -278,6 +295,10 @@ def validate_wy_control(control, subject):
     if control.get("wy_delivery") == subject.get("wy_delivery"):
         raise ValueError("WY control silently selected the candidate delivery")
     residual = subject.get("wy_delivery") == "residual"
+    if subject.get("wy_delivery") in RESIDUAL_DELIVERIES:
+        if (control.get("wy_delivery") != "residual" or
+                control.get("math_contract") != MATH_CONTRACT or subject.get("math_contract") != MATH_CONTRACT):
+            raise ValueError("residual delivery must compare same-math residual control")
     if residual:
         if (control.get("wy_delivery") != "state-pipeline" or
                 control.get("math_contract") != WY_MATH_CONTRACT or
@@ -494,7 +515,7 @@ def main():
     parser.add_argument("--wy-run", type=Path,
                         help="reuse this admitted WY comparison/numeric-receipt directory; never compile")
     parser.add_argument("--wy-delivery", choices=tuple(PROFILE_VARIANTS), default="scalar")
-    parser.add_argument("--wy-control", choices=tuple(DELIVERIES),
+    parser.add_argument("--wy-control", choices=tuple(PROFILE_VARIANTS),
                         help="also capture this same-binary WY control before the candidate; FLA runs once")
     args = parser.parse_args()
     if args.wy_run and args.extension:
@@ -505,6 +526,8 @@ def main():
         parser.error("--wy-control requires --wy-run and a different --wy-delivery")
     if args.wy_delivery == "residual" and args.wy_control != "state-pipeline":
         parser.error("residual algorithm requires --wy-control state-pipeline")
+    if args.wy_delivery in RESIDUAL_DELIVERIES and args.wy_control != "residual":
+        parser.error("residual delivery requires --wy-control residual")
     if args.wy_run:
         args.wy_run = args.wy_run.resolve()
     args.sdk = Path(os.environ.get("PPU_SDK", "/usr/local/PPU_SDK")).resolve()

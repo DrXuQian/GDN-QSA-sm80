@@ -76,11 +76,12 @@ uint64_t suite(Counts& counts, unsigned plant = 0) {
   uint64_t bad = check_tile<16, 16>(counts, plant) + check_tile<16, 32>(counts, plant) +
       check_tile<16, 64>(counts, plant) + check_tile<64, 128>(counts, plant) +
       check_tile<64, 32>(counts, plant) + check_tile<128, 32>(counts, plant) +
-      check_tile<64, 64>(counts, plant) + check_tile<128, 64>(counts, plant);
+      check_tile<64, 64>(counts, plant) + check_tile<128, 64>(counts, plant) +
+      check_tile<64, 16>(counts, plant) + check_tile<128, 16>(counts, plant);
   // Pin the full inventory independently; omitting a cube cannot lower the denominator.
-  bad += counts.cells != 8 || counts.values != 28416;
+  bad += counts.cells != 10 || counts.values != 31488;
   bad += counts.descriptors != 7ull * (16 * (256 + 512 + 1024) +
-      64 * (8192 + 2048 + 4096) + 128 * (4096 + 8192));
+      64 * (8192 + 2048 + 4096 + 1024) + 128 * (4096 + 8192 + 2048));
   return bad;
 }
 
