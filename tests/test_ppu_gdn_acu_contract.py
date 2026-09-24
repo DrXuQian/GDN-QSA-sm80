@@ -378,7 +378,7 @@ class ACUContract(unittest.TestCase):
                 collect.validate_comparison(comparison, ours | ({key: value} if role == "wy" else {}),
                                              fla | ({key: value} if role == "fla" else {}))
 
-    def run_mock_capture(self, directory, control=None, plant=None):
+    def run_mock_capture(self, directory, control=None, plant=None, subject_delivery=None):
         """Run the real orchestration with synthetic tool receipts, not a GPU."""
         prior = directory / "preceding"
         prior.mkdir()
@@ -396,14 +396,14 @@ class ACUContract(unittest.TestCase):
                           device=ours["device"]["properties"])
         comparison["cases"] = [dict(g=-0.1, input_sha="input", arms={
             role: dict(fingerprint="output", state_dtype="torch.float32") for role in ("wy", "fla")})]
-        delivery = "aiu-state-output" if control is not None else "scalar"
+        delivery = subject_delivery or ("aiu-state-output" if control is not None else "scalar")
         if control is not None:
             # Reproduce the already-shipped AIU JSON exactly at the disputed
             # boundary: generic flag false, no aiu_ab flag, correct arm masks.
             comparison["delivery_ab"] = False
             comparison["cases"][0]["arms"].update({f"wy-{name}": dict(
                 fingerprint="output", state_dtype="torch.float32", delivery_mask=mask)
-                for name, mask in (("prepare-rows-shared", 1520), ("aiu-state-output", 13808))})
+                for name, mask in ((control, collect.DELIVERIES[control]), (delivery, collect.DELIVERIES[delivery]))})
         if plant == "missing-comparison-arm":
             del comparison["cases"][0]["arms"]["wy-prepare-rows-shared"]
         if plant == "wrong-comparison-mask":
@@ -455,6 +455,24 @@ class ACUContract(unittest.TestCase):
             status = collect.collect(args, bundle, {"PATH": ""})
         self.assertEqual(collect.sha(comparison_path), original_comparison_hash)
         return status, commands, bundle, library
+
+    def test_pipeline_capture_keeps_same_binary_split_control_and_all_fla_kernels(self):
+        status, commands, bundle, _ = self.run_mock_capture(
+            self.directory(),control="split-prepare",subject_delivery="state-pipeline")
+        self.assertEqual(status["status"],"PASS")
+        subjects = [cmd for cmd in commands if "--set" in cmd]
+        self.assertEqual(len(subjects),3)
+        self.assertEqual([(cmd[cmd.index("--role")+1],cmd[cmd.index("--wy-delivery")+1]) for cmd in subjects],
+                         [("wy","split-prepare"),("wy","state-pipeline"),("fla","state-pipeline")])
+        for cmd in subjects:
+            for forbidden in ("--launch-count","--kernel-name","--csv"):
+                self.assertNotIn(forbidden,cmd)
+        self.assertEqual(status["capture_order"],["wy-control","wy","fla"])
+        control=json.loads((bundle/"wy-control/wy.json").read_text())
+        subject=json.loads((bundle/"wy.json").read_text())
+        collect.validate_wy_control(control,subject)
+        with self.assertRaises(ValueError):
+            collect.validate_wy_control(control,subject | dict(wy_delivery="split-prepare"))
 
     def test_complete_reused_wy_capture_never_builds_or_selects_original(self):
         status, commands, bundle, library = self.run_mock_capture(self.directory())

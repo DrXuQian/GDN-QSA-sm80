@@ -33,6 +33,12 @@ below has been fixed in the candidate, not the retained control. State/output
 bodies are unchanged. Additional120.251 us is needed for the new149.055 us
 target; a state-only change is insufficient. No default promotion.
 
+Next opt-in implementation: [single-buffer state operand pipeline](PPU_WY_STATE_PIPELINE.md),
+mask62960 with split30192 retained. It overlaps current K/U with W@H and
+next W with the update using the same shared storage. Local native/lifetime
+proofs do not establish a device speedup; the linked three-arm command is
+the next measurement, not another claimed1.5x result.
+
 ### Before split prepare (historical prioritization)
 
 The [2026-09-24 verified result](PPU_WY_AIU_ACU_20260924.md) supersedes the

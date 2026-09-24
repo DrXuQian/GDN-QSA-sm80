@@ -18,7 +18,7 @@ import bench_ppu_wy_fla as benchmark
 from bench_ppu_wy_fla import (comparison_summary, delivery_comparisons, order,
                               DELIVERY_ROLES, TILE_ROLES, STATE_ROLES, STAGE_ROLES,
                               PREPARE_ROWS_ROLES, experiment, resolve_samples)
-from bench_ppu_wy_fla import AIU_ROLES, SPLIT_PREPARE_ROLES
+from bench_ppu_wy_fla import AIU_ROLES, SPLIT_PREPARE_ROLES, STATE_PIPELINE_ROLES
 from bench_ppu_gdn_fla import checked_pair, verdict
 
 
@@ -125,6 +125,35 @@ class Contracts(unittest.TestCase):
         del arms["wy-aiu-state-output"]
         with self.assertRaises(KeyError):
             delivery_comparisons(arms, "split-prepare", split_prepare_ab=True)
+
+    def test_state_pipeline_inventory_masks_default_and_missing_arm(self):
+        def inventory():
+            names, roles = experiment(state_pipeline_ab=True)
+            self.assertEqual(names, ("split-prepare", "state-pipeline"))
+            self.assertEqual(tuple(api.DELIVERIES[name] for name in names), (30192,62960))
+            self.assertEqual(roles, STATE_PIPELINE_ROLES)
+            self.assertEqual(len(roles), 5)
+            return roles
+        roles = inventory()
+        for column in zip(*(order(i,roles) for i in range(resolve_samples(None,roles)))):
+            for role in roles: self.assertEqual(column.count(role),2)
+        self.assertEqual(experiment()[1],("original","wy","fla"))
+        with patch.object(benchmark,"STATE_PIPELINE_DELIVERIES",("state-pipeline",)):
+            with self.assertRaises(AssertionError): inventory()
+        for flag in ("delivery_ab","tile_ab","state_ab","stage_ab","prepare_rows_ab","aiu_ab","split_prepare_ab"):
+            with self.assertRaises(ValueError): experiment(state_pipeline_ab=True,**{flag:True})
+
+    def test_pipeline_losing_verdict_keeps_split_incumbent(self):
+        arms = {role:dict(samples_us=[300.,310.]) for role in STATE_PIPELINE_ROLES}
+        arms["wy-state-pipeline"]["samples_us"]=[320.,330.]
+        verdicts=delivery_comparisons(arms,"state-pipeline",state_pipeline_ab=True)
+        self.assertEqual(set(verdicts),{"original","wy","fla","wy-split-prepare"})
+        self.assertTrue(all(x["verdict"]=="CONTROL-WINS" for x in verdicts.values()))
+        arms["wy-state-pipeline"]["samples_us"]=[290.,305.]
+        self.assertTrue(all(x["verdict"]=="UNRESOLVED" for x in
+            delivery_comparisons(arms,"state-pipeline",state_pipeline_ab=True).values()))
+        del arms["wy-split-prepare"]
+        with self.assertRaises(KeyError): delivery_comparisons(arms,"state-pipeline",state_pipeline_ab=True)
 
     def test_aiu_verdict_keeps_incumbent_and_both_single_changes(self):
         arms = {role: dict(samples_us=[500., 510.]) for role in AIU_ROLES}
@@ -401,19 +430,20 @@ class Contracts(unittest.TestCase):
         args = SimpleNamespace(delivery_ab=False, tile_ab=True, warmup=5, samples=16, launches=10)
         seen = []
         def run(plant=False, state_ab=False, stage_ab=False, prepare_rows_ab=False, aiu_ab=False, split_prepare_ab=False,
-                admission_only=False):
-            args.tile_ab = not (state_ab or stage_ab or prepare_rows_ab or aiu_ab or split_prepare_ab)
+                admission_only=False, state_pipeline_ab=False):
+            args.tile_ab = not (state_ab or stage_ab or prepare_rows_ab or aiu_ab or split_prepare_ab or state_pipeline_ab)
             args.state_ab = state_ab
             args.stage_ab = stage_ab
             args.prepare_rows_ab = prepare_rows_ab
             args.aiu_ab = aiu_ab
             args.split_prepare_ab = split_prepare_ab
+            args.state_pipeline_ab = state_pipeline_ab
             args.admission_only = admission_only
-            args.samples = 0 if admission_only else 10 if split_prepare_ab else 14 if aiu_ab else 16
+            args.samples = 0 if admission_only else 10 if split_prepare_ab or state_pipeline_ab else 14 if aiu_ab else 16
             def wy(*inputs, delivery="scalar"):
                 seen.append(delivery)
                 # Within the unchanged 2% gate, but not scalar raw equality.
-                selected = ("split-prepare" if split_prepare_ab else "aiu-state-output" if aiu_ab else "prepare-rows-warp" if prepare_rows_ab else "stage-address-both" if stage_ab else
+                selected = ("state-pipeline" if state_pipeline_ab else "split-prepare" if split_prepare_ab else "aiu-state-output" if aiu_ab else "prepare-rows-warp" if prepare_rows_ab else "stage-address-both" if stage_ab else
                             "tiled-state-output-both" if state_ab else "tiled-state-output")
                 return (want[0] + .001, want[1]) if plant and delivery == selected else want
             with patch.object(benchmark.admission, "fixture", return_value=cpu), \
@@ -493,6 +523,23 @@ class Contracts(unittest.TestCase):
             self.assertNotIn("versus", arm)
         with self.assertRaisesRegex(AssertionError, "wy-split-prepare output/state bits differ"):
             run(plant=True, split_prepare_ab=True, admission_only=True)
+        seen.clear()
+        result=run(state_pipeline_ab=True,admission_only=True)
+        self.assertEqual(set(result["arms"]),set(STATE_PIPELINE_ROLES))
+        self.assertEqual(result["timing"],"NOT_RUN")
+        for name in ("scalar",*api.STATE_PIPELINE_DELIVERIES): self.assertEqual(seen.count(name),8+5)
+        for arm in result["arms"].values():
+            self.assertEqual(arm["admitted_repeats"],8)
+            self.assertEqual(arm["samples_us"],[])
+            self.assertNotIn("median_us",arm)
+        self.assertEqual(result["arms"]["wy-state-pipeline"]["delivery_mask"],62960)
+        with self.assertRaisesRegex(AssertionError,"wy-state-pipeline output/state bits differ"):
+            run(plant=True,state_pipeline_ab=True,admission_only=True)
+        seen.clear()
+        result=run(state_pipeline_ab=True)
+        for name in ("scalar",*api.STATE_PIPELINE_DELIVERIES): self.assertEqual(seen.count(name),8+5+10*10)
+        self.assertEqual(set(result["arms"]["wy-state-pipeline"]["versus"]),
+                         {"original","wy","fla","wy-split-prepare"})
 
     def test_delivery_mask_is_consumed_not_silently_ignored(self):
         class Fake:

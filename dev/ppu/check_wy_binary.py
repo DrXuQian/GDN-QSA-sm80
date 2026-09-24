@@ -4,6 +4,10 @@ import argparse
 from pathlib import Path
 import re
 import subprocess
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from check_state_pipeline import native_schedule
 
 
 def kernel_sequences(isa):
@@ -20,8 +24,8 @@ def kernel_sequences(isa):
 
 def compare_controls(before, after):
     old, new = kernel_sequences(before), kernel_sequences(after)
-    if len(old) != 18 or len(new) != 21:
-        raise AssertionError("control comparison must cover all18 old and all21 current images")
+    if len(old) != 21 or len(new) != 22:
+        raise AssertionError("control comparison must cover all21 old and all22 current images")
     for name, sequence in old.items():
         if new.get(name) != sequence:
             raise AssertionError(f"admitted control native instructions changed: {name}")
@@ -147,11 +151,35 @@ def plant_late_row_barrier(isa):
     return "Disassembly of section ".join(sections)
 
 
+def plant_serialized_prefetch(isa):
+    """Keep every opcode: move the loop W wait immediately after NEXT_W.
+
+    The old three-hand-off count still agrees; only a CFG schedule check can
+    reject the resulting loss of overlap. This is ISA-text validator input,
+    not a runnable modified binary.
+    """
+    sections = isa.split("Disassembly of section ")
+    matches = [i for i,s in enumerate(sections) if s.startswith(".text.kernel.") and
+               "gdn_wy_state_pipelineE" in s.splitlines()[0]]
+    if len(matches) != 1: raise AssertionError("prefetch plant exact symbol absent")
+    i = matches[0]
+    schedule = native_schedule(sections[i])
+    # W wait is the first reachable commit_group wait after all16 UPDATEs;
+    # CURRENT_INPUTS' wait lies after PROJECT and before the next-W copies.
+    project = schedule["project"]
+    begin_wait = min(schedule["waits"])
+    if begin_wait > min(project): raise AssertionError("W wait anchor changed; inspect CFG")
+    copy = max(schedule["future"])
+    following = min(pc for pc in schedule["records"] if pc > copy)
+    sections[i] = swap_native_instructions(sections[i],begin_wait,following)
+    return "Disassembly of section ".join(sections)
+
+
 def audit(isa, resources, symbols):
     funcs = re.findall(r"Func \d+ (\S+) RESOURCE INFO:\n(.*?)(?=Func \d+ \S+ RESOURCE INFO:|\Z)",
                        resources, flags=re.S)
-    if len(funcs) != 21:
-        raise AssertionError(f"WY image denominator must be18 controls +3 split-prepare stages, got {len(funcs)}")
+    if len(funcs) != 22:
+        raise AssertionError(f"WY image denominator must be21 controls +1 state pipeline, got {len(funcs)}")
     rows = []
     mma_counts = {}
     for role, packed in ((role, packed) for role in ("prepare", "state", "output") for packed in (False, True)):
@@ -362,13 +390,37 @@ def audit(isa, resources, symbols):
         rows.append(dict(role=role, delivery="split-prepare", registers=regs, stack=stack,
                          static_instructions=len(ops), aiu_sites=copies, bf16_mma_sites=bf16,
                          tf32_mma_sites=tf32, cta_barrier_sites=barriers, vector_store_sites=stores))
+    matches = [(name,body) for name,body in funcs if "gdn_wy_state_pipelineE" in name]
+    if len(matches) != 1: raise AssertionError("missing/ambiguous state pipeline image")
+    name, body = matches[0]
+    regs = int(re.search(r"vreg_number:(\d+)",body)[1])
+    stack = int(re.search(r"STACK SIZE:(\d+)",body)[1])
+    if stack or regs > 234 or name not in sequences:
+        raise AssertionError("state pipeline spills, exceeds admitted register budget, or lacks native body")
+    ops = [line.split()[0] for line in sequences[name]]
+    if (ops.count("vmem.aiu.ld.tsm.l0.t0.p0.s0.m0.2d.b16.kp1"),
+        ops.count("v.mma.f32.bf16.m16n16k16"),ops.count("v.exp2.f32"),
+        ops.count("s.blksyn.defer"),sum(op.startswith("tsm.ld.swzl") for op in ops)) != (7,32,5,4,44):
+        raise AssertionError("pipeline native delivery/arithmetic/lifetime inventory changed")
+    if any(op.startswith(("vmem.ld.tsm","vmem.aiu.ld.tsm.l1","tsm.ld.ncom")) for op in ops):
+        raise AssertionError("pipeline lost matched native producer/consumer")
+    if "vmem.st.b32x4" not in ops or "vmem.st.b16" in ops:
+        raise AssertionError("pipeline lost vector publication")
+    section = next(s for s in isa.split("Disassembly of section ") if
+                   s.startswith(".text.kernel.") and name in s.splitlines()[0])
+    schedule = native_schedule(section)
+    rows.append(dict(role="state",delivery="state-pipeline",registers=regs,stack=stack,
+                     static_instructions=len(ops),aiu_sites=7,bf16_mma_sites=32,
+                     v2s_sites=ops.count("v.mov.v2s"),cta_barrier_sites=4,
+                     overlap_mma_before_commit_wait={hex(pc):work for pc,work in schedule["overlap"].items()}))
     for name in ("gdn_wy_forward", "gdn_wy_forward_delivery"):
         if not re.search(rf"\b{name}$", symbols, re.M):
             raise AssertionError(f"WY launcher missing from linked library: {name}")
     for name in ("configure_tiled", "launch_tiled_prepare", "launch_tiled_state", "launch_tiled_output",
                  "configure_state_ab", "launch_state_ab", "configure_stage_address",
                  "launch_address_prepare", "launch_address_output", "configure_prepare_rows", "launch_prepare_rows",
-                 "forward_aiu", "configure_split_prepare", "launch_split_prepare"):
+                 "forward_aiu", "configure_split_prepare", "launch_split_prepare",
+                 "configure_state_pipeline", "launch_state_pipeline"):
         if not re.search(rf"\b_ZN7gdn_qsa2wy\d+{name}E\S*$", symbols, re.M):
             raise AssertionError(f"tiled cross-TU launcher missing from linked library: {name}")
     return rows
@@ -427,6 +479,15 @@ def main():
                 "s.blksyn.defer", "MISSING_BARRIER"), resources, symbols)),
             ("split-prefix-lost-shuffle", (plant_in_kernel(isa, "gdn_wy_split_prefix",
                 "v.shuffle.up.b32", "MISSING_SCAN"), resources, symbols)),
+            ("pipeline-missing-image", (isa.replace("gdn_wy_state_pipelineE", "MISSING_pipelineE"),resources,symbols)),
+            ("pipeline-missing-link", (isa,resources,symbols.replace("launch_state_pipeline","MISSING_pipeline"))),
+            ("pipeline-wrong-writer", (plant_in_kernel(isa,"gdn_wy_state_pipeline",
+                "vmem.aiu.ld.tsm.l0","vmem.aiu.ld.tsm.l1"),resources,symbols)),
+            ("pipeline-lost-wait", (plant_in_kernel(isa,"gdn_wy_state_pipeline",
+                "commit_group(0)","MISSING_WAIT"),resources,symbols)),
+            ("pipeline-lost-retirement", (plant_in_kernel(isa,"gdn_wy_state_pipeline",
+                "s.blksyn.defer","MISSING_BARRIER"),resources,symbols)),
+            ("pipeline-serialized-same-opcodes", (plant_serialized_prefetch(isa),resources,symbols)),
         ):
             try:
                 audit(*texts)
@@ -444,7 +505,7 @@ def main():
                 print("[WY binary negative] changed-control EXPECTED-RED/PASS")
             else:
                 raise AssertionError("control-comparison negative escaped")
-        print("[WY binary controls] 18/18 native instruction+operand sequences IDENTICAL")
+        print("[WY binary controls] 21/21 native instruction+operand sequences IDENTICAL")
     print("[WY binary] PASS device_execution=NOT_RUN")
 
 

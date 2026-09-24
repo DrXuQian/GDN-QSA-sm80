@@ -11,7 +11,7 @@ if [[ -e "$RUN" ]]; then
 fi
 echo "[WY split ACU] target=FLA/subject>=1.5 metric=SUM-OF-ALL-ACU-KERNEL-DURATIONS"
 echo "[WY split ACU] incumbent=aiu-state-output subject=split-prepare routing=UNCHANGED"
-env -u SAMPLES OUT="$RUN" PERF=1 ADMISSION_ONLY=1 SPLIT_PREPARE_AB=1 AIU_AB=0 PREPARE_ROWS_AB=0 \
+env -u SAMPLES OUT="$RUN" PERF=1 ADMISSION_ONLY=1 STATE_PIPELINE_AB=0 SPLIT_PREPARE_AB=1 AIU_AB=0 PREPARE_ROWS_AB=0 \
   STAGE_AB=0 STATE_AB=0 TILE_AB=0 DELIVERY_AB=0 \
   bash "$ROOT/tools/run_ppu_wy_fla_box.sh"
 echo "[WY split ACU] API_TIMING=NOT_RUN; correctness complete, starting ACU comparison"

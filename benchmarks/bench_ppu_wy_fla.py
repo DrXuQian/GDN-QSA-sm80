@@ -16,7 +16,7 @@ from bench_ppu_gdn_fla import admission, checked_pair, fla_call, load_fla, verdi
 from gdn_qsa_sm80 import gdn_chunk_wy
 from gdn_qsa_sm80.gdn_wy_interface import (DELIVERIES, PACKED_DELIVERIES, TILED_DELIVERIES,
                                           STATE_DELIVERIES, STAGE_DELIVERIES, PREPARE_ROWS_DELIVERIES,
-                                          AIU_DELIVERIES, SPLIT_PREPARE_DELIVERIES)
+                                          AIU_DELIVERIES, SPLIT_PREPARE_DELIVERIES, STATE_PIPELINE_DELIVERIES)
 
 
 DELIVERY_ROLES = ("original", "wy", "wy-prepare", "wy-state", "wy-output", "wy-all", "fla")
@@ -26,13 +26,14 @@ STAGE_ROLES = ("original", "wy", *(f"wy-{name}" for name in STAGE_DELIVERIES), "
 PREPARE_ROWS_ROLES = ("original", "wy", *(f"wy-{name}" for name in PREPARE_ROWS_DELIVERIES), "fla")
 AIU_ROLES = ("original", "wy", *(f"wy-{name}" for name in AIU_DELIVERIES), "fla")
 SPLIT_PREPARE_ROLES = ("original", "wy", *(f"wy-{name}" for name in SPLIT_PREPARE_DELIVERIES), "fla")
+STATE_PIPELINE_ROLES = ("original", "wy", *(f"wy-{name}" for name in STATE_PIPELINE_DELIVERIES), "fla")
 
 
 def experiment(delivery_ab=False, tile_ab=False, state_ab=False, stage_ab=False, prepare_rows_ab=False, aiu_ab=False,
-               split_prepare_ab=False):
-    if sum((delivery_ab, tile_ab, state_ab, stage_ab, prepare_rows_ab, aiu_ab, split_prepare_ab)) > 1:
+               split_prepare_ab=False, state_pipeline_ab=False):
+    if sum((delivery_ab, tile_ab, state_ab, stage_ab, prepare_rows_ab, aiu_ab, split_prepare_ab, state_pipeline_ab)) > 1:
         raise ValueError("choose one balanced candidate family")
-    names = (SPLIT_PREPARE_DELIVERIES if split_prepare_ab else AIU_DELIVERIES if aiu_ab else PREPARE_ROWS_DELIVERIES if prepare_rows_ab else STAGE_DELIVERIES if stage_ab else STATE_DELIVERIES if state_ab else
+    names = (STATE_PIPELINE_DELIVERIES if state_pipeline_ab else SPLIT_PREPARE_DELIVERIES if split_prepare_ab else AIU_DELIVERIES if aiu_ab else PREPARE_ROWS_DELIVERIES if prepare_rows_ab else STAGE_DELIVERIES if stage_ab else STATE_DELIVERIES if state_ab else
              TILED_DELIVERIES if tile_ab else PACKED_DELIVERIES if delivery_ab else ())
     return names, ("original", "wy", *(f"wy-{name}" for name in names), "fla")
 
@@ -63,10 +64,12 @@ def order(sample, roles=("original", "wy", "fla")):
 
 
 def delivery_comparisons(arms, delivery, state_ab=False, stage_ab=False, prepare_rows_ab=False, aiu_ab=False,
-                        split_prepare_ab=False):
+                        split_prepare_ab=False, state_pipeline_ab=False):
     """Compare the new pair directly, without subtracting isolated stage costs."""
     controls = ("wy", "fla")
-    if split_prepare_ab:
+    if state_pipeline_ab:
+        controls += tuple(role for role in STATE_PIPELINE_ROLES if role not in controls and role != f"wy-{delivery}")
+    elif split_prepare_ab:
         controls += tuple(role for role in SPLIT_PREPARE_ROLES if role not in controls and role != f"wy-{delivery}")
     elif aiu_ab:
         controls += tuple(role for role in AIU_ROLES if role not in controls and role != f"wy-{delivery}")
@@ -121,7 +124,8 @@ def compare(fn, gate, args, device):
     stage_ab = getattr(args, "stage_ab", False)
     prepare_rows_ab = getattr(args, "prepare_rows_ab", False)
     names, roles = experiment(args.delivery_ab, args.tile_ab, state_ab, stage_ab, prepare_rows_ab,
-                              getattr(args, "aiu_ab", False), getattr(args, "split_prepare_ab", False))
+                              getattr(args, "aiu_ab", False), getattr(args, "split_prepare_ab", False),
+                              getattr(args, "state_pipeline_ab", False))
     for delivery in names:
         calls[f"wy-{delivery}"] = lambda delivery=delivery: gdn_chunk_wy(*inputs, delivery=delivery)
     record = dict(g=gate, shape="B1/S2048/Hk16/Hv32/D128", input_sha=admission.digest(cpu), arms={})
@@ -190,7 +194,8 @@ def compare(fn, gate, args, device):
             role = f"wy-{delivery}"
             candidate = record["arms"][role]
             candidate["versus"] = delivery_comparisons(record["arms"], delivery, state_ab, stage_ab, prepare_rows_ab,
-                                                        getattr(args, "aiu_ab", False), getattr(args, "split_prepare_ab", False))
+                                                        getattr(args, "aiu_ab", False), getattr(args, "split_prepare_ab", False),
+                                                        getattr(args, "state_pipeline_ab", False))
             for control, comparison in candidate["versus"].items():
                 label, speedup = comparison["verdict"], comparison["descriptive_speedup"]
                 print(f"[WY delivery verdict] g={gate} candidate={role} control={control} "
@@ -225,9 +230,11 @@ def main():
                         help="matched AIU/SWZL state/output/both on the shared-row incumbent")
     family.add_argument("--split-prepare-ab", action="store_true",
                         help="separate prefix/solve/WU resource budgets on frozen AIU state/output")
+    family.add_argument("--state-pipeline-ab", action="store_true",
+                        help="current K/U and next W overlap; frozen split prepare/AIU output")
     args = p.parse_args()
     _, roles = experiment(args.delivery_ab, args.tile_ab, args.state_ab, args.stage_ab, args.prepare_rows_ab, args.aiu_ab,
-                          args.split_prepare_ab)
+                          args.split_prepare_ab, args.state_pipeline_ab)
     if args.admission_only:
         if args.samples is not None:
             p.error("--admission-only does not accept --samples")
@@ -262,6 +269,7 @@ def main():
                   prepare_rows_ab=args.prepare_rows_ab,
                   aiu_ab=args.aiu_ab,
                   split_prepare_ab=args.split_prepare_ab,
+                  state_pipeline_ab=args.state_pipeline_ab,
                   roles=roles, order_cycle_samples=2 * len(roles),
                   binary_sha256={str(x): hashlib.sha256(x.read_bytes()).hexdigest()
                                  for x in (args.extension, args.wy_extension)}, cases=[])

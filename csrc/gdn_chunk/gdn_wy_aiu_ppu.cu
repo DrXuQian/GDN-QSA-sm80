@@ -232,12 +232,14 @@ int forward_aiu(Inputs p, Workspace ws, BF16* output, float* final,
       !aiu::Tile<Chunk, Dim>::admitted_stride(int64_t(p.shape.value_heads) * Dim))
     return int(hggcErrorInvalidValue);
   bool const split = bool(options & SplitPrepare);
-  if (split && options != (SplitPrepare | AiuOptions)) return int(hggcErrorInvalidValue);
+  bool const pipeline = bool(options & StatePipeline);
+  if (pipeline && options != (StatePipeline | SplitPrepare | AiuOptions)) return int(hggcErrorInvalidValue);
+  if (split && (options & ~StatePipeline) != (SplitPrepare | AiuOptions)) return int(hggcErrorInvalidValue);
   return visit_aiu_options(options & AiuOptions, [&](auto use_state, auto use_output) {
     int rc = split ? configure_split_prepare() : configure_prepare_rows(PrepareRowsShared);
     if (rc) return rc;
     if constexpr (decltype(use_state)::value)
-      rc = int(hggcFuncSetAttribute(aiu::gdn_wy_aiu_state,
+      rc = pipeline ? configure_state_pipeline() : int(hggcFuncSetAttribute(aiu::gdn_wy_aiu_state,
           hggcFuncAttributeMaxDynamicSharedMemorySize, sizeof(TiledStateStorage)));
     else
       rc = configure_state_ab(StateOptions);
@@ -252,9 +254,13 @@ int forward_aiu(Inputs p, Workspace ws, BF16* output, float* final,
                : launch_prepare_rows(p, ws, stream, PrepareRowsShared);
     if (rc) return rc;
     if constexpr (decltype(use_state)::value) {
-      unsigned const grid = unsigned(int64_t(p.shape.batch) * p.shape.value_heads * (Dim / ValueTile));
-      aiu::gdn_wy_aiu_state<<<grid, StateTile::Threads, sizeof(TiledStateStorage), stream>>>(p, ws, final);
-      rc = int(hggcGetLastError());
+      if (pipeline) {
+        rc = launch_state_pipeline(p, ws, final, stream);
+      } else {
+        unsigned const grid = unsigned(int64_t(p.shape.batch) * p.shape.value_heads * (Dim / ValueTile));
+        aiu::gdn_wy_aiu_state<<<grid, StateTile::Threads, sizeof(TiledStateStorage), stream>>>(p, ws, final);
+        rc = int(hggcGetLastError());
+      }
     } else {
       rc = launch_state_ab(p, ws, final, stream, StateOptions);
     }

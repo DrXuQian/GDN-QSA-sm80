@@ -27,6 +27,7 @@ PREPARE_ROWS_DELIVERIES = ("tiled-state-output", "tiled-state-output-both", "sta
                            "prepare-rows-shared", "prepare-rows-warp")
 AIU_DELIVERIES = ("prepare-rows-shared", "aiu-state", "aiu-output", "aiu-state-output")
 SPLIT_PREPARE_DELIVERIES = ("aiu-state-output", "split-prepare")
+STATE_PIPELINE_DELIVERIES = ("split-prepare", "state-pipeline")
 DELIVERIES = {"scalar": 0, "prepare": 1, "state": 2, "output": 4, "all": 7,
               "tiled-prepare": 8, "tiled-state": 16, "tiled-output": 32,
               "tiled-state-output": 48, "tiled-all": 56,
@@ -35,7 +36,7 @@ DELIVERIES = {"scalar": 0, "prepare": 1, "state": 2, "output": 4, "all": 7,
               "stage-address-output": 752, "stage-address-both": 1008,
               "prepare-rows-shared": 1520, "prepare-rows-warp": 2544,
               "aiu-state": 5616, "aiu-output": 9712, "aiu-state-output": 13808,
-              "split-prepare": 30192}
+              "split-prepare": 30192, "state-pipeline": 62960}
 
 
 def gdn_chunk_wy(q, k, v, g, beta, initial_state=None, output_final_state=True, *, delivery="scalar"):

@@ -22,6 +22,8 @@ int forward_aiu(Inputs p, Workspace ws, BF16* output, float* final,
                  gdn_arch::Stream stream, unsigned options);
 int configure_split_prepare();
 int launch_split_prepare(Inputs p, Workspace ws, gdn_arch::Stream stream);
+int configure_state_pipeline();
+int launch_state_pipeline(Inputs p, Workspace ws, float* final, gdn_arch::Stream stream);
 
 template <int Rows, int Cols, int Threads>
 __device__ void stage(BF16* dst, BF16 const* src, int64_t stride, int valid_rows) {

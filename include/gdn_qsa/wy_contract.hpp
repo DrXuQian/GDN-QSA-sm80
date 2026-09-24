@@ -25,6 +25,8 @@ constexpr unsigned AiuOptions = AiuState | AiuOutput;
 constexpr unsigned AiuControl = 1520u;  // shared-row prepare + tiled/gated state + tiled output
 constexpr unsigned SplitPrepare = 16384u;
 constexpr unsigned SplitPrepareDelivery = SplitPrepare | AiuControl | AiuOptions;
+constexpr unsigned StatePipeline = 32768u;
+constexpr unsigned StatePipelineDelivery = StatePipeline | SplitPrepareDelivery;
 
 template <class Visitor>
 constexpr int visit_aiu_options(unsigned options, Visitor visitor, int invalid) {
@@ -62,6 +64,7 @@ constexpr StageAddressSelection stage_address_selection(unsigned delivery) {
 // OutputAddress requires the tiled output. Row caches require PrepareAddress
 // and are mutually exclusive. Old masks0..1023 keep their meaning.
 constexpr bool valid_delivery(unsigned mask) {
+  if (mask & StatePipeline) return mask == StatePipelineDelivery;
   if (mask & SplitPrepare) return mask == SplitPrepareDelivery;
   // The native-pair experiment has exactly three registered cells. It cannot
   // silently ignore old options, select another prepare, or accept unknown bits.

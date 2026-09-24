@@ -103,6 +103,7 @@ def main():
     family.add_argument("--prepare-rows-ab", action="store_true")
     family.add_argument("--aiu-ab", action="store_true")
     family.add_argument("--split-prepare-ab", action="store_true")
+    family.add_argument("--state-pipeline-ab", action="store_true")
     args = p.parse_args()
     if not args.wy_extension.is_file():
         p.error("WY extension missing")
@@ -115,8 +116,9 @@ def main():
     device = torch.device("cuda", args.device)
     from gdn_qsa_sm80.gdn_wy_interface import (PACKED_DELIVERIES, TILED_DELIVERIES,
                                               STATE_DELIVERIES, STAGE_DELIVERIES, PREPARE_ROWS_DELIVERIES, AIU_DELIVERIES,
-                                              SPLIT_PREPARE_DELIVERIES)
-    deliveries = (SPLIT_PREPARE_DELIVERIES if args.split_prepare_ab else AIU_DELIVERIES if args.aiu_ab else PREPARE_ROWS_DELIVERIES if args.prepare_rows_ab else
+                                              SPLIT_PREPARE_DELIVERIES, STATE_PIPELINE_DELIVERIES)
+    deliveries = (STATE_PIPELINE_DELIVERIES if args.state_pipeline_ab else
+                  SPLIT_PREPARE_DELIVERIES if args.split_prepare_ab else AIU_DELIVERIES if args.aiu_ab else PREPARE_ROWS_DELIVERIES if args.prepare_rows_ab else
                   STAGE_DELIVERIES if args.stage_ab else STATE_DELIVERIES if args.state_ab else
                   TILED_DELIVERIES if args.tile_ab else PACKED_DELIVERIES if args.delivery_ab else ())
     for length in (1, 16, 63, 64, 65, 129):
