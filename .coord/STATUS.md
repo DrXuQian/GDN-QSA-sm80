@@ -1,9 +1,25 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 09:38:12 UTC
-working-on: V32/eight-warp local closure complete; ready for same-binary box ACU
-blocked-on: device RAW-BIT/occupancy/performance await user; no local blocker
-last-commit: 1750cf1 (eight-warp implementation; default routing unchanged)
+updated-at: 2026-09-24 11:56:09 UTC
+working-on: eight-warp upload integrity check; no new performance verdict
+blocked-on: uploaded acu.tar.gz truncated at 3,145,728 B; complete re-upload needed
+last-commit: dfe76c3 (local closure checkpoint; implementation 1750cf1 unchanged)
+
+Upload SHA256 bbf652de5019da1b6387443f92c10b4d9edf805464e196c8a55b53abc4041188.
+gzip -t fails unexpected end of file. Streaming inspection received595/611
+complete members; all594 received checksum-covered members match their
+manifest. Truncation occurs inside wy-control/wy-g-1.0.report.acurep;
+16 members absent/incomplete, including candidate report/details/raw and
+both arms' receipts. The received STATUS says residual-warps8/source dfe76c3,
+but that self-report does NOT establish complete capture or device admission.
+Do not derive a performance, occupancy, register or correctness verdict from
+this incomplete bundle. Analysis BLOCKED_INPUT, not kernel FAIL or PASS.
+Retained /workspace/gdn-residual-warps8-acu-analysis-20260924/
+capture-truncated-bbf652de.tar.gz; no uploaded code/binary executed and no
+kernel, default routing or preregistered acceptance changes. User asked to
+re-upload the complete archive; no device re-run requested.
+
+## Previous local closure (unchanged)
 
 Isolated source /workspace/gdn-wy-residual-warps8-20260924, evidence
 /workspace/gdn-wy-residual-warps8-evidence-20260924. Final full rerun
