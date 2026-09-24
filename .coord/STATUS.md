@@ -1,9 +1,14 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 14:32:27 UTC
-working-on: recording verified B-layout result, holistic occupancy and native WAR evidence
-blocked-on: none; no kernel/default-routing changes
-last-commit: 0273ad3 (eight-warp B-layout handoff)
+updated-at: 2026-09-24 14:36:41 UTC
+working-on: analysis complete; next operand-lifetime/H/K experiments are design only
+blocked-on: push only (GitHub SSH publickey denied; no authentication agent)
+last-commit: cc8fc04 (verified ACU report/data; this checkpoint is metadata only)
+
+Report/data committed locally ascc8fc04;skillfollow-up28f52d9 also local.
+Both gitpush attempts failedPermission denied(publickey). No claim of push.
+Finalanalyze.py --native andsummarize.py rerunPASS;summary matches committed
+JSON byte-for-byte. Skillquick_validatePASS. No kernel/default changed.
 
 New upload /root/acu.tar.gz SHA2566b47378313f59748a5d34177f3f3391bddfbf3e6df2ea2f0a20cf520a0a07125
 safely retained under/workspace/gdn-warps8-blayout-acu-analysis-20260924.
