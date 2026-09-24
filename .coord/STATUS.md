@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 09:13:33 UTC
+updated-at: 2026-09-24 09:15:04 UTC
 working-on: B-layout ACU analysis closed; no measured speed benefit, not promoted
 blocked-on: none; next V32/8-warp experiment is not implemented, routing unchanged
-last-commit: 3c7da09 (capture source; analysis checkpoint follows)
+last-commit: d9b0bcd (verified ACU report/data; captured code remains3c7da09)
 
 Upload580e0df3 verified607files/606checks/131sources against3c7da09, same
 binary/fixture/device, all15 kernels1.700GHz.30residual+30B-layout cases x8,
