@@ -1,9 +1,57 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 14:01:39 UTC
-working-on: eight-warp B-layout local closure complete; ready for user ACU run
-blocked-on: none; device performance NOT_RUN and default routing unchanged
-last-commit: 6afd2a5 (eight-warp B-layout candidate and same-geometry ACU runner)
+updated-at: 2026-09-24 15:06:50 UTC
+working-on: full local closure complete; publishing exact tested tree via connected GitHub
+blocked-on: none; device performance NOT_RUN, SSH replaced by authorized GitHub API
+last-commit: a883d3f (UPDATE-only operand candidate, runner and local proofs)
+
+Finalcomplete rerunPASS19/19CTest,87hostcontracts,7dialect,45WY+61residual
+algebra,305originalsource;30WY+15originalnativeimages,29oldbodiesidentical.
+Host2048MMAconsumers/16384words,8plants;6source+5nativeplantsred,including
+old-schedule-same-work. All work local/no deviceexecution/no defaultchange.
+DSO893a87c3f099ad47b3f4748daa4dad513d7e0b637ce47de742b69e3ec5534377;
+bindingffc3999084453174edf368631d5fefa356a48df741c44cc56eefcc02b8c503ea.
+Runafterpublishedpull:DEVICE=0 JOBS=16 CANDIDATE=residual-warps8-operands
+bash tools/run_ppu_residual_delivery_acu_box.sh. Control=warps8-blayout,
+subject=warps8-operands,reference=FLA;full4/4/7kernelACU,no API timing.
+H/Klayoutsareunchanged;10otherimmediatereuse sitesremain. API tree equality
+will bind publication tolocalmeasuredsources; neverclaimdevicegainbeforeACU.
+
+## Implementation checkpoints
+
+User authorized continuing the proposed optimization. New source worktree
+/workspace/gdn-wy-warps8-operands-20260924; evidence plan/ledger
+/workspace/gdn-wy-warps8-operands-evidence-20260924. Control is8warpB-layout;
+onlyoperandlookahead,notH/Klayouts/grid/math. No registercap/defaultchange.
+Firstlocalcheckpoint15:35UTC;full-callperformanceNOT_RUN.
+Native2slotsUPDATEBlookahead0/1->2/3MMAs,targetimmediatereuse3->0;
+otherKH/PR10sitesremain. Four-slots/emptylivenessconstraintsidenticalto2slot
+codegen,rejectedandremoved.124regs/zero stack,math/traffic/barriersfixed.
+Host2048consumers/16384tagwords and8negativesPASS;6source+5native
+negativesPASS includingold-schedulewithsamework. Firstfulltierfoundold
+control-denominator28/29 mustbe29/30;fixandrerunfulltierbeforeclaimclosure.
+
+Report/data committed locally ascc8fc04;skillfollow-up28f52d9 also local.
+Both gitpush attempts failedPermission denied(publickey). No claim of push.
+Finalanalyze.py --native andsummarize.py rerunPASS;summary matches committed
+JSON byte-for-byte. Skillquick_validatePASS. No kernel/default changed.
+
+New upload /root/acu.tar.gz SHA2566b47378313f59748a5d34177f3f3391bddfbf3e6df2ea2f0a20cf520a0a07125
+safely retained under/workspace/gdn-warps8-blayout-acu-analysis-20260924.
+Verified616files/615hashes/140source snapshots; receipts/binaries/numerics
+and15/15kernel opcode sums close. FullsiteACU205.35882->205.85352us;
+state104.31353->105.14588;FLA223.91471us. Onecapture,no speed admission.
+BC7,979,008->5,881,856;global/shared instruction counts and useful math fixed.
+Registers162->124/zero stack;capacity3->4CTA/CU but grid128/72supplies1.78;
+sharedlimit5,warplimit8,blocklimit64 unchanged. Active14.12->14.11warps/CU,
+eligible0.36->0.34/WE. NativeMMA-source registers overwritten by nextload
+at4verifiedPCpairs;computeTFUWARratio0.00->0.39 is aggregate evidence,
+not a perPC attribution or proved cancellation of saved memory time.
+H/K remain distinct layout targets with multiple consumer contracts.
+Nextdesign:preserveBlayout and test independent operand lifetime/prefetch,
+then pairedHsnapshot andKdual-consumer layouts. No implementation thisturn.
+
+## Previous local handoff
 
 User authorized implementation. Source worktree:
 /workspace/gdn-wy-warps8-blayout-20260924; evidence/plan:

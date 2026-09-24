@@ -62,12 +62,13 @@ class ACUContract(unittest.TestCase):
         inputs=tuple(torch.zeros(1) for _ in range(5))
         backend=SimpleNamespace(**{name:Mock(return_value=('out','state')) for name in
             ('residual','residual_prefetch','residual_operands','residual_v16','residual_blayout',
-             'residual_warps8','residual_warps8_blayout')})
+             'residual_warps8','residual_warps8_blayout','residual_warps8_operands')})
         with patch.object(api,'_backend',return_value=backend):
             for delivery,name in (('scalar','residual'),('prefetch','residual_prefetch'),
                                   ('operands','residual_operands'),('v16','residual_v16'),
                                   ('blayout','residual_blayout'),('warps8','residual_warps8'),
-                                  ('warps8-blayout','residual_warps8_blayout')):
+                                  ('warps8-blayout','residual_warps8_blayout'),
+                                  ('warps8-operands','residual_warps8_operands')):
                 self.assertEqual(api.gdn_chunk_residual(*inputs,delivery=delivery),('out','state'))
                 getattr(backend,name).assert_called_once()
             with self.assertRaises(ValueError): api.gdn_chunk_residual(*inputs,delivery='unknown')
@@ -86,7 +87,7 @@ class ACUContract(unittest.TestCase):
         directory = self.directory()
         runner = ROOT / 'tools/run_ppu_residual_delivery_acu_box.sh'
         for candidate in ('not-a-candidate', 'residual-v16', 'residual-blayout', 'residual-warps8',
-                          'residual-warps8-blayout'):
+                          'residual-warps8-blayout','residual-warps8-operands'):
             out = directory / candidate
             env = os.environ | {'CANDIDATE': candidate, 'OUT': str(out),
                                 'ACU': str(directory / 'missing-site-acu')}
@@ -150,6 +151,40 @@ class ACUContract(unittest.TestCase):
         captures = [cmd for cmd in commands if '--phase' in cmd and cmd[cmd.index('--phase')+1] == 'subject']
         self.assertEqual([cmd[cmd.index('--wy-delivery')+1] for cmd in captures],
                          ['residual-warps8','residual-warps8-blayout','residual-warps8-blayout'])
+
+    def test_warps8_operands_requires_its_backend_and_blayout_control(self):
+        import torch
+        from unittest.mock import Mock
+        from gdn_qsa_sm80 import gdn_residual_interface as api
+        inputs = tuple(torch.zeros(1) for _ in range(5))
+        backend = SimpleNamespace(residual=Mock(), residual_warps8_blayout=Mock())
+        with patch.object(api, '_backend', return_value=backend), self.assertRaises(AttributeError):
+            api.gdn_chunk_residual(*inputs, delivery='warps8-operands')
+        backend.residual.assert_not_called()
+        backend.residual_warps8_blayout.assert_not_called()
+        control, _ = self.records()
+        control.update(role='wy', implementation='wy', wy_delivery='residual-warps8-blayout',
+                       math_contract=collect.MATH_CONTRACT)
+        subject = control | dict(wy_delivery='residual-warps8-operands')
+        collect.validate_wy_control(control, subject)
+        for wrong in ('residual', 'residual-warps8', 'residual-warps8-operands'):
+            with self.subTest(wrong=wrong), self.assertRaises(ValueError):
+                collect.validate_wy_control(control | dict(wy_delivery=wrong), subject)
+
+    def test_warps8_operands_profile_and_capture_are_exact(self):
+        inputs = (1,2,3,4,5)
+        with patch('gdn_qsa_sm80.gdn_chunk_residual', return_value='new-schedule') as call:
+            subject, _ = profile.subject_call('wy','wy',Path('/binding.so'),inputs,
+                                               'residual-warps8-operands')
+            self.assertEqual(subject(), 'new-schedule')
+            call.assert_called_once_with(*inputs, output_final_state=True, delivery='warps8-operands')
+        directory = self.directory()
+        status, commands, _, _ = self.run_mock_capture(
+            directory, control='residual-warps8-blayout', subject_delivery='residual-warps8-operands')
+        self.assertEqual(status['status'], 'PASS', status['errors'])
+        captures = [cmd for cmd in commands if '--phase' in cmd and cmd[cmd.index('--phase')+1] == 'subject']
+        self.assertEqual([cmd[cmd.index('--wy-delivery')+1] for cmd in captures],
+                         ['residual-warps8-blayout','residual-warps8-operands','residual-warps8-operands'])
 
     @classmethod
     def setUpClass(cls):
