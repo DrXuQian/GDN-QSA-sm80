@@ -1,5 +1,10 @@
 # Eight-warps: paired residual/scaledV B layout
 
+Device follow-up: [2026-09-24 ACU verdict](PPU_GDN_RESIDUAL_WARPS8_B_LAYOUT_ACU_20260924.md)
+passes numerics and lowers BC26.3%, but full-call205.359->205.854us shows
+no speed gain. Keep the eight-warp control; routing unchanged. The following
+records the original local handoff, before that measurement.
+
 Parent a2c8617. This is a layout-only branch of the measured eight-warp
 residual implementation, not a new arithmetic algorithm or default route.
 Priority: B1/S2048/Hk16/Hv32/K=V128/C64, g=-1.0 profile; both -0.1/-1.0

@@ -1,9 +1,26 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 14:01:39 UTC
-working-on: eight-warp B-layout local closure complete; ready for user ACU run
-blocked-on: none; device performance NOT_RUN and default routing unchanged
-last-commit: 6afd2a5 (eight-warp B-layout candidate and same-geometry ACU runner)
+updated-at: 2026-09-24 14:32:27 UTC
+working-on: recording verified B-layout result, holistic occupancy and native WAR evidence
+blocked-on: none; no kernel/default-routing changes
+last-commit: 0273ad3 (eight-warp B-layout handoff)
+
+New upload /root/acu.tar.gz SHA2566b47378313f59748a5d34177f3f3391bddfbf3e6df2ea2f0a20cf520a0a07125
+safely retained under/workspace/gdn-warps8-blayout-acu-analysis-20260924.
+Verified616files/615hashes/140source snapshots; receipts/binaries/numerics
+and15/15kernel opcode sums close. FullsiteACU205.35882->205.85352us;
+state104.31353->105.14588;FLA223.91471us. Onecapture,no speed admission.
+BC7,979,008->5,881,856;global/shared instruction counts and useful math fixed.
+Registers162->124/zero stack;capacity3->4CTA/CU but grid128/72supplies1.78;
+sharedlimit5,warplimit8,blocklimit64 unchanged. Active14.12->14.11warps/CU,
+eligible0.36->0.34/WE. NativeMMA-source registers overwritten by nextload
+at4verifiedPCpairs;computeTFUWARratio0.00->0.39 is aggregate evidence,
+not a perPC attribution or proved cancellation of saved memory time.
+H/K remain distinct layout targets with multiple consumer contracts.
+Nextdesign:preserveBlayout and test independent operand lifetime/prefetch,
+then pairedHsnapshot andKdual-consumer layouts. No implementation thisturn.
+
+## Previous local handoff
 
 User authorized implementation. Source worktree:
 /workspace/gdn-wy-warps8-blayout-20260924; evidence/plan:
