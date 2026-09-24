@@ -7,10 +7,16 @@ WY_MATH_CONTRACT = "materialized-wu-bf16-v1"
 # deliberately does not. None is NOT a secretly reused delivery mask.
 RESIDUAL_VARIANTS = {"residual": "scalar", "residual-prefetch": "prefetch",
                      "residual-operands": "operands", "residual-v16": "v16",
-                     "residual-blayout": "blayout", "residual-warps8": "warps8"}
+                     "residual-blayout": "blayout", "residual-warps8": "warps8",
+                     "residual-warps8-blayout": "warps8-blayout"}
 RESIDUAL_ENTRYPOINTS = {"scalar": "residual", "prefetch": "residual_prefetch",
                         "operands": "residual_operands", "v16": "residual_v16",
-                        "blayout": "residual_blayout", "warps8": "residual_warps8"}
+                        "blayout": "residual_blayout", "warps8": "residual_warps8",
+                        "warps8-blayout": "residual_warps8_blayout"}
+# Same-geometry performance controls; scalar residual remains the numeric
+# anchor for every delivery. Do not profile the combination against four warps.
+RESIDUAL_CONTROLS = {name: "residual" for name in RESIDUAL_VARIANTS if name != "residual"}
+RESIDUAL_CONTROLS["residual-warps8-blayout"] = "residual-warps8"
 PROFILE_VARIANTS = {**DELIVERIES, **dict.fromkeys(RESIDUAL_VARIANTS)}
 
 

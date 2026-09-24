@@ -26,9 +26,10 @@ class ACUContract(unittest.TestCase):
     def test_residual_delivery_capture_requires_matching_control(self):
         for delivery in sorted(collect.RESIDUAL_DELIVERIES):
             with self.subTest(delivery=delivery):
-                arms=collect.capture_arms(Path('/bundle'),'wy',delivery,'residual')
-                self.assertEqual([a.delivery for a in arms],['residual',delivery,delivery])
-                for wrong in (None,'scalar','state-pipeline',delivery):
+                control = collect.RESIDUAL_CONTROLS[delivery]
+                arms=collect.capture_arms(Path('/bundle'),'wy',delivery,control)
+                self.assertEqual([a.delivery for a in arms],[control,delivery,delivery])
+                for wrong in {None,'scalar','state-pipeline',delivery,'residual','residual-warps8'} - {control}:
                     with self.assertRaises(ValueError):
                         collect.capture_arms(Path('/bundle'),'wy',delivery,wrong)
 
@@ -45,11 +46,12 @@ class ACUContract(unittest.TestCase):
     def test_complete_residual_deliveries_and_changed_output_negative(self):
         directory=self.directory()
         for delivery in sorted(collect.RESIDUAL_DELIVERIES):
+            control = collect.RESIDUAL_CONTROLS[delivery]
             d=directory/delivery;d.mkdir()
-            status,commands,bundle,_=self.run_mock_capture(d,control='residual',subject_delivery=delivery)
+            status,commands,bundle,_=self.run_mock_capture(d,control=control,subject_delivery=delivery)
             self.assertEqual(status['status'],'PASS',status['errors'])
             d=directory/(delivery+'-bad');d.mkdir()
-            status,_,_,_=self.run_mock_capture(d,control='residual',subject_delivery=delivery,
+            status,_,_,_=self.run_mock_capture(d,control=control,subject_delivery=delivery,
                                               plant='changed-control-output')
             self.assertEqual(status['status'],'INCOMPLETE')
 
@@ -59,11 +61,13 @@ class ACUContract(unittest.TestCase):
         from unittest.mock import Mock
         inputs=tuple(torch.zeros(1) for _ in range(5))
         backend=SimpleNamespace(**{name:Mock(return_value=('out','state')) for name in
-            ('residual','residual_prefetch','residual_operands','residual_v16','residual_blayout','residual_warps8')})
+            ('residual','residual_prefetch','residual_operands','residual_v16','residual_blayout',
+             'residual_warps8','residual_warps8_blayout')})
         with patch.object(api,'_backend',return_value=backend):
             for delivery,name in (('scalar','residual'),('prefetch','residual_prefetch'),
                                   ('operands','residual_operands'),('v16','residual_v16'),
-                                  ('blayout','residual_blayout'),('warps8','residual_warps8')):
+                                  ('blayout','residual_blayout'),('warps8','residual_warps8'),
+                                  ('warps8-blayout','residual_warps8_blayout')):
                 self.assertEqual(api.gdn_chunk_residual(*inputs,delivery=delivery),('out','state'))
                 getattr(backend,name).assert_called_once()
             with self.assertRaises(ValueError): api.gdn_chunk_residual(*inputs,delivery='unknown')
@@ -81,7 +85,8 @@ class ACUContract(unittest.TestCase):
     def test_residual_runner_rejects_bad_selector_or_missing_acu_before_build(self):
         directory = self.directory()
         runner = ROOT / 'tools/run_ppu_residual_delivery_acu_box.sh'
-        for candidate in ('not-a-candidate', 'residual-v16', 'residual-blayout', 'residual-warps8'):
+        for candidate in ('not-a-candidate', 'residual-v16', 'residual-blayout', 'residual-warps8',
+                          'residual-warps8-blayout'):
             out = directory / candidate
             env = os.environ | {'CANDIDATE': candidate, 'OUT': str(out),
                                 'ACU': str(directory / 'missing-site-acu')}
@@ -110,6 +115,41 @@ class ACUContract(unittest.TestCase):
         with patch.object(api,'_backend',return_value=backend),self.assertRaises(AttributeError):
             api.gdn_chunk_residual(*inputs,delivery='warps8')
         backend.residual.assert_not_called()
+
+    def test_warps8_blayout_cannot_silently_use_control_backend(self):
+        import torch
+        from unittest.mock import Mock
+        from gdn_qsa_sm80 import gdn_residual_interface as api
+        inputs = tuple(torch.zeros(1) for _ in range(5))
+        backend = SimpleNamespace(residual=Mock(), residual_warps8=Mock())
+        with patch.object(api, '_backend', return_value=backend), self.assertRaises(AttributeError):
+            api.gdn_chunk_residual(*inputs, delivery='warps8-blayout')
+        backend.residual.assert_not_called()
+        backend.residual_warps8.assert_not_called()
+
+    def test_warps8_blayout_same_geometry_receipt_cannot_be_four_warps(self):
+        control, _ = self.records()
+        control.update(role='wy', implementation='wy', wy_delivery='residual-warps8',
+                       math_contract=collect.MATH_CONTRACT)
+        subject = control | dict(wy_delivery='residual-warps8-blayout')
+        collect.validate_wy_control(control, subject)
+        with self.assertRaises(ValueError):
+            collect.validate_wy_control(control | dict(wy_delivery='residual'), subject)
+
+    def test_warps8_blayout_profile_selects_exact_api_and_paired_capture(self):
+        inputs = (1,2,3,4,5)
+        with patch('gdn_qsa_sm80.gdn_chunk_residual', return_value='new-layout') as call:
+            subject, _ = profile.subject_call('wy','wy',Path('/binding.so'),inputs,
+                                               'residual-warps8-blayout')
+            self.assertEqual(subject(), 'new-layout')
+            call.assert_called_once_with(*inputs, output_final_state=True, delivery='warps8-blayout')
+        directory = self.directory()
+        status, commands, _, _ = self.run_mock_capture(
+            directory, control='residual-warps8', subject_delivery='residual-warps8-blayout')
+        self.assertEqual(status['status'], 'PASS', status['errors'])
+        captures = [cmd for cmd in commands if '--phase' in cmd and cmd[cmd.index('--phase')+1] == 'subject']
+        self.assertEqual([cmd[cmd.index('--wy-delivery')+1] for cmd in captures],
+                         ['residual-warps8','residual-warps8-blayout','residual-warps8-blayout'])
 
     @classmethod
     def setUpClass(cls):
@@ -570,12 +610,13 @@ class ACUContract(unittest.TestCase):
                 fingerprint="residual-output", math_contract=collect.MATH_CONTRACT,
                 errors=[.008, .004], scalar_raw_bit_equal=None)
         if delivery in collect.RESIDUAL_DELIVERIES:
-            for variant in ("residual",delivery):
-                comparison["cases"][0]["arms"][f"wy-{variant}"].update(
+            for variant in {"residual",delivery,control}:
+                comparison["cases"][0]["arms"].setdefault(f"wy-{variant}", dict(delivery_mask=None)).update(
                     fingerprint="residual-output",math_contract=collect.MATH_CONTRACT,
                     errors=[.008,.004],scalar_raw_bit_equal=None)
-            comparison["cases"][0]["arms"][f"wy-{delivery}"].update(
-                residual_raw_bit_equal=True,residual_fingerprint="residual-output")
+                if variant != "residual":
+                    comparison["cases"][0]["arms"][f"wy-{variant}"].update(
+                        residual_raw_bit_equal=True,residual_fingerprint="residual-output")
         if plant == "missing-comparison-arm":
             del comparison["cases"][0]["arms"]["wy-prepare-rows-shared"]
         if plant == "wrong-comparison-mask":

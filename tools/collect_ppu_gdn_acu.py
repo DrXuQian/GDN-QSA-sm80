@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ACU = Path("/sim/eec/shared/junfu.qx/asight/bin/acu")
 sys.path.insert(0, str(ROOT))
 from gdn_qsa_sm80.gdn_wy_interface import DELIVERIES
-from gdn_qsa_sm80.gdn_residual_interface import PROFILE_VARIANTS, RESIDUAL_VARIANTS, MATH_CONTRACT, WY_MATH_CONTRACT
+from gdn_qsa_sm80.gdn_residual_interface import PROFILE_VARIANTS, RESIDUAL_VARIANTS, RESIDUAL_CONTROLS, MATH_CONTRACT, WY_MATH_CONTRACT
 
 RESIDUAL_DELIVERIES = set(RESIDUAL_VARIANTS) - {"residual"}
 
@@ -44,8 +44,8 @@ def capture_arms(bundle, implementation, delivery, control=None):
         raise ValueError("WY control/delivery requires --wy-run")
     if delivery == "residual" and control != "state-pipeline":
         raise ValueError("residual requires the registered state-pipeline control")
-    if delivery in RESIDUAL_DELIVERIES and control != "residual":
-        raise ValueError("residual delivery requires its unchanged residual control")
+    if delivery in RESIDUAL_DELIVERIES and control != RESIDUAL_CONTROLS[delivery]:
+        raise ValueError(f"residual delivery requires same-geometry control {RESIDUAL_CONTROLS[delivery]}")
     arms = []
     if control is not None:
         if control not in PROFILE_VARIANTS or control == delivery:
@@ -296,7 +296,7 @@ def validate_wy_control(control, subject):
         raise ValueError("WY control silently selected the candidate delivery")
     residual = subject.get("wy_delivery") == "residual"
     if subject.get("wy_delivery") in RESIDUAL_DELIVERIES:
-        if (control.get("wy_delivery") != "residual" or
+        if (control.get("wy_delivery") != RESIDUAL_CONTROLS[subject["wy_delivery"]] or
                 control.get("math_contract") != MATH_CONTRACT or subject.get("math_contract") != MATH_CONTRACT):
             raise ValueError("residual delivery must compare same-math residual control")
     if residual:
@@ -526,8 +526,8 @@ def main():
         parser.error("--wy-control requires --wy-run and a different --wy-delivery")
     if args.wy_delivery == "residual" and args.wy_control != "state-pipeline":
         parser.error("residual algorithm requires --wy-control state-pipeline")
-    if args.wy_delivery in RESIDUAL_DELIVERIES and args.wy_control != "residual":
-        parser.error("residual delivery requires --wy-control residual")
+    if args.wy_delivery in RESIDUAL_DELIVERIES and args.wy_control != RESIDUAL_CONTROLS[args.wy_delivery]:
+        parser.error(f"residual delivery requires --wy-control {RESIDUAL_CONTROLS[args.wy_delivery]}")
     if args.wy_run:
         args.wy_run = args.wy_run.resolve()
     args.sdk = Path(os.environ.get("PPU_SDK", "/usr/local/PPU_SDK")).resolve()

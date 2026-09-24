@@ -41,7 +41,7 @@ def check_source(control, candidate, header):
             raise AssertionError(f'B-layout added forbidden work: {forbidden}')
 
 
-def native_body(isa, marker):
+def native_body(isa, marker, mma_sites=40):
     sections = [s for s in isa.split('Disassembly of section ')
                 if s.startswith('.text.kernel.') and marker in s.splitlines()[0]]
     if len(sections) != 1:
@@ -56,7 +56,7 @@ def native_body(isa, marker):
         if text.startswith('s.cbr') and dest and labels[dest[1]] < pc:
             head = labels[dest[1]]
             body = [op for at, op in ops if head <= at <= pc]
-            if sum(op.startswith('v.mma.f32.bf16') for op in body) == 40:
+            if sum(op.startswith('v.mma.f32.bf16') for op in body) == mma_sites:
                 loops.append(body)
     if not loops or len({len(x) for x in loops}) != len(loops):
         raise AssertionError('residual recurrence native backedges not classified')
