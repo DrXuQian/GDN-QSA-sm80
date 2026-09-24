@@ -1,9 +1,32 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 12:37:06 UTC
-working-on: static BC/transpose report and negative controls pushed; implementation unchanged
-blocked-on: none; no kernel/default-routing edits
-last-commit: 9c9d2e7 (static analysis and host diagnostics; implementation unchanged)
+updated-at: 2026-09-24 14:01:39 UTC
+working-on: eight-warp B-layout local closure complete; ready for user ACU run
+blocked-on: none; device performance NOT_RUN and default routing unchanged
+last-commit: 6afd2a5 (eight-warp B-layout candidate and same-geometry ACU runner)
+
+User authorized implementation. Source worktree:
+/workspace/gdn-wy-warps8-blayout-20260924; evidence/plan:
+/workspace/gdn-wy-warps8-blayout-evidence-20260924.
+Only paired residual/scaledV writer/readers; control must be eight-warps.
+H/K/P/Vnew/global staging/barriers/precision unchanged. First local closure
+target 15:15 UTC, not a device speed promise. Full-call ACU after user runs.
+Full-local.log exited0:18/18CTest,85hostcontracts,7dialect,45WY+61residual
+algebra,305originalsource. 29WY+15originalnativeimages;28oldbodiesidentical.
+Native124regs vs162,stack0,shared45568B;static1313vs1316,recurring516/530
+vs523/537. 1,048,576writer+4,194,304reader values and8hostnegativecontrols;
+6source+4nativeplantsred. New capture uses warps8 control, NOT4warp residual.
+No register cap/default promotion; actual device numerics/BC/performance NOT_RUN.
+Final complete rerun exited0 at14:01 UTC; final-local-complete.log is the
+authority, not an individual re-run. Source branchdbab55b cherry-picked as
+6afd2a5; skill lesson053c090 pushed. Run after pull:
+DEVICE=0 JOBS=16 CANDIDATE=residual-warps8-blayout bash
+tools/run_ppu_residual_delivery_acu_box.sh. Same-binary control=warps8,
+candidate=warps8-blayout,reference=FLA. Both state grids128x256;4/4/7kernels,
+siteACU only/API_TIMING=NOT_RUN.30devicefixturesx8 perdelivery plusbothgates.
+Upload printed/workspace archive; default remains unchanged pending result.
+
+## Previous static-analysis checkpoint
 
 Analysis push confirmed. Quactlize skill lesson de6fbb2 is also pushed:
 native fragment maps and empirical BC accounting are distinct evidence;
