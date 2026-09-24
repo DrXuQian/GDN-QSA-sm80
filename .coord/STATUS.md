@@ -1,9 +1,13 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 12:33:47 UTC
-working-on: static BC/transpose analysis complete; implementation intentionally unchanged
+updated-at: 2026-09-24 12:37:06 UTC
+working-on: static BC/transpose report and negative controls pushed; implementation unchanged
 blocked-on: none; no kernel/default-routing edits
-last-commit: 920e21c (eight-warp result checkpoint; implementation unchanged)
+last-commit: 9c9d2e7 (static analysis and host diagnostics; implementation unchanged)
+
+Analysis push confirmed. Quactlize skill lesson de6fbb2 is also pushed:
+native fragment maps and empirical BC accounting are distinct evidence;
+the simple bank model does not prove native TSM service phases.
 
 New user scope: locate BC statically before modifying it; explain why trans
 exists and whether it can move to producers. Current source already emits
