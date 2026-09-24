@@ -86,4 +86,14 @@ hashes and source under its printed `/workspace/gdn-wy-fla-...` directory.
 Compare each candidate to the contemporaneous incumbent, not only scalar
 WY. Preserve losses and overlapping envelopes as UNRESOLVED. A terminal
 PASS means numerics and measurement completed, not an admitted speedup.
-Device numerical and performance verdicts are pending; none were run locally.
+
+### Device status: 2026-09-24 UTC
+
+User reports correctness PASS following the8340fc7 box handoff. Record this
+as **USER-REPORTED/PASS**; detailed per-arm logs and loaded binary identity
+have not yet been received, so no specific case/repeat counts are claimed
+as verified results. No device code was run locally.
+
+Performance is still pending. Compare AIU-state/output/both to the same-run
+`prepare-rows-shared` control at both decay values before selecting a winner.
+No default routing change or speedup admission follows from correctness alone.
