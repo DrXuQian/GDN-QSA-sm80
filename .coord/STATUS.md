@@ -1,9 +1,31 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 03:02:26 UTC
-working-on: same-binary incumbent/AIU-both/FLA ACU collector complete; box command ready
-blocked-on: awaiting new device ACU bundle and complete prior comparison; no local PPU
-last-commit: 7a49ad5 (three-arm capture and exact measured-mask binding)
+updated-at: 2026-09-24 03:30:24 UTC
+working-on: verified AIU three-arm ACU; structural prepare/state priorities documented
+blocked-on: none for analysis; structural rewrite not implemented by this checkpoint
+last-commit: 073939f (verified uploaded AIU ACU result and remaining FLA gap)
+
+New archive gdn-qsa-acu-20260924T031047Z-2637570.tar.gz:570 files/569 hashes
+verify. Clean8340fc7 measured binary; b75b25d collector; all3 arms same UUID,
+input, precision and1.700 GHz. Exact16 cases x4 deliveries,8 repeats and
+2 gates x7 roles x14 API samples verified. Native per-PC sums close all13
+kernels; dropping an executed PC fails all13.62 host contracts PASS.
+
+User explicitly chooses ACU TIME ONLY for next optimization. Current
+prepare/state/output135.854/121.071/47.123 us vs FLA83.428/90.198/42.748;
+FLA fills6.491 us separately. Total304.048 vs222.864 us:36.4% slower.
+Old control346.278 us; real state/output gains17.0%/27.5% with45.0%/46.1%
+fewer dynamic instructions, equal MMA counts and similar traffic/warps.
+Prepare is60% of remaining matched-phase gap. Next is structural prefix/
+KKT-solve/WU resource separation and vector publication, not a claim one
+store edit closes it; then state load/wait/operand schedule. Output only5%.
+Keep native AIU pair, FP32 state and TF32 residual precision; no kernel or
+route changed now. Full report docs/PPU_WY_AIU_ACU_20260924.md; revised
+design docs/PPU_WY_FLA_REWRITE.md. Evidence /workspace/gdn-wy-aiu-acu-analysis-20260924.
+Quactlize skill9a51415 records measured instruction/time and sync-counter
+limits; unrelated dirty files were not staged. No local device execution.
+
+## Prior collector/user-table checkpoint (superseded by verified upload)
 
 Current helper adds optional --wy-control prepare-rows-shared alongside
 --wy-delivery aiu-state-output --wy-run EXISTING_COMPARISON --gate -1.0.

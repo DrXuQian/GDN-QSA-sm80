@@ -17,6 +17,42 @@ explicit internal layout. It does not yet change the three-stage graph,
 prepare publication or joint QH/QK reuse. This is a separately measurable
 delivery step, not completion of every rewrite item below.
 
+## Current priority after the three-arm ACU capture
+
+The [2026-09-24 verified result](PPU_WY_AIU_ACU_20260924.md) supersedes the
+historical instruction/time figures below. Current AIU prepare/state/output
+are135.854/121.071/47.123 us versus FLA83.428/90.198/42.748 us. Including
+FLA's6.491 us fills, totals are304.048 vs222.864 us. The user selects
+**ACU time**, not complete Python API time, as the next optimization metric.
+
+Remaining matched-phase excess is60% prepare,35% state,5% output. Resume the
+structural plan here, not another series of descriptor micro-ablations:
+
+1. Separate preparation responsibilities as prefix, KKT+solve, and W/U,
+   with independent CTA/shared/register budgets. The current fused prepare
+   carries70,144 B/CTA and128 threads through unlike phases; FLA W/U has
+   25,600 B/CTA and256 threads. Its observed active warps are37.11 vs our
+   fused prepare's11.76. This is evidence of a resource-layout difference,
+   not proof that splitting alone provides the52.426 us saving. Use native
+   actlize tensor tiles and vector publication for W/U. Include the cost of
+   extra launches and intermediate traffic in the entire prepare comparison.
+2. Preserve the admitted AIU state as control. Inspect the generated recurrent
+   loop's operand reuse, prefetch/wait placement and publication lifetimes
+   against the selected FLA loop. Both necessarily recur over chunks; both
+   already keep FP32 state in registers. Barrier counts are unchanged by AIU
+   but sync waiting rises. Do not remove barriers or claim overlap without
+   verifying the generated schedule and dependencies.
+3. Keep current AIU output first: only4.375 us remains against FLA. Joint
+   QH/QK reuse remains a later independent test, not a prerequisite for the
+   much larger prepare/state gaps.
+
+Vector-only W/U publication is a useful causal control within the prepare
+rewrite, not a claim that one store change closes the whole gap. Preserve
+the current TF32 residual terms, BF16 boundaries, FP32 recurrence, independent
+numerical gate and old path. The existing five-stage plan has **not** already
+been delivered by the paired AIU patch. These priorities are design only;
+no structural kernel rewrite is made by this analysis checkpoint.
+
 ## Diagnosis ledger: what is established
 
 Counts below are measured warp executions from the verified native reports,

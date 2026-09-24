@@ -137,7 +137,7 @@ It explains why45% fewer instructions must not be forecast as45% less time.
 Per-issue stall ratios are not wall-time fractions and are not summed into
 an E2E time equation.
 
-## The next bounded change
+## Next structural priority (user requested ACU-only reassessment)
 
 Remaining matched-math difference versus FLA is87.675 us:
 
@@ -145,7 +145,7 @@ Remaining matched-math difference versus FLA is87.675 us:
 - State30.874 us (35.2%).
 - Output4.375 us (5.0%).
 
-**Prepare W/U publication is the next isolated target.** Its unchanged
+**Prepare is the next structural target; W/U publication is one measured defect.** Its unchanged
 source `gdn_wy_prepare_rows_ppu.cu` still writes each BF16 accumulator element
 directly to `ws.w[at]` and `ws.u[at]`. The measured524,288 `vmem.st.b16`
 warp executions represent32 MiB useful W/U, but their KVD write requests are
@@ -153,12 +153,19 @@ warp executions represent32 MiB useful W/U, but their KVD write requests are
 33,816,576 B=32.25 MiB. Thus the16x amplification is at the KVD interface,
 **not HBM**, and it is not removed by the new state/output readers.
 
-Test only coalesced/vector W/U publication on the currently admitted prepare
-math, retaining the new AIU state/output and the old path as counterfactual.
-Prove scratch liveness and MMA-output/lane-to-vector ownership first. Do not
-reuse the entire old tiled-prepare candidate: it changed more than publication
-and previously lost. The expected diagnostic is fewer scalar stores and KVD
-write requests closer to useful output; latency improvement remains unmeasured.
+Use the existing [FLA-structured design](PPU_WY_FLA_REWRITE.md): separate
+prefix/KKT+solve/W/U responsibilities and resource budgets. Current fused
+prepare uses70,144 shared bytes and128 threads, while FLA W/U uses25,600
+bytes and256 threads. Redesign W/U tensor ownership and vector publication
+with that independent budget. Splitting also adds launches/intermediate
+traffic, so compare the complete preparation sum, not just its fastest child.
+The52.426 us difference is a target to explain, not a guaranteed split gain.
+
+Keep vector-only publication as a causal control, retaining the new AIU
+state/output and old path. Prove scratch liveness and MMA-output/lane-to-vector
+ownership first. Do not simply reuse the old losing tiled-prepare candidate.
+The diagnostic is fewer scalar stores and KVD requests closer to useful
+output; its isolated latency contribution remains unmeasured.
 
 Keep the TF32 inverse's high/high plus two residual products. Its98,304
 TF32 MMAs versus FLA32,768 are an intentional accuracy cost, not free removable
