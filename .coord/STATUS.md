@@ -1,9 +1,13 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 15:06:50 UTC
-working-on: full local closure complete; publishing exact tested tree via connected GitHub
-blocked-on: none; device performance NOT_RUN, SSH replaced by authorized GitHub API
-last-commit: a883d3f (UPDATE-only operand candidate, runner and local proofs)
+updated-at: 2026-09-24 15:12:18 UTC
+working-on: local closure and publication complete; ready for user same-binary ACU run
+blocked-on: none; device performance remains NOT_RUN and default routing unchanged
+last-commit: 7cfeb06 (published UPDATE operand candidate; this checkpoint is metadata only)
+
+Published7cfeb06 through authorizedGitHubAPI; remote/localtreeboth
+b0856e41ad09fc852878657295793010b41e8d30. HTTPSfetch+treecomparisonPASS,
+localhistorymergednon-destructively. Skilllessonpublisheda5c667c.
 
 Finalcomplete rerunPASS19/19CTest,87hostcontracts,7dialect,45WY+61residual
 algebra,305originalsource;30WY+15originalnativeimages,29oldbodiesidentical.
@@ -18,6 +22,10 @@ H/Klayoutsareunchanged;10otherimmediatereuse sitesremain. API tree equality
 will bind publication tolocalmeasuredsources; neverclaimdevicegainbeforeACU.
 
 ## Implementation checkpoints
+
+Earlier SSH-failure checkpoints below are superseded by the verified API
+publication above. No identity, authentication configuration or credential
+was changed to publish.
 
 User authorized continuing the proposed optimization. New source worktree
 /workspace/gdn-wy-warps8-operands-20260924; evidence plan/ledger
