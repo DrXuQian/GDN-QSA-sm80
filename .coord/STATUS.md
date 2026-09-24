@@ -1,9 +1,32 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 05:07:48 UTC
-working-on: state-pipeline local closure complete; three-arm ACU handoff ready
-blocked-on: box numeric/performance NOT_RUN for62960; FLA1.5x not yet achieved
-last-commit: 6e05041 (opt-in state pipeline, lifetime/native gates and runner)
+updated-at: 2026-09-24 05:48:55 UTC
+working-on: uploaded state-pipeline verdict and site-ACU selection closed; final review and push
+blocked-on: none for this delivery; FLA1.5x remains unmet; next candidate is W/U register conditioning
+last-commit: 8eaaa56 (state-pipeline handoff measured by this upload)
+
+Upload SHA256 a735ad2ad07a9390358664dbe88a1ad0036fb3961d8d7ae0007e0c3d3c30bc6f:
+580 files/579 hashes verify; clean8eaaa56, all17 kernels at1.700GHz,
+control/candidate/FLA5/5/7 kernels. Device16 cases x2 deliveries x8 repeats
+RAW-BIT+2% oracle PASS; both gates numerical admission, g=-1 capture only.
+ACU sum control271.48295 -> candidate252.19059 us, FLA224.77529 us.
+State122.19647 ->105.33471 us; unchanged-stage variation will be separated.
+Native re-import/per-PC totals close all17 kernels; omitted-PC plants red.
+Uploaded native CFG retains12 PROJECT/16 UPDATE overlap; same-opcode wait
+relocation is red. State instructions-0.91%, sync-stall avg-48.55%, commit
+stall avg-55.53%; math/load/maintraffic/occupancy unchanged. Actual box232regs,
+1956static instructions, not local230/1880. Unchanged-stage variation2.43060us
+is not credited to new source. Goal requires149.85019us; another40.58% reduction.
+Full report docs/PPU_WY_STATE_PIPELINE_ACU_20260924.md; evidence under
+/workspace/gdn-wy-state-pipeline-acu-analysis-20260924. Keep opt-in62960;
+no kernel/default/routing edits. Future box captures default to
+/sim/eec/shared/junfu.qx/asight/bin/acu per user instruction, no implicit SDK/PATH
+fallback. Explicit override remains recorded.69 host contracts PASS; actual
+missing-site invocation returns rc1/INCOMPLETE before build/profile despite
+available SDK ACU. Existing upload retains actual SDK ACU provenance. Local
+report re-import only uses available local parser; no device execution.
+
+## Prior state-pipeline handoff (device-pending claims superseded above)
 
 New worktree /workspace/gdn-wy-state-pipeline-20260924, parent5ec469f;
 plan/ledger /workspace/gdn-wy-state-pipeline-evidence-20260924. Hypothesis:

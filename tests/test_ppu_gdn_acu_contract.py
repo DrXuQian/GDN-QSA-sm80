@@ -53,7 +53,7 @@ class ACUContract(unittest.TestCase):
         fla["role"] = "fla"
         return ours, fla
 
-    def test_sdk_acu_outranks_shared_site_and_path(self):
+    def test_site_acu_outranks_sdk_and_path(self):
         directory = self.directory()
         sdk = directory / "sdk"
         matched = sdk / "asight/bin/acu"
@@ -65,14 +65,24 @@ class ACUContract(unittest.TestCase):
                 patch.object(collect.shutil, "which", return_value=str(directory / "older-acu")), \
                 patch.object(Path, "is_file", return_value=True), \
                 patch.object(collect.os, "access", return_value=True):
-            self.assertEqual(collect.find_acu(sdk), matched)
-            self.assertNotEqual(collect.find_acu(sdk), site)
+            self.assertEqual(collect.find_acu(), site)
+            self.assertNotEqual(collect.find_acu(), matched)
+
+    def test_missing_site_acu_does_not_fall_back_to_sdk_or_path(self):
+        site = Path("/sim/eec/shared/junfu.qx/asight/bin/acu")
+        with patch.dict(os.environ, {}, clear=True), \
+                patch.object(collect.shutil, "which", return_value="/sdk/asight/bin/acu"), \
+                patch.object(Path, "is_file", side_effect=lambda p: p != site, autospec=True), \
+                patch.object(collect.os, "access", return_value=True):
+            self.assertFalse(site.is_file())
+            self.assertTrue(Path("/sdk/asight/bin/acu").is_file())
+            self.assertEqual(collect.find_acu(), site)
 
     def test_explicit_acu_is_not_silently_replaced(self):
         directory = self.directory()
         absent = directory / "missing-explicit-acu"
         with patch.dict(os.environ, {"ACU": str(absent)}, clear=True):
-            self.assertEqual(collect.find_acu(directory / "sdk"), absent.resolve())
+            self.assertEqual(collect.find_acu(), absent.resolve())
 
     def test_direct_subject_calls_once_without_profiler_hooks(self):
         order = []

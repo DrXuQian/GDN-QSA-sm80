@@ -20,6 +20,7 @@ import traceback
 from typing import NamedTuple
 
 ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_ACU = Path("/sim/eec/shared/junfu.qx/asight/bin/acu")
 sys.path.insert(0, str(ROOT))
 from gdn_qsa_sm80.gdn_wy_interface import DELIVERIES
 
@@ -285,18 +286,13 @@ def pack(bundle, status):
     return archive
 
 
-def find_acu(sdk):
+def find_acu():
     if os.environ.get("ACU"):
         return Path(os.environ["ACU"]).resolve()
-    # The site installation can predate the compiler/runtime by a release.
-    # Prefer the profiler shipped with the explicitly selected SDK. Never
-    # retry a failed profiler with another version inside the same experiment.
-    candidates = [sdk / "asight/bin/acu"]
-    on_path = shutil.which("acu")
-    if on_path:
-        candidates.append(Path(on_path))
-    candidates.append(Path("/sim/eec/shared/junfu.qx/asight/bin/acu"))
-    return next((p for p in candidates if p.is_file() and os.access(p, os.X_OK)), candidates[0])
+    # Operator-selected site profiler (2026-09-24). Tool selection is not
+    # capability discovery: a missing executable must fail at admission,
+    # never silently choose the SDK or PATH version instead.
+    return DEFAULT_ACU
 
 
 def collect(args, bundle, env):
@@ -471,7 +467,7 @@ def main():
     if args.wy_run:
         args.wy_run = args.wy_run.resolve()
     args.sdk = Path(os.environ.get("PPU_SDK", "/usr/local/PPU_SDK")).resolve()
-    args.acu = find_acu(args.sdk)
+    args.acu = find_acu()
     args.device = os.environ.get("DEVICE", "0")
     if not args.device.isdigit():
         parser.error("DEVICE must be one physical PPU's nonnegative integer index")

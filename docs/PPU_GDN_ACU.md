@@ -1,6 +1,25 @@
 # GDN versus FLA: one-command counter bundle
 
-## Current: same-binary shared-row / AIU-both / FLA capture
+## Profiler selection (2026-09-24)
+
+All new box captures default to the operator-requested
+`/sim/eec/shared/junfu.qx/asight/bin/acu`, independent of the compiler SDK
+and PATH. If it is missing or not executable, capture fails; there is no
+automatic fallback or retry with a different ACU. An explicit `ACU` override
+is retained for deliberate tool comparisons. The actual path, binary hash,
+version and loaded profiler libraries remain part of every bundle.
+
+This selection supersedes the earlier SDK-first discovery rule below. It
+does not rewrite the identity or numerical provenance of existing reports.
+
+## Current state-pipeline result
+
+[The verified latest capture](PPU_WY_STATE_PIPELINE_ACU_20260924.md) compares
+split-prepare / state-pipeline / FLA, all5/5/7 kernels. The handoff is
+[the state-pipeline wrapper](PPU_WY_STATE_PIPELINE.md); do not select an
+older AIU/shared-row arm as the current incumbent.
+
+## Historical: same-binary shared-row / AIU-both / FLA capture
 
 Capture completed and verified: [AIU phase/counter result](PPU_WY_AIU_ACU_20260924.md).
 The command below is retained for reproduction, not a request to repeat it.
@@ -16,7 +35,7 @@ git pull --ff-only origin ppu-backend &&
 read -r -p 'Completed AIU comparison artifacts directory: ' WY_RUN &&
 env -u OUT -u EXTENSION \
   DEVICE=0 PPU_SDK=/usr/local/PPU_SDK \
-  ACU=/usr/local/PPU_SDK/asight/bin/acu \
+  ACU=/sim/eec/shared/junfu.qx/asight/bin/acu \
   bash tools/run_ppu_gdn_fla_acu_box.sh \
     --wy-run "$WY_RUN" \
     --wy-control prepare-rows-shared \
@@ -82,7 +101,7 @@ its final `artifacts=` line when the following command prompts:
 read -r -p 'Previous comparison artifacts directory: ' WY_RUN
 if [ -n "$WY_RUN" ] && [ -f "$WY_RUN/comparison.json" ]; then
   env -u OUT -u EXTENSION \
-    PPU_SDK=/usr/local/PPU_SDK ACU=/usr/local/PPU_SDK/asight/bin/acu DEVICE=0 \
+    PPU_SDK=/usr/local/PPU_SDK ACU=/sim/eec/shared/junfu.qx/asight/bin/acu DEVICE=0 \
     bash tools/run_ppu_gdn_fla_acu_box.sh \
       --wy-run "$WY_RUN" --wy-delivery prepare-rows-shared --gate -1.0
 else
@@ -133,7 +152,7 @@ comparison binary and select mask48, not scalar WY, old packed-all or tiled-all:
 ```bash
 git pull --ff-only &&
 env -u OUT -u EXTENSION \
-  PPU_SDK=/usr/local/PPU_SDK ACU=/usr/local/PPU_SDK/asight/bin/acu DEVICE=0 \
+  PPU_SDK=/usr/local/PPU_SDK ACU=/sim/eec/shared/junfu.qx/asight/bin/acu DEVICE=0 \
   bash tools/run_ppu_gdn_fla_acu_box.sh \
   --wy-run /workspace/gdn-wy-fla-90eafeb-20260922T013928Z \
   --wy-delivery tiled-state-output --gate -1.0
@@ -193,9 +212,9 @@ own ACU reports `v2.1.1_20260725-15d8b9d` / data 15000. The failed run's tool
 version has not yet been supplied, so the old path alone is **not proof** of
 which binary version it used or of the exception's root cause.
 
-Discovery now prefers the selected SDK's ACU; explicit `ACU` remains an
-override. To test only this tool change, keep both kernel binaries and inputs
-and use:
+At that historical checkpoint discovery was changed to SDK-first. The
+2026-09-24 operator choice above supersedes it. This earlier explicit command
+is retained only to reproduce that historical tool comparison:
 
 ```bash
 PPU_SDK=/usr/local/PPU_SDK ACU=/usr/local/PPU_SDK/asight/bin/acu DEVICE=0 \
@@ -257,9 +276,8 @@ DEVICE=0 JOBS=16 bash tools/run_ppu_gdn_fla_acu_box.sh
 
 Use the same physical `DEVICE` as the preceding latency comparison. The
 default SDK is `/usr/local/PPU_SDK`; override `PPU_SDK` only if needed. ACU is
-found first at `$PPU_SDK/asight/bin/acu`, then PATH, then the site's
-`/sim/eec/shared/junfu.qx/asight/bin/acu`;
-`ACU=/absolute/path/to/acu` overrides discovery. Installed FLA is
+fixed by default to `/sim/eec/shared/junfu.qx/asight/bin/acu`;
+`ACU=/absolute/path/to/acu` explicitly overrides that choice. Installed FLA is
 used by default; optional `FLA_ROOT` selects an existing checkout. No clone,
 pip install, SSH, clock setting, or mandatory identity form is involved.
 

@@ -1,5 +1,10 @@
 # Single-buffer state operand pipeline
 
+Device follow-up: [verified three-arm ACU result](PPU_WY_STATE_PIPELINE_ACU_20260924.md).
+State122.196 ->105.335 us; all-kernel sum271.483 ->252.191 us, FLA224.775 us.
+Numerics pass; keep opt-in,1.5x goal not reached. Local-only facts below are
+retained as their original evidence scope, not substituted for box resources.
+
 Parent5ec469f; explicit `delivery="state-pipeline"`, mask62960. Control is
 `split-prepare`/30192. This changes only recurrent-state staging/synchronization;
 prefix, solve, W/U, output, public input layouts and original auto-routing
@@ -109,6 +114,7 @@ successful previous run (override PPU_SDK if installed elsewhere):
 
 ```bash
 DEVICE=0 PPU_SDK=/usr/local/PPU_SDK JOBS=16 \
+  ACU=/sim/eec/shared/junfu.qx/asight/bin/acu \
   bash tools/run_ppu_wy_state_pipeline_acu_box.sh
 ```
 
