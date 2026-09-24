@@ -1,8 +1,11 @@
 # Structural prepare: first step toward FLA1.5x (ACU only)
 
 Parent8b64bd3; opt-in `delivery="split-prepare"` / mask30192. No default
-or original reset/scan routing change. Device timing and numerics **NOT_RUN**
-at local handoff. This is a structure candidate, not a speed admission.
+or original reset/scan routing change. Device timing and numerics were
+NOT_RUN at local handoff. The [verified uploaded result](PPU_WY_SPLIT_ACU_20260924.md)
+now closes correctness: ACU304.995 ->269.306 us, versus FLA223.583 us.
+Prepare improves25.51%; full profiled sum improves11.70%. The1.5x target
+is **NOT MET**; weak-gate speed and production promotion are not established.
 
 ## Target fixed before measurement
 
@@ -67,7 +70,10 @@ Splitting adds8MiB inverse writes +8MiB inverse reads and rereads16MiB K at
 the priority shape, plus small row metadata. Those are logical payloads, not
 measured HBM misses. Conversely old W/U had32MiB useful output but512MiB
 KVD-interface stores. New vector publication is intended to remove that
-amplification; native store width is proved, **device traffic/time is pending**.
+amplification; the subsequent device report confirms W/U KVD512 ->32 MiB,
+while total prepare DRAM reads increase24.269 ->40.907 MiB. The complete
+prepare sum nevertheless falls136.341 ->101.566 us. These are measurements
+of the combined change, not isolated publication/splitting speedups.
 Report these costs and the two added launches, including losing outcomes.
 
 ## Local admission

@@ -11,9 +11,10 @@ Revision2026-09-24: separate demonstrated instruction/dataflow problems from
 unmeasured replacement hypotheses. The five-stage design below is a reference-
 aligned candidate, not a claim that five launches inherently beat three.
 
-Next implementation checkpoint: [structural split prepare](PPU_WY_SPLIT_PREPARE.md).
-Prefix/KKT-solve/WU are now separate opt-in kernels, locally compiled/proved;
-device admission and speed remain pending. User target is **FLA1.5x on all
+Latest implementation checkpoint: [structural split prepare](PPU_WY_SPLIT_PREPARE.md).
+Prefix/KKT-solve/WU are separate opt-in kernels, now device-admitted. The
+[new uploaded ACU result](PPU_WY_SPLIT_ACU_20260924.md) is269.306 vs FLA223.583
+us; old AIU control304.995 us. User target is **FLA1.5x on all
 ACU kernels**, not merely parity and not a complete-API-event win. This takes
 precedence over historical implementation order/performance goals below.
 
@@ -24,6 +25,15 @@ prepare publication or joint QH/QK reuse. This is a separately measurable
 delivery step, not completion of every rewrite item below.
 
 ## Current priority after the three-arm ACU capture
+
+After split prepare, the remaining matched-phase excess is58.5% state,
+34.7% prepare,6.7% output. State scheduling/delivery is now first priority,
+then W/U's conditioning/shared roundtrip. The write-amplification mechanism
+below has been fixed in the candidate, not the retained control. State/output
+bodies are unchanged. Additional120.251 us is needed for the new149.055 us
+target; a state-only change is insufficient. No default promotion.
+
+### Before split prepare (historical prioritization)
 
 The [2026-09-24 verified result](PPU_WY_AIU_ACU_20260924.md) supersedes the
 historical instruction/time figures below. Current AIU prepare/state/output
@@ -56,8 +66,8 @@ Vector-only W/U publication is a useful causal control within the prepare
 rewrite, not a claim that one store change closes the whole gap. Preserve
 the current TF32 residual terms, BF16 boundaries, FP32 recurrence, independent
 numerical gate and old path. The AIU patch did not deliver the five-stage
-graph; the linked split-prepare candidate is its first implementation, still
-awaiting device evidence. State pipeline/joint output reuse remain open.
+graph; the linked split-prepare candidate is its first implementation, now
+device-measured as described above. State pipeline/joint output reuse remain open.
 
 ## Diagnosis ledger: what is established
 
