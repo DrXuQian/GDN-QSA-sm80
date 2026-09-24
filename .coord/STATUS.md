@@ -1,9 +1,32 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 09:15:04 UTC
-working-on: B-layout ACU analysis closed; no measured speed benefit, not promoted
-blocked-on: none; next V32/8-warp experiment is not implemented, routing unchanged
-last-commit: d9b0bcd (verified ACU report/data; captured code remains3c7da09)
+updated-at: 2026-09-24 09:38:12 UTC
+working-on: V32/eight-warp local closure complete; ready for same-binary box ACU
+blocked-on: device RAW-BIT/occupancy/performance await user; no local blocker
+last-commit: 1750cf1 (eight-warp implementation; default routing unchanged)
+
+Isolated source /workspace/gdn-wy-residual-warps8-20260924, evidence
+/workspace/gdn-wy-residual-warps8-evidence-20260924. Final full rerun
+final-local-complete.log exited0:17/17CTest,82hostcontracts,7dialect,
+45WY+61residualalgebra,305originalcontrols,28WY+15originalnativeimages.
+All27oldnative instruction/operand sequences IDENTICAL. New162regs vs242,
+0stack,45568sharedB,256threads/grid128/V32;1316vs2092static sites.
+Actual real-trait ownership163840output/Kcells and6144producer/reader
+values exact;8host+6source+4native new negatives red. Native4AIU/20MMA/
+36matrix-load/5barrier sites. Missing backend cannot silently use residual.
+Global K/P/V28KiB/CTA/chunk unchanged; shared matrix loads224->288
+(+28.57%) are explicit cost, not free occupancy.3CTA raw register capacity
+at162x256 exceeds1.78CTA/CU average supply;128 is not a hard goal for
+this grid. No forced register cap, no B-layout combination/default change.
+Local library SHA256 ef418fde4ec4f12d9930ef40f220c13c502c794ee3704ca9956358d442acca4c.
+Run after pull: DEVICE=0 JOBS=16 CANDIDATE=residual-warps8
+bash tools/run_ppu_residual_delivery_acu_box.sh.30devicecases x8 RAW-BIT,
+both-gate numeric admission then4/4/7 control/candidate/FLA site-ACU
+captures; API_TIMING=NOT_RUN. Upload printed/workspace tar. See
+docs/PPU_GDN_RESIDUAL_WARPS8.md. Skill lesson pushed Quactlize8a3a4bd.
+Device speed and1.5x target are NOT established locally.
+
+## Previous B-layout verdict
 
 Upload580e0df3 verified607files/606checks/131sources against3c7da09, same
 binary/fixture/device, all15 kernels1.700GHz.30residual+30B-layout cases x8,
