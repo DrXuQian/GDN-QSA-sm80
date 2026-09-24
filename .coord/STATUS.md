@@ -1,9 +1,32 @@
 # PPU original-structure port
 
-updated-at: 2026-09-22 13:44:14 UTC
-working-on: same-binary mask1520 shared-row/FLA ACU handoff verified; no kernel changes
-blocked-on: exact preceding artifacts directory and actual box capture are not yet supplied
-last-commit: 8e40d3e (strong-gate result record; this checkpoint changes documentation only)
+updated-at: 2026-09-24 01:10:09 UTC
+working-on: analysis complete; starting isolated state shared-address/operand ablation
+blocked-on: none locally; new candidate has no device timing yet
+last-commit: 4267b28 (verified ACU analysis; checkpoint follows)
+
+New upload gdn-qsa-acu-20260922T225857Z-797428.tar.gz:553 files/552 hashes
+verify; clean eed5ba2 binary origin, shared1520 actual kernel, same physical
+UUID/input/runtime, all kernels1.700 GHz. Native reimport metrics agree;
+per-PC sums close and omitted-PC negatives fail for all10 kernels.
+Preceding16 cases/80 candidate admissions/8 repeats and2 gates x8 roles x16
+samples verified. Weak shared354.666 vs496358.918 remains UNRESOLVED;
+strong352.192 vs356.590 wins. Both shared/FLA API comparisons win. Raw role
+is prepare-rows-warp, resolving the pasted singular spelling.
+
+Profiled prepare/state/output135.350/145.466/66.476 us vs matched FLA
+83.107/89.490/43.385; two FLA fills6.500 us separately. Profile sums are NOT
+API spans or a host-overhead measurement. State has same grid128/block128,
+7.09 active warps/CU,524288 BF16 MMA and98 MiB KVD write traffic as FLA,
+but2.165x measured instructions. Output occupancy58.75% vs35.48% and2.352x
+instructions. Prepare1.758x instructions, W/U scalar-write KVD16x
+amplification; explicit TF32 residual precision3x MMA kept separate.
+Next target state shared fragment/base-address overhead, then prepare W/U
+publication, then output delivery; not another grid-only adjustment.
+Report docs/PPU_WY_SHARED_ACU_20260922.md. All 24 host ACU contract tests
+pass. No kernel/default/routing edits in the analysis checkpoint.
+
+## Previous capture handoff (completed by the upload above)
 
 Next command in docs/PPU_GDN_ACU.md. Existing collector already supports
 prepare-rows-shared and binds its exact measured role/binding/device library;
