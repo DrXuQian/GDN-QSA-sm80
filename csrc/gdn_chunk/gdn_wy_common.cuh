@@ -18,6 +18,9 @@ struct Workspace {
   float* gates;
 };
 
+int forward_aiu(Inputs p, Workspace ws, BF16* output, float* final,
+                 gdn_arch::Stream stream, unsigned options);
+
 template <int Rows, int Cols, int Threads>
 __device__ void stage(BF16* dst, BF16 const* src, int64_t stride, int valid_rows) {
   // Each transaction is eight contiguous BF16 values, including under the

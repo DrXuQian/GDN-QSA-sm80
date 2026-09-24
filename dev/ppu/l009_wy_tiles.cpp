@@ -112,9 +112,10 @@ int reduction_order(int plant = 0) {
 }
 
 // Independent Cartesian inventory, not a copy of valid_delivery's predicates.
-// 6 prepare choices x6 state choices x4 output choices =144 valid masks.
+// 6 prepare choices x6 state choices x4 output choices =144 old masks,
+// plus exactly three isolated AIU experiments on the fixed1520 incumbent.
 int selectors(int plant = 0) {
-  std::array<bool, 8192> expected{};
+  std::array<bool, 32768> expected{};
   for (unsigned prepare : {0u, 1u, 8u, 256u, 1280u, 2304u})
     for (unsigned state : {0u, 2u, 16u, 80u, 144u, 208u})
       for (unsigned output : {0u, 4u, 32u, 544u}) {
@@ -122,6 +123,7 @@ int selectors(int plant = 0) {
         if (expected[mask]) throw std::runtime_error("duplicate delivery combination");
         expected[mask] = true;
       }
+  for (unsigned mask : {5616u, 9712u, 13808u}) expected[mask] = true;
   int accepted = 0, bad = 0;
   int old27 = 0, old54 = 0, old96 = 0;
   for (unsigned mask = 0; mask < expected.size(); ++mask) {
@@ -132,7 +134,7 @@ int selectors(int plant = 0) {
     old96 += actual && mask < 1024;
     bad += actual != expected[mask];
   }
-  return bad + (accepted != 144) + (old27 != 27) + (old54 != 54) + (old96 != 96) + valid_delivery(1u << 31);
+  return bad + (accepted != 147) + (old27 != 27) + (old54 != 54) + (old96 != 96) + valid_delivery(1u << 31);
 }
 
 int main() {
@@ -147,5 +149,5 @@ int main() {
     if (!bad) throw std::runtime_error("tiled negative escaped");
     std::printf("[WY tiled negative] plant=%d bad=%d EXPECTED-RED/PASS\n", plant, bad);
   }
-  std::puts("[WY tiles] native H exchange=8192 reads; independent scalar-coordinate reduction order=34816 outputs (W/U counted separately); selectors=8192/144 valid (old27/54/96 preserved); PASS device_execution=NOT_RUN");
+  std::puts("[WY tiles] native H exchange=8192 reads; independent scalar-coordinate reduction order=34816 outputs (W/U counted separately); selectors=32768/147 valid (old27/54/96/144 preserved); PASS device_execution=NOT_RUN");
 }

@@ -19,6 +19,20 @@ constexpr unsigned StageAddressOptions = PrepareAddress | OutputAddress;
 constexpr unsigned PrepareRowsShared = 1024u;
 constexpr unsigned PrepareRowsWarp = 2048u;
 constexpr unsigned PrepareRowsOptions = PrepareRowsShared | PrepareRowsWarp;
+constexpr unsigned AiuState = 4096u;
+constexpr unsigned AiuOutput = 8192u;
+constexpr unsigned AiuOptions = AiuState | AiuOutput;
+constexpr unsigned AiuControl = 1520u;  // shared-row prepare + tiled/gated state + tiled output
+
+template <class Visitor>
+constexpr int visit_aiu_options(unsigned options, Visitor visitor, int invalid) {
+  switch (options) {
+    case AiuState: return visitor(std::true_type{}, std::false_type{});
+    case AiuOutput: return visitor(std::false_type{}, std::true_type{});
+    case AiuOptions: return visitor(std::true_type{}, std::true_type{});
+    default: return invalid;
+  }
+}
 
 constexpr bool valid_prepare_rows(unsigned mask) {
   unsigned const rows = mask & PrepareRowsOptions;
@@ -46,6 +60,9 @@ constexpr StageAddressSelection stage_address_selection(unsigned delivery) {
 // OutputAddress requires the tiled output. Row caches require PrepareAddress
 // and are mutually exclusive. Old masks0..1023 keep their meaning.
 constexpr bool valid_delivery(unsigned mask) {
+  // The native-pair experiment has exactly three registered cells. It cannot
+  // silently ignore old options, select another prepare, or accept unknown bits.
+  if (mask & AiuOptions) return (mask & ~AiuOptions) == AiuControl;
   return mask < 4096 && ((mask & 7u) & ((mask >> 3) & 7u)) == 0 &&
          (!(mask & StateOptions) || (mask & 16u)) &&
          (!(mask & PrepareAddress) || !(mask & 9u)) &&

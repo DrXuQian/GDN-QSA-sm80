@@ -35,6 +35,8 @@ std::vector<torch::Tensor> forward(torch::Tensor q, torch::Tensor k, torch::Tens
               "WY natural-log gate must be BF16 or FP32");
   TORCH_CHECK(B <= INT_MAX && S <= INT_MAX && Hv <= INT_MAX,
               "WY dimensions exceed 32-bit kernel extents");
+  TORCH_CHECK(!(delivery & AiuOptions) || Hv <= INT_MAX / Dim,
+              "WY AIU row pitch exceeds 32-bit element descriptor");
   int64_t const nt = (S - 1) / Chunk + 1;
   TORCH_CHECK(B <= INT_MAX / Hv && B * Hv <= INT_MAX / nt && B * Hv <= INT_MAX / 4,
               "WY launch grid overflow");

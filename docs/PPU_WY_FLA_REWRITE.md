@@ -11,6 +11,12 @@ Revision2026-09-24: separate demonstrated instruction/dataflow problems from
 unmeasured replacement hypotheses. The five-stage design below is a reference-
 aligned candidate, not a claim that five launches inherently beat three.
 
+Implementation checkpoint: [matched native AIU/SWZL state/output candidate](PPU_WY_AIU_PAIR.md).
+It replaces manual global-input placement with paired bulk delivery and an
+explicit internal layout. It does not yet change the three-stage graph,
+prepare publication or joint QH/QK reuse. This is a separately measurable
+delivery step, not completion of every rewrite item below.
+
 ## Diagnosis ledger: what is established
 
 Counts below are measured warp executions from the verified native reports,

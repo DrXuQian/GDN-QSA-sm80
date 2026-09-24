@@ -16,6 +16,7 @@ import bench_ppu_wy_fla as benchmark
 from bench_ppu_wy_fla import (comparison_summary, delivery_comparisons, order,
                               DELIVERY_ROLES, TILE_ROLES, STATE_ROLES, STAGE_ROLES,
                               PREPARE_ROWS_ROLES, experiment, resolve_samples)
+from bench_ppu_wy_fla import AIU_ROLES
 from bench_ppu_gdn_fla import checked_pair, verdict
 
 
@@ -75,6 +76,41 @@ class Contracts(unittest.TestCase):
         with patch.object(benchmark, "TILED_DELIVERIES", missing):
             with self.assertRaises(AssertionError):
                 check_inventory()
+
+    def test_aiu_inventory_masks_and_orders(self):
+        def inventory():
+            names, roles = experiment(aiu_ab=True)
+            self.assertEqual(tuple(api.DELIVERIES[name] for name in names), (1520, 5616, 9712, 13808))
+            self.assertEqual(roles, AIU_ROLES)
+            self.assertEqual(len(roles), 7)
+            return roles
+        roles = inventory()
+        self.assertEqual(resolve_samples(None, roles), 14)
+        for column in zip(*(order(i, roles) for i in range(14))):
+            for role in roles:
+                self.assertEqual(column.count(role), 2)
+        with patch.object(benchmark, "AIU_DELIVERIES", api.AIU_DELIVERIES[:-1]):
+            with self.assertRaises(AssertionError):
+                inventory()
+        for name in ("delivery_ab", "tile_ab", "state_ab", "stage_ab", "prepare_rows_ab"):
+            with self.assertRaises(ValueError):
+                experiment(aiu_ab=True, **{name: True})
+
+    def test_aiu_verdict_keeps_incumbent_and_both_single_changes(self):
+        arms = {role: dict(samples_us=[500., 510.]) for role in AIU_ROLES}
+        arms["wy-aiu-state-output"]["samples_us"] = [400., 410.]
+        comparisons = delivery_comparisons(arms, "aiu-state-output", aiu_ab=True)
+        self.assertEqual(set(comparisons), set(AIU_ROLES) - {"wy-aiu-state-output"})
+        self.assertTrue(all(x["verdict"] == "CANDIDATE-WINS" for x in comparisons.values()))
+        arms["wy-aiu-state-output"]["samples_us"] = [600., 610.]
+        self.assertTrue(all(x["verdict"] == "CONTROL-WINS" for x in
+                            delivery_comparisons(arms, "aiu-state-output", aiu_ab=True).values()))
+        arms["wy-aiu-state-output"]["samples_us"] = [400., 610.]
+        self.assertTrue(all(x["verdict"] == "UNRESOLVED" for x in
+                            delivery_comparisons(arms, "aiu-state-output", aiu_ab=True).values()))
+        del arms["wy-aiu-output"]
+        with self.assertRaises(KeyError):
+            delivery_comparisons(arms, "aiu-state-output", aiu_ab=True)
 
     def test_sample_count_tracks_actual_family_and_rejects_old_fourteen(self):
         self.assertEqual(resolve_samples(None, experiment()[1]), 12)
@@ -311,15 +347,17 @@ class Contracts(unittest.TestCase):
         want = (torch.ones(1), torch.ones(1))
         args = SimpleNamespace(delivery_ab=False, tile_ab=True, warmup=5, samples=16, launches=10)
         seen = []
-        def run(plant=False, state_ab=False, stage_ab=False, prepare_rows_ab=False):
-            args.tile_ab = not (state_ab or stage_ab or prepare_rows_ab)
+        def run(plant=False, state_ab=False, stage_ab=False, prepare_rows_ab=False, aiu_ab=False):
+            args.tile_ab = not (state_ab or stage_ab or prepare_rows_ab or aiu_ab)
             args.state_ab = state_ab
             args.stage_ab = stage_ab
             args.prepare_rows_ab = prepare_rows_ab
+            args.aiu_ab = aiu_ab
+            args.samples = 14 if aiu_ab else 16
             def wy(*inputs, delivery="scalar"):
                 seen.append(delivery)
                 # Within the unchanged 2% gate, but not scalar raw equality.
-                selected = ("prepare-rows-warp" if prepare_rows_ab else "stage-address-both" if stage_ab else
+                selected = ("aiu-state-output" if aiu_ab else "prepare-rows-warp" if prepare_rows_ab else "stage-address-both" if stage_ab else
                             "tiled-state-output-both" if state_ab else "tiled-state-output")
                 return (want[0] + .001, want[1]) if plant and delivery == selected else want
             with patch.object(benchmark.admission, "fixture", return_value=cpu), \
@@ -368,6 +406,15 @@ class Contracts(unittest.TestCase):
         self.assertEqual(len(result['arms']['wy-prepare-rows-warp']['versus']),7)
         with self.assertRaisesRegex(AssertionError,'wy-prepare-rows-warp output/state bits differ'):
             run(plant=True,prepare_rows_ab=True)
+        seen.clear()
+        result = run(aiu_ab=True)
+        self.assertEqual(set(result["arms"]), set(AIU_ROLES))
+        for name in ("scalar", *api.AIU_DELIVERIES):
+            self.assertEqual(seen.count(name), 8 + 5 + 14 * 10)
+        self.assertEqual(result["arms"]["wy-aiu-state-output"]["delivery_mask"], 13808)
+        self.assertEqual(len(result["arms"]["wy-aiu-state-output"]["versus"]), 6)
+        with self.assertRaisesRegex(AssertionError, "wy-aiu-state-output output/state bits differ"):
+            run(plant=True, aiu_ab=True)
 
     def test_delivery_mask_is_consumed_not_silently_ignored(self):
         class Fake:

@@ -20,8 +20,8 @@ def kernel_sequences(isa):
 
 def compare_controls(before, after):
     old, new = kernel_sequences(before), kernel_sequences(after)
-    if len(old) != 14 or len(new) != 16:
-        raise AssertionError("control comparison must cover all14 old and all16 current images")
+    if len(old) != 16 or len(new) != 18:
+        raise AssertionError("control comparison must cover all16 old and all18 current images")
     for name, sequence in old.items():
         if new.get(name) != sequence:
             raise AssertionError(f"admitted control native instructions changed: {name}")
@@ -150,8 +150,8 @@ def plant_late_row_barrier(isa):
 def audit(isa, resources, symbols):
     funcs = re.findall(r"Func \d+ (\S+) RESOURCE INFO:\n(.*?)(?=Func \d+ \S+ RESOURCE INFO:|\Z)",
                        resources, flags=re.S)
-    if len(funcs) != 16:
-        raise AssertionError(f"WY image denominator must be 14 controls + 2 prepare-row variants, got {len(funcs)}")
+    if len(funcs) != 18:
+        raise AssertionError(f"WY image denominator must be 16 controls + 2 AIU variants, got {len(funcs)}")
     rows = []
     mma_counts = {}
     for role, packed in ((role, packed) for role in ("prepare", "state", "output") for packed in (False, True)):
@@ -298,12 +298,44 @@ def audit(isa, resources, symbols):
                          loop_exponents=0, hoisted_exponent_pcs=[hex(pc) for pc in region['hoisted']],
                          cache_publication_pcs=[hex(pc) for pc in region['publication']],
                          cta_barrier_sites=actual[4], indexed_shuffle_sites=actual[5]))
+    for role, copies, mmas, exponents, barriers in (("state", 5, 32, 5, 5), ("output", 6, 40, 18, 6)):
+        matches = [(name, body) for name, body in funcs if f"gdn_wy_aiu_{role}E" in name]
+        if len(matches) != 1:
+            raise AssertionError(f"missing/ambiguous AIU {role} image")
+        name, body = matches[0]
+        stack = int(re.search(r"STACK SIZE:(\d+)", body)[1])
+        regs = int(re.search(r"vreg_number:(\d+)", body)[1])
+        if stack or name not in sequences:
+            raise AssertionError(f"AIU {role} body absent or spilling")
+        ops = [line.split()[0] for line in sequences[name]]
+        # l0 is the native SWZL writer. A same-source true/false probe gives
+        # l0/l1 respectively; do not count any AIU instruction as a matched pair.
+        actual = (ops.count("vmem.aiu.ld.tsm.l0.t0.p0.s0.m0.2d.b16.kp1"),
+                  ops.count("v.mma.f32.bf16.m16n16k16"), ops.count("v.exp2.f32"),
+                  ops.count("s.blksyn.defer"))
+        if actual != (copies, mmas, exponents, barriers):
+            raise AssertionError(f"AIU {role} delivery/arithmetic/sync changed: {actual}")
+        if any(op.startswith("vmem.ld.tsm") or op.startswith("vmem.aiu.ld.tsm.l1") for op in ops):
+            raise AssertionError(f"AIU {role} retained manual copies or mismatched linear writer")
+        if any(op.startswith("tsm.ld.ncom") for op in ops):
+            raise AssertionError(f"AIU {role} has an unmatched NCOM consumer")
+        if sum(op.startswith("tsm.ld.swzl") for op in ops) != (44 if role == "state" else 60):
+            raise AssertionError(f"AIU {role} fragment-load coverage changed")
+        for suffix in ("trans0", "trans1"):
+            if f"tsm.ld.swzl.b32x4.s0.t1.{suffix}" not in ops:
+                raise AssertionError(f"AIU {role} lost matching {suffix} SWZL reader")
+        if "vmem.st.b32x4" not in ops or "vmem.st.b16" in ops:
+            raise AssertionError(f"AIU {role} lost vector publication")
+        rows.append(dict(role=role, delivery="aiu-paired", registers=regs, stack=stack,
+                         static_instructions=len(ops), aiu_sites=copies, bf16_mma_sites=mmas,
+                         v2s_sites=ops.count("v.mov.v2s"), cta_barrier_sites=barriers))
     for name in ("gdn_wy_forward", "gdn_wy_forward_delivery"):
         if not re.search(rf"\b{name}$", symbols, re.M):
             raise AssertionError(f"WY launcher missing from linked library: {name}")
     for name in ("configure_tiled", "launch_tiled_prepare", "launch_tiled_state", "launch_tiled_output",
                  "configure_state_ab", "launch_state_ab", "configure_stage_address",
-                 "launch_address_prepare", "launch_address_output", "configure_prepare_rows", "launch_prepare_rows"):
+                 "launch_address_prepare", "launch_address_output", "configure_prepare_rows", "launch_prepare_rows",
+                 "forward_aiu"):
         if not re.search(rf"\b_ZN7gdn_qsa2wy\d+{name}E\S*$", symbols, re.M):
             raise AssertionError(f"tiled cross-TU launcher missing from linked library: {name}")
     return rows
@@ -345,6 +377,12 @@ def main():
             ("missing-row-host-link", (isa, resources, symbols.replace("launch_prepare_rows", "MISSING_ROWS"))),
             ("row-exp-back-in-loop-same-count", (plant_repeated_row_exp(isa), resources, symbols)),
             ("row-shared-late-publication-same-count", (plant_late_row_barrier(isa), resources, symbols)),
+            ("missing-aiu-image", (isa.replace("gdn_wy_aiu_state", "MISSING_aiu_state"), resources, symbols)),
+            ("missing-aiu-link", (isa, resources, symbols.replace("forward_aiu", "MISSING_aiu_link"))),
+            ("aiu-linear-writer", (plant_in_kernel(isa, "gdn_wy_aiu_state",
+                "vmem.aiu.ld.tsm.l0", "vmem.aiu.ld.tsm.l1"), resources, symbols)),
+            ("aiu-wrong-reader", (plant_in_kernel(isa, "gdn_wy_aiu_output",
+                "tsm.ld.swzl.b32x4.s0.t1.trans1", "tsm.ld.ncom.b32x4"), resources, symbols)),
         ):
             try:
                 audit(*texts)
@@ -362,7 +400,7 @@ def main():
                 print("[WY binary negative] changed-control EXPECTED-RED/PASS")
             else:
                 raise AssertionError("control-comparison negative escaped")
-        print("[WY binary controls] 14/14 native instruction+operand sequences IDENTICAL")
+        print("[WY binary controls] 16/16 native instruction+operand sequences IDENTICAL")
     print("[WY binary] PASS device_execution=NOT_RUN")
 
 

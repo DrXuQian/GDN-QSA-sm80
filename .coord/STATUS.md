@@ -1,9 +1,32 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 01:54:26 UTC
-working-on: SWZL address-transfer attribution and port provenance closed; matched AIU/SWZL delivery added to rewrite contract
-blocked-on: no local PPU; complete new delivery paths and device admission remain pending
-last-commit: 7029acc (SWZL diagnosis + four-cell compile probe; production unchanged)
+updated-at: 2026-09-24 02:29:47 UTC
+working-on: matched AIU/SWZL state/output candidate locally closed; sealing and pushing opt-in box handoff
+blocked-on: no local PPU; device correctness and latency remain NOT_RUN
+last-commit: 2698276 (parent; new candidate not yet admitted or committed)
+
+Worktree /workspace/gdn-wy-aiu-20260924, branch wy-aiu-pair-20260924.
+Artifacts /workspace/gdn-wy-aiu-evidence-20260924, explicit plan/ledger.
+New state/output delivery uses full-height32/64-column AIU cubes and matching
+SWZL descriptors; no16x16 software base decomposition for input staging.
+Current prepare shared-row control, original/scalar/old bodies and arithmetic
+remain. Three opt-in cells (state/output/both), no default routing change.
+Local gates:9/9 CTests;58 Python contracts;7 HGGC contracts;45 algebra cases;
+305 original source controls;18 native images with16/16 old bodies unchanged.
+Layout:28,416 values and17,633,280 descriptor/tail cells;6 negative plants red.
+State static instructions2300->1875, v2s52->34, registers242->234; output
+1725->1442, v2s68->52, registers98->94. Both stack0; not latency predictions.
+Native writer l0 vs linear l1 confirmed with same-source compile control;
+wrong writer/one wrong reader/missing image/link/control mutation all red.
+Full Python3.12/Torch2.9 bindings for WY AND original now compile/link with
+real SDK2.1.1 device libraries. Task-local CPython/dependencies reused the
+existing CUDA Torch wheel; no global interpreter or installed Torch changed.
+Ready command: AIU_AB=1 DEVICE=0 PPU_SDK=/usr/local/PPU_SDK JOBS=16
+bash tools/run_ppu_wy_fla_box.sh.7 roles,14 balanced samples,2 gates;16-case
+raw-bit/oracle/replay/GVA/output-only admission first. Device NOT_RUN.
+This closes the delivery candidate, not the entire five-stage FLA rewrite.
+
+## Pre-implementation diagnosis
 
 User distinction confirmed: AIU.swzl and matching ld.swzl avoid a software
 unswizzle, but current WY instead uses per-thread async_copy16 with software

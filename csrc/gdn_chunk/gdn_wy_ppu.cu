@@ -305,6 +305,8 @@ extern "C" int gdn_wy_forward_delivery(
            g, initial, gate_fp32, {batch, sequence, q_heads, value_heads}};
   Workspace ws{static_cast<BF16*>(w), static_cast<BF16*>(u), static_cast<BF16*>(snapshots),
                static_cast<BF16*>(vnew), gates};
+  if (delivery & AiuOptions)
+    return forward_aiu(p, ws, static_cast<BF16*>(output), final, stream, delivery & AiuOptions);
   // Match the original backend's explicit opt-in for >48 KiB shared memory.
   // An SDK/device resource refusal is a launch failure, never a fallback.
   if (delivery & 56) {
