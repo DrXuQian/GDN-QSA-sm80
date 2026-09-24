@@ -1,9 +1,30 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 11:56:09 UTC
-working-on: eight-warp upload integrity check; no new performance verdict
-blocked-on: uploaded acu.tar.gz truncated at 3,145,728 B; complete re-upload needed
-last-commit: dfe76c3 (local closure checkpoint; implementation 1750cf1 unchanged)
+updated-at: 2026-09-24 12:08:26 UTC
+working-on: eight-warp ACU verdict closed; recording measured experimental winner
+blocked-on: none; no kernel/default-routing edits
+last-commit: c61906b (truncated-upload checkpoint; implementation 1750cf1 unchanged)
+
+Complete re-upload SHA256 b86b02f9ec67ffcc666f42945ff7e298a074f0b0651c7c588b93ed7b731cf612,
+3,703,105 B.611files/610hashes/135sources match dfe76c3. Same-binary/fixture/
+device paired receipts and both-gate numerical admission pass;30residual+
+30eight-warp cases x8 RAW-BIT. All15kernels1.700GHz. Complete checked ACU
+all-kernel sums control228.64059/candidate207.00235/FLA226.96941us; state
+127.74471->104.81000us.1.09646xFLA,1.5xgoalNOT_MET. All15native opcode sums
+close; omitted-PC checks red. Uploaded native inventory plus6source/4native
+negative checks pass. Actual162regs/0stack/45568sharedB,14.12vs7.07warps/CU,
+eligible0.36vs0.25; registerblocklimit3vs4 but grid supplyonly1.78CTA/CU.
+KVD->TSM112MiB both, ordinaryglobal17MiBloads/98MiBstores both. Matrixreads
+917504->1179648(+28.57%);BC6.930432M->7.979008M(+15.13%);nativeopcodes
++9.72% despite state-17.95%. Extra1024BF16converts are zero setup, not math.
+Unchangedstages+1.29647us are not attributed to the state source change.
+Keep as experimental control, no default promotion. Weakgate performance
+and8warp+B-layout combination NOT_MEASURED. Replay and summary under
+/workspace/gdn-residual-warps8-acu-analysis-20260924; report
+docs/PPU_GDN_RESIDUAL_WARPS8_ACU_20260924.md and condensedJSON dev/ppu/results.
+No kernel/runner/selector changes this analysis. Skills lesson updated.
+
+## Superseded incomplete-upload checkpoint
 
 Upload SHA256 bbf652de5019da1b6387443f92c10b4d9edf805464e196c8a55b53abc4041188.
 gzip -t fails unexpected end of file. Streaming inspection received595/611

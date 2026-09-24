@@ -1,5 +1,13 @@
 # V32 residual with eight CTA-local warps
 
+Device follow-up: [2026-09-24 ACU verdict](PPU_GDN_RESIDUAL_WARPS8_ACU_20260924.md).
+RAW-BIT admission passes; state 127.74 -> 104.81 us, all-kernel sum
+228.64 -> 207.00 us versus FLA 226.97 us. Registers162/stack0 confirmed,
+active warps7.07 -> 14.12, global staging112MiB unchanged; shared matrix
+reads+28.57% and BC+15.13%. Keep as experimental control, routing unchanged.
+The local handoff below is historical; its device-pending statements are
+superseded by that report, not its original contracts or predicted budgets.
+
 Parent c537f42. This opt-in experiment retains the V32 CTA tile, grid128,
 shared layout, BF16 boundaries, FP32 state, arithmetic/K order, and existing
 barriers. Only independent output-row ownership changes4->8 warps. It does
