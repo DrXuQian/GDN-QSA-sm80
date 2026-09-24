@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 02:29:47 UTC
-working-on: matched AIU/SWZL state/output candidate locally closed; sealing and pushing opt-in box handoff
+updated-at: 2026-09-24 02:31:49 UTC
+working-on: matched AIU/SWZL state/output candidate complete locally; opt-in box handoff ready
 blocked-on: no local PPU; device correctness and latency remain NOT_RUN
-last-commit: 2698276 (parent; new candidate not yet admitted or committed)
+last-commit: 5cbe8db (matched AIU/SWZL delivery, local closure and opt-in box runner)
 
 Worktree /workspace/gdn-wy-aiu-20260924, branch wy-aiu-pair-20260924.
 Artifacts /workspace/gdn-wy-aiu-evidence-20260924, explicit plan/ledger.
