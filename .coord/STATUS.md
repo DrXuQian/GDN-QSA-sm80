@@ -1,9 +1,23 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 01:32:13 UTC
-working-on: structural FLA rewrite planned; SDK NCOM load reachability proved, next layout/numerical gate
-blocked-on: no local PPU; full rewrite and device admission remain pending
-last-commit: dc79c83 (FLA rewrite design + compile-only native SDK probe)
+updated-at: 2026-09-24 01:54:26 UTC
+working-on: SWZL address-transfer attribution and port provenance closed; matched AIU/SWZL delivery added to rewrite contract
+blocked-on: no local PPU; complete new delivery paths and device admission remain pending
+last-commit: 7029acc (SWZL diagnosis + four-cell compile probe; production unchanged)
+
+User distinction confirmed: AIU.swzl and matching ld.swzl avoid a software
+unswizzle, but current WY instead uses per-thread async_copy16 with software
+swizzled addresses. Our port1af3d5c introduced that choice; upstream aa04271
+uses NVIDIA cp.async/LDSM. Not an upstream PPU design or a numerical failure.
+Local l015 native control: SWZL fixed/warp-base v2s=0/1; NCOM=0/0. The
+move's SGPR is the SWZL load base, not post-load data. Four negative plants
+red (extra/missing move, wrong consumer, missing cell). Actual SDK compiled;
+numeric/performance NOT_RUN. Ordinary v.mov remains separately classified.
+Quactlize skill90d771c records matched AIU/SWZL producer/consumer contract,
+explicit manual-copy alternatives, and register-born intermediate exception.
+No production kernel, selector, numerical criterion or submodule modified.
+
+## Structural rewrite feasibility checkpoint
 
 User redirected from micro-tuning to structural alignment. Architecture:
 prefix, KKT+solve, W/U, state, output; pure C++/actlize, forward only, retain
