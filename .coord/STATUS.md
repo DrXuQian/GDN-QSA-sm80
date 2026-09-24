@@ -1,9 +1,37 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 03:30:24 UTC
-working-on: verified AIU three-arm ACU; structural prepare/state priorities documented
-blocked-on: none for analysis; structural rewrite not implemented by this checkpoint
-last-commit: 073939f (verified uploaded AIU ACU result and remaining FLA gap)
+updated-at: 2026-09-24 04:06:39 UTC
+working-on: split prepare local handoff complete; ready same-binary ACU comparison
+blocked-on: box numerical admission and timing NOT_RUN; FLA1.5x not achieved yet
+last-commit: 3e94030 (three-stage prepare + ACU-only handoff; no default promotion)
+
+User goal now1.5x FLA:222.86413/1.5=148.57609us. Not yet achieved.
+State+output168.19412us already exceeds target; prepare split is a bounded
+first step, not a promise to hit goal alone. Dedicated worktree
+/workspace/gdn-wy-split-prepare-20260924 at8b64bd3; plan/ledger under
+/workspace/gdn-wy-split-prepare-evidence-20260924. Preserve AIU13808 and
+all old bodies; native paired loads, arithmetic/raw-bit and full-call gates.
+First native compile21 images:18/18 incumbent instruction+operand sequences
+identical. New prefix/solve/WU32/84/128 registers, stack0; WU256threads,
+41472B shared, solve49664B. Local shipping-helper gate:32768 prefix rows,
+4194304 conditioned values,16384 W/U outputs,49373184 inverse scratch cells;
+6 fault plants red. Source solve segment matches control exactly;9 source
+lifetime/order/selector negatives red. Final complete gate PASS:10/10 compiled
+host tests,65 Python contracts,7 HGCC contracts,45 algebra cases,305 original
+structure controls.21 WY images/15 original images linked; old18/18 native
+bodies identical; new6 binary negatives + changed-control negative red.
+This does not establish device correctness or any speedup. Opt-in30192 only.
+
+One command: DEVICE=0 PPU_SDK=/usr/local/PPU_SDK JOBS=16
+bash tools/run_ppu_wy_split_prepare_acu_box.sh. Builds, device16-case gate
+with8 repeats/raw scalar equality, then both-gate FLA numeric admission;
+API_TIMING=NOT_RUN. Three direct sequential ACU captures:AIU13808,split30192,
+FLA once(g=-1). All five candidate kernels count toward total. Upload printed
+/workspace/gdn-wy-split-prepare-<sha>-<UTC>-<pid>/acu.tar.gz. No PPUProfiler.
+Current candidate only changes prepare; state/output pipeline remains the
+next structural step. Report gains AND regressions; no1.5x claim from compile.
+
+## Prior verified ACU result (before split-prepare)
 
 New archive gdn-qsa-acu-20260924T031047Z-2637570.tar.gz:570 files/569 hashes
 verify. Clean8340fc7 measured binary; b75b25d collector; all3 arms same UUID,
