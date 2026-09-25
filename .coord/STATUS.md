@@ -1,9 +1,22 @@
 # PPU original-structure port
 
-updated-at: 2026-09-24 15:12:18 UTC
-working-on: local closure and publication complete; ready for user same-binary ACU run
-blocked-on: none; device performance remains NOT_RUN and default routing unchanged
-last-commit: 7cfeb06 (published UPDATE operand candidate; this checkpoint is metadata only)
+updated-at: 2026-09-25 01:28:51 UTC
+working-on: close UPDATE-lookahead no-gain report, native/per-PC validation and durable lesson
+blocked-on: none; no new kernel work; default routing unchanged
+last-commit: 9eac7bd (local merge; uploaded source 0755b93)
+
+New upload SHA256 564de266956ef11c6cd548ccd26493666a9c81d016058a24f73bc08c0a32c354.
+Retained /workspace/gdn-warps8-operands-acu-analysis-20260925/capture.tar.gz.
+620 files/619 hashes/144 source snapshots verified. Same-binary/fixture/device,
+30 scalar +30 B-layout +30 new cases x8, both-gate numeric admissions PASS.
+Full4/4/7 ACU sums204.83530->206.17588us, FLA224.98530us; all1.700GHz.
+State104.52765->104.36118us; unchanged stages+1.50705us, not source regression.
+NO_OBSERVED_SPEED_GAIN;1.09123x FLA, target1.5x NOT_MET. BC5,881,856 and
+112MiB KVD-to-TSM fixed;124regs/0stack, active14.14->14.12/eligible.35->.34.
+Actual UPDATE lead improved and immediate reuse3->0; other KH/PR7/3 sites
+remain. TFU-WAR.39->.40; UPDATE load compute samples444->379 but whole-kernel
+3565->3620. Samples are not cycles.15/15 opcode sums/36load-site mappings PASS;
+6source+5native negatives red. No uploaded executable or PPU code run here.
 
 Published7cfeb06 through authorizedGitHubAPI; remote/localtreeboth
 b0856e41ad09fc852878657295793010b41e8d30. HTTPSfetch+treecomparisonPASS,
