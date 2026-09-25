@@ -8,7 +8,7 @@ PPU_SDK_ROOT="${PPU_SDK:-${PPU_SDK_ROOT:-/usr/local/PPU_SDK}}"
 ACU="${ACU:-/sim/eec/shared/junfu.qx/asight/bin/acu}"
 CANDIDATE="${CANDIDATE:-residual-v16}"
 case "$CANDIDATE" in
-  residual-prefetch|residual-operands|residual-v16|residual-blayout|residual-warps8|residual-warps8-blayout|residual-warps8-operands) DELIVERY="${CANDIDATE#residual-}" ;;
+  residual-prefetch|residual-operands|residual-v16|residual-blayout|residual-warps8|residual-warps8-blayout|residual-warps8-operands|residual-warps8-hlayout) DELIVERY="${CANDIDATE#residual-}" ;;
   *) echo "[residual delivery ACU] FAIL: unknown CANDIDATE=$CANDIDATE" >&2; exit 1 ;;
 esac
 if [[ -e "$RUN" || ! -x "$ACU" ]]; then
@@ -53,6 +53,13 @@ if [[ "$CANDIDATE" == residual-warps8-operands ]]; then
   "$RUN/build/l028_wy_residual_warps8_operands" | tee "$RUN/warps8-operands-schedule.log"
   python "$ROOT/dev/ppu/check_residual_warps8_operands.py" --self-test --isa "$RUN/build/gdn_wy_ppu.isa" \
     | tee "$RUN/warps8-operands-native.log"
+fi
+if [[ "$CANDIDATE" == residual-warps8-hlayout ]]; then
+  cmake --build "$RUN/build" --target l029_wy_residual_warps8_hlayout -j"${JOBS:-16}" \
+    | tee "$RUN/warps8-hlayout-host-build.log"
+  "$RUN/build/l029_wy_residual_warps8_hlayout" | tee "$RUN/warps8-hlayout-paired-map.log"
+  python "$ROOT/dev/ppu/check_residual_warps8_hlayout.py" --self-test --isa "$RUN/build/gdn_wy_ppu.isa" \
+    | tee "$RUN/warps8-hlayout-native.log"
 fi
 extensions=("$RUN/build"/_gdn_wy_ppu*.so)
 if [[ ${#extensions[@]} != 1 || ! -f "${extensions[0]}" ]]; then
