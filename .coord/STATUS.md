@@ -1,9 +1,35 @@
 # PPU original-structure port
 
-updated-at: 2026-09-25 09:09:37 UTC
-working-on: HV-layout ACU verdict and machine-readable evidence published; next hypothesis is state input-ready/metadata overlap
-blocked-on: none; no kernel or default routing changes
-last-commit: 32c2765 (published HV ACU report/data; exact validated1d6acea/6171b55 tree, current edit metadata only)
+updated-at: 2026-09-25 09:44:41 UTC
+working-on: metadata lookahead complete replay PASS; explicit-path commit and publication
+blocked-on: none; device performance NOT_RUN, default routing unchanged
+last-commit: 69e6bfb (published HV verdict checkpoint; localaa7aefa identical tree)
+
+User authorized planned optimization. Worktree /workspace/gdn-wy-residual-metadata-20260925;
+plan/evidence /workspace/gdn-wy-residual-metadata-evidence-20260925.
+Only gate/beta register prefetch timing; matrix layouts/math/traffic/shared/grid/barriers
+and output/solve remain fixed. First native screen09:35UTC, handoff target10:15UTC.
+No claim of speed or proof from source order; native overlap must be demonstrable.
+
+09:35UTC checkpoint: native120vregs/0stack versusHV122; gate/beta loads each
+precede8UPDATE MMAs before vldcnt wait (actual CFG, not linear PC order).
+Static sites1194->1309: added control/address cost remains visible, no speed claim.
+Host1..2048 all tails,28672contexts/473088chunks/30277632gate rows/
+29374464beta rows,8-warp publication/RETIRE DAG and64bit addresses PASS;
+8host and9source/binding plants red. Full sameSDK linked35-image build running.
+
+Full local final-local.log exit0:22/22CTest,93contracts,7dialect,45WY+61residual
+algebra,305original controls,35WY+15original linked native images PASS.
+34oldnative instruction+operand sequences IDENTICAL. Fixed loop-only checker
+gap exposed by deleted final-H store negative; whole-body work now checked too.
+7native negatives red, including2serialized waits preserving both opcode/operand
+multiset andCFG. No subsequent kernel edits; corrected stale32/32 print to actual
+34/34. complete-replay.log exit0 at09:44UTC; all gates rerun PASS, hashes stable.
+DSO395da41d, bindinge04c4785 (full hashes in doc).
+Device=NOT_RUN, default=UNCHANGED; candidate/control=metadata/HV; target1.5xFLA
+unmet until measured. Handoff doc PPU_GDN_RESIDUAL_METADATA_LOOKAHEAD.md.
+
+## Previous HV device verdict
 
 Upload76dfc9d0022b87e0696142b04da250b105eabfa1feb6c4624c725e821e829bf6
 copied intact to /workspace/gdn-warps8-hvlayout-acu-analysis-20260925.

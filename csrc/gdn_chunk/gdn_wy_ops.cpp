@@ -41,6 +41,9 @@ extern "C" int gdn_wy_forward_residual_warps8_hlayout(
 extern "C" int gdn_wy_forward_residual_warps8_hvlayout(
     void const*, void const*, void const*, void const*, void const*, float const*,
     void*, float*, void*, void*, void*, float*, int, int, int, int, bool, cudaStream_t);
+extern "C" int gdn_wy_forward_residual_warps8_metadata(
+    void const*, void const*, void const*, void const*, void const*, float const*,
+    void*, float*, void*, void*, void*, float*, int, int, int, int, bool, cudaStream_t);
 
 namespace {
 template <bool Residual = false, unsigned Variant = 0>
@@ -48,7 +51,7 @@ std::vector<torch::Tensor> forward(torch::Tensor q, torch::Tensor k, torch::Tens
     torch::Tensor g, torch::Tensor beta, c10::optional<torch::Tensor> initial,
     bool output_final_state, unsigned delivery) {
   using namespace gdn_qsa::wy;
-  static_assert(Variant <= 9 && (!Variant || Residual), "invalid residual-only delivery");
+  static_assert(Variant <= 10 && (!Variant || Residual), "invalid residual-only delivery");
   TORCH_CHECK(valid_delivery(delivery), "invalid or conflicting WY delivery mask");
   TORCH_CHECK(!Residual || delivery == 0, "residual is an algorithm, not a WY delivery mask");
   TORCH_CHECK(q.dim() == 4 && q.size(3) == Dim && k.sizes() == q.sizes(),
@@ -103,7 +106,8 @@ std::vector<torch::Tensor> forward(torch::Tensor q, torch::Tensor k, torch::Tens
                               Variant == 6 ? gdn_wy_forward_residual_warps8_blayout :
                               Variant == 7 ? gdn_wy_forward_residual_warps8_operands :
                               Variant == 8 ? gdn_wy_forward_residual_warps8_hlayout :
-                                             gdn_wy_forward_residual_warps8_hvlayout;
+                              Variant == 9 ? gdn_wy_forward_residual_warps8_hvlayout :
+                                             gdn_wy_forward_residual_warps8_metadata;
       rc = launch(q.data_ptr(), k.data_ptr(), v.data_ptr(), g.data_ptr(), beta.data_ptr(),
         initial.has_value() ? initial->data_ptr<float>() : nullptr, out.data_ptr(),
         output_final_state ? final.data_ptr<float>() : nullptr, w.data_ptr(),
@@ -160,6 +164,9 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         pybind11::arg("g"), pybind11::arg("beta"), pybind11::arg("initial_state") = pybind11::none(),
         pybind11::arg("output_final_state") = true, pybind11::arg("delivery") = 0);
   m.def("residual_warps8_hvlayout", &forward<true, 9>, pybind11::arg("q"), pybind11::arg("k"), pybind11::arg("v"),
+        pybind11::arg("g"), pybind11::arg("beta"), pybind11::arg("initial_state") = pybind11::none(),
+        pybind11::arg("output_final_state") = true, pybind11::arg("delivery") = 0);
+  m.def("residual_warps8_metadata", &forward<true, 10>, pybind11::arg("q"), pybind11::arg("k"), pybind11::arg("v"),
         pybind11::arg("g"), pybind11::arg("beta"), pybind11::arg("initial_state") = pybind11::none(),
         pybind11::arg("output_final_state") = true, pybind11::arg("delivery") = 0);
 }
