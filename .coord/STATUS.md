@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-25 14:56:34 UTC
-working-on: metadata ACU verdict verified; report/data and PPU wait-transfer lesson publication
+updated-at: 2026-09-25 15:00:06 UTC
+working-on: metadata ACU verdict and PPU wait-transfer lesson published; retain HV, next separate experiment is solve indexing
 blocked-on: none; no kernel/default changes, keep HV as measured control
-last-commit: 6a102fd (published metadata handoff; localbd77b91 identical tree)
+last-commit: e92ed54 (published metadata ACU report/data; tested698d64b/9720389 tree identical)
 
 New upload762112d7ce83fd0bb4de02e41751204215eb3521dae54e6cfe2636bced94e1f9
 preserved in /workspace/gdn-metadata-acu-analysis-20260925. Reports name6a102fd,
@@ -25,6 +25,11 @@ All15opcode sums and state/output/metadatawait PC bindings close;9source+
 Next separate axis:solve static register indexing, precision unchanged;
 not implemented in this analysis. First verified times14:46UTC within14:55.
 Final analysis/summary replay PASS. Report PPU_GDN_RESIDUAL_METADATA_ACU_20260925.md.
+
+Reporte92ed543abec2838d62e4615e145a880f94bcf47 published, validatedtree
+e7ed4f471fba68c5639393a1c9a4b04ec5e48eee. PPU-only skilllesson4b2ab84 also
+published; quick_validate PASS. Source/kernel/dispatch untouched throughout.
+Full evidence closure14:59UTC within15:15 handoff target; no new box request.
 
 ## Previous implementation handoff
 
