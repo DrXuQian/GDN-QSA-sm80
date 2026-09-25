@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-25 03:43:33 UTC
-working-on: paired Vnew implementation and complete local closure PASS; committing and publishing box handoff
+updated-at: 2026-09-25 03:46:21 UTC
+working-on: paired Vnew experiment published; ready for H/HV/FLA correctness and complete-call site-ACU box capture
 blocked-on: none; device performance NOT_RUN, defaults unchanged
-last-commit: 2432bf4 (tree matches published4b0aab4; new Vnew experiment not yet committed)
+last-commit: fd25bcf (published paired Vnew code, tree equals tested59a45e6/476573d; current edit is metadata only)
 
 User authorized continue. Source /workspace/gdn-wy-warps8-hvlayout-20260925;
 plan/evidence /workspace/gdn-wy-warps8-hvlayout-evidence-20260925.
@@ -27,6 +27,14 @@ Added two C++ old-variant/old-launcher binding negatives:12source/binding
 and6native plants red. Final clean replay after this checker edit EXIT0:
 final-closure.log; no subsequent kernel edits. LatestDSO01665ad8310766f1acccf499e7b1d9ee54d12c5235e193328fa541fa78e542de.
 Binding8a7c301e1448cc75de5d6f9a307125d69cb6b4789251d89d2731960b56407748.
+
+Publishedfd25bcf59a44c73b26b0b0d4053866d7ccfbbb5e, tested tree
+49feebc7d2a099e0835f947af2350261467f6e08. Skill126017c records only PPU
+cube-geometry cost, not generic advice or an unmeasured performance claim.
+Run CANDIDATE=residual-warps8-hvlayout with the existing delivery ACU runner.
+Local device numerics/performance NOT_RUN; automatic routing unchanged.
+
+## Previous H measured result
 
 Published8911d8007beecae4d495339ad659d4a6eeaf587b; tree93ec0afa2cfab87c20a93f605d3ab77c93c0bc3f
 matches local committed evidence. Skill follow-up24910b9 also published.
