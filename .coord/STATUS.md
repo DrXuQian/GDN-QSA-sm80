@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-25 09:44:41 UTC
-working-on: metadata lookahead complete replay PASS; explicit-path commit and publication
+updated-at: 2026-09-25 09:47:08 UTC
+working-on: metadata lookahead published; ready for user same-binary HV/metadata/FLA ACU
 blocked-on: none; device performance NOT_RUN, default routing unchanged
-last-commit: 69e6bfb (published HV verdict checkpoint; localaa7aefa identical tree)
+last-commit: b33686a (published metadata implementation; tested d6a6711/0fee95e tree identical)
 
 User authorized planned optimization. Worktree /workspace/gdn-wy-residual-metadata-20260925;
 plan/evidence /workspace/gdn-wy-residual-metadata-evidence-20260925.
@@ -28,6 +28,14 @@ multiset andCFG. No subsequent kernel edits; corrected stale32/32 print to actua
 DSO395da41d, bindinge04c4785 (full hashes in doc).
 Device=NOT_RUN, default=UNCHANGED; candidate/control=metadata/HV; target1.5xFLA
 unmet until measured. Handoff doc PPU_GDN_RESIDUAL_METADATA_LOOKAHEAD.md.
+
+Publishedb33686adee1597060f63933c2cef010847630480, exact testedtree
+15911021e90c1c0d4782039fcf7e0976ccc9d05d. No device run and no default change.
+Command: DEVICE=0 JOBS=16 CANDIDATE=residual-warps8-metadata bash
+tools/run_ppu_residual_delivery_acu_box.sh. Uses siteACU, /workspace bundle,
+30scalar+30HV+30candidate numerical cases before full4/4/7kernel capture.
+No new skill performance claim: actual speed remains unknown; existing PPU
+rotated-CFG lesson reused, not duplicated as another generic rule.
 
 ## Previous HV device verdict
 
