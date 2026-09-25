@@ -1,9 +1,27 @@
 # PPU original-structure port
 
-updated-at: 2026-09-25 03:46:21 UTC
-working-on: paired Vnew experiment published; ready for H/HV/FLA correctness and complete-call site-ACU box capture
-blocked-on: none; device performance NOT_RUN, defaults unchanged
-last-commit: fd25bcf (published paired Vnew code, tree equals tested59a45e6/476573d; current edit is metadata only)
+updated-at: 2026-09-25 09:06:34 UTC
+working-on: HV-layout ACU analysis validated; final replay and documentation publication
+blocked-on: none; no kernel or default routing changes
+last-commit: 58b2e29 (published implementation checkpoint; local81b1451 has identical tree)
+
+Upload76dfc9d0022b87e0696142b04da250b105eabfa1feb6c4624c725e821e829bf6
+copied intact to /workspace/gdn-warps8-hvlayout-acu-analysis-20260925.
+Captured source58b2e29;628files/627hashes/152source snapshots PASS.
+30scalar+30H+30HV cases x8 RAW-BIT/recurrence PASS; onlyg=-1 timed.
+All4/4/7kernels194.53824->186.15942us,FLA224.85000us,all1.700GHz:
+4.31%time reduction,1.20784xFLA;1.5x NOT_MET(36.25942us remains).
+State95.72765->88.40706;output44.06647->43.03706us. Prefix/solve
+-0.02882us is unchanged-stage variation,not credited. State KVD/L2store
+66->50MiB,logical/L2toLLC50MiB fixed. AIU staging112/80MiB unchanged.
+Output readBC524288->0;state readBC+15%,totalBC-2.87%:not global BC elimination.
+Actualwarps14.18->14.16/36.82->36.74;not occupancy gain.
+All15nativeopcode sums and both changed PC bodies bound;12source/binding
++6native negatives red. Next hypothesis:state input-ready/metadata overlap;
+no kernel/default edit or new box request. Only PPU-specific skill counterexample.
+First verified numbers09:00UTC;within09:35UTC handoff budget.
+
+## Previous implementation handoff
 
 User authorized continue. Source /workspace/gdn-wy-warps8-hvlayout-20260925;
 plan/evidence /workspace/gdn-wy-warps8-hvlayout-evidence-20260925.
