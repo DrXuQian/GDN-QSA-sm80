@@ -1,9 +1,32 @@
 # PPU original-structure port
 
-updated-at: 2026-09-25 09:47:08 UTC
-working-on: metadata lookahead published; ready for user same-binary HV/metadata/FLA ACU
-blocked-on: none; device performance NOT_RUN, default routing unchanged
-last-commit: b33686a (published metadata implementation; tested d6a6711/0fee95e tree identical)
+updated-at: 2026-09-25 14:56:34 UTC
+working-on: metadata ACU verdict verified; report/data and PPU wait-transfer lesson publication
+blocked-on: none; no kernel/default changes, keep HV as measured control
+last-commit: 6a102fd (published metadata handoff; localbd77b91 identical tree)
+
+New upload762112d7ce83fd0bb4de02e41751204215eb3521dae54e6cfe2636bced94e1f9
+preserved in /workspace/gdn-metadata-acu-analysis-20260925. Reports name6a102fd,
+HV control and metadata candidate, siteACU. Validate before interpreting.
+First verified numbers14:55UTC, complete evidence/report target15:15UTC.
+No kernel/default edit or uploaded executable/device execution.
+
+Verified632files/631hashes/156sources;30scalar+30HV+30metadata x8 RAW-BIT and
+independent recurrence PASS, onlyg=-1 profiled. All4/4/7kernels187.00764->
+189.57529us,FLA223.44057us;1.700GHz throughout. NO_OBSERVED_SPEED_GAIN;
+state89.88176->91.94353us(+2.29%),unchangedphases+0.50588us uncredited.
+Metadatawait samples1007->38,AIUcommit196->625,INPUTS_READYsync3735->4094;
+not cycle/time buckets. Native UPDATElead8 proven on uploadedISA, yet extra
+1,440,256instructions(+9.38%) mainlyaddress/control.122->120regs/0stack;
+actualwarps14.16->14.15,reg/shared/warp slots4/5/8 fixed. BC4,440,064 and
+AIU112MiB/vectorread17MiB/store50MiB fixed;scalarKSD+4096B disclosed.
+All15opcode sums and state/output/metadatawait PC bindings close;9source+
+7native negatives red. RetainHV1.19482xFLA;1.5xtarget needs38.04726us more.
+Next separate axis:solve static register indexing, precision unchanged;
+not implemented in this analysis. First verified times14:46UTC within14:55.
+Final analysis/summary replay PASS. Report PPU_GDN_RESIDUAL_METADATA_ACU_20260925.md.
+
+## Previous implementation handoff
 
 User authorized planned optimization. Worktree /workspace/gdn-wy-residual-metadata-20260925;
 plan/evidence /workspace/gdn-wy-residual-metadata-evidence-20260925.
