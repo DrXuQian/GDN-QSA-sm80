@@ -1,9 +1,14 @@
 # PPU original-structure port
 
-updated-at: 2026-09-25 02:27:38 UTC
-working-on: H-layout uploaded evidence fully validated; documenting/publishing observed full-call gain and remaining target gap
+updated-at: 2026-09-25 02:30:13 UTC
+working-on: H-layout ACU analysis complete and published; next candidate is paired Vnew publication/output (not implemented)
 blocked-on: none; no kernel/default changes, no new device request
-last-commit: 1a0c507 (tree equals published14c7268; H-layout device evidence analysis in progress)
+last-commit: 8911d80 (published device report/data, exact local6bd892a tree; current edit is metadata only)
+
+Published8911d8007beecae4d495339ad659d4a6eeaf587b; tree93ec0afa2cfab87c20a93f605d3ab77c93c0bc3f
+matches local committed evidence. Skill follow-up24910b9 also published.
+Final analyze.py --native + summarize.py rerun PASS; committed JSON byte-equal
+to regenerated summary. No uploaded binary was executed locally.
 
 New upload2b08d40e3f1b87a17f2b34e68ab1e1aa6cd01001d03356046aafd9568f28383b
 retained under /workspace/gdn-warps8-hlayout-acu-analysis-20260925. gzip intact;
@@ -20,6 +25,8 @@ matches difference; service granularity remains explicitly an inference.
 Registers124/94->122/78,stack0;activewarps14.09/37.00->14.19/36.98.
 Both changed native PC streams bound,15/15 opcode sums closed;
 8source+6native negatives red. No device code executed here.
+
+## Previous H implementation handoff (superseded by measured verdict above)
 
 Published41ab78e with tree66bb1aaa0e508d7b6c401fa8a9eaa60369926891 identical
 to the tested committed tree. Lesson7e137fe also published. No device run or
