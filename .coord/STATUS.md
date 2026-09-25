@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-25 15:23:12 UTC
-working-on: solve static-index full local replay PASS; committing/publishing isolated A/B handoff
-blocked-on: none; local SDK compile only, HV retained and default routing unchanged
-last-commit: 704e72f (pre-edit experiment checkpoint; parent a96bf0d)
+updated-at: 2026-09-25 15:25:34 UTC
+working-on: static solve A/B published; awaiting user box numerical admission and complete ACU capture
+blocked-on: device verdict not measured locally; retained HV/default routing unchanged
+last-commit: ec6e5d4 (published static solve, tested8434d88/577ef7d identical tree)
 
 User authorized next step. Worktree /workspace/gdn-wy-solve-static-20260925;
 plan/evidence /workspace/gdn-wy-solve-static-evidence-20260925. Only diagonal
@@ -29,6 +29,11 @@ PPU-only compilelesson published6c4d0d4,quick_validatePASS; no speed claim.
 Box command:CANDIDATE=residual-solve-static DEVICE=0 JOBS=16 bash
 tools/run_ppu_residual_delivery_acu_box.sh;30scalar+30HV+30subject numerics
 then same-binary4/4/7kernel siteACU. Source/publication in progress.
+
+Publishedec6e5d436dbffcbd0e2b206440d56a1bf8f6d87a; remotetree485f8c63
+matches tested localtree exactly. Local closure and publication before16:15
+budget, actual15:25UTC. PPU-only skill6c4d0d4 published. No default promotion,
+no box run, no promised timing gain. User command ready as above.
 
 ## Previous metadata verdict
 
