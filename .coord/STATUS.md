@@ -1,9 +1,13 @@
 # PPU original-structure port
 
-updated-at: 2026-09-25 01:58:23 UTC
-working-on: H paired-layout final full rerun PASS; publishing exact tested tree and box handoff
+updated-at: 2026-09-25 02:00:16 UTC
+working-on: H paired-layout published and ready for same-binary B-layout/H-layout/FLA ACU
 blocked-on: none; device numerics/performance NOT_RUN, defaults unchanged
-last-commit: 9dac309 (paired H implementation; source worktree commit 8485cc8)
+last-commit: 41ab78e (published paired H implementation and full local closure; this checkpoint is metadata only)
+
+Published41ab78e with tree66bb1aaa0e508d7b6c401fa8a9eaa60369926891 identical
+to the tested committed tree. Lesson7e137fe also published. No device run or
+default change. Final source comparison against worktree8485cc8 PASS.
 
 User authorized next experiment. Source /workspace/gdn-wy-warps8-hlayout-20260925;
 plan/evidence /workspace/gdn-wy-warps8-hlayout-evidence-20260925. Control
