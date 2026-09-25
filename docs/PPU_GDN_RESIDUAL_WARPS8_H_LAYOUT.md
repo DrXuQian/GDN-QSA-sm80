@@ -5,6 +5,12 @@ Performance control: **residual-warps8-blayout**, not the ineffective
 UPDATE-only lookahead and not a different warp geometry. Default routing
 and every existing kernel body remain unchanged.
 
+Device follow-up at14c7268 is now recorded in
+[the ACU report](PPU_GDN_RESIDUAL_WARPS8_H_LAYOUT_ACU_20260925.md):
+all-kernel205.732→194.466us,FLA224.350us; both changed stages improve.
+The local-only claims below remain historical compile/proof scope, not
+retroactively relabelled device measurements. Default routing is unchanged.
+
 ## Contract and why both kernels change
 
 H is not like the internal-only residual/scaledV planes. It has a state-MMA

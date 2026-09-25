@@ -1,9 +1,25 @@
 # PPU original-structure port
 
-updated-at: 2026-09-25 02:00:16 UTC
-working-on: H paired-layout published and ready for same-binary B-layout/H-layout/FLA ACU
-blocked-on: none; device numerics/performance NOT_RUN, defaults unchanged
-last-commit: 41ab78e (published paired H implementation and full local closure; this checkpoint is metadata only)
+updated-at: 2026-09-25 02:27:38 UTC
+working-on: H-layout uploaded evidence fully validated; documenting/publishing observed full-call gain and remaining target gap
+blocked-on: none; no kernel/default changes, no new device request
+last-commit: 1a0c507 (tree equals published14c7268; H-layout device evidence analysis in progress)
+
+New upload2b08d40e3f1b87a17f2b34e68ab1e1aa6cd01001d03356046aafd9568f28383b
+retained under /workspace/gdn-warps8-hlayout-acu-analysis-20260925. gzip intact;
+capture says source14c7268 and residual-warps8-hlayout vs warps8-blayout.
+624files/623hashes/148source snapshots PASS.30scalar+30B-layout+30H cases x8
+RAW-BIT/independent recurrence PASS; g=-0.1/-1 numerics, onlyg=-1 timed.
+All4/4/7 site-ACU sums205.73177->194.46647us,FLA224.35000us,all1.700GHz.
+State104.95235->95.41235us;output45.70824->44.08412us;unchangedprefix/solve
+-0.10118us not credited.1.15367xFLA,target1.5x NOT_MET (44.89980us remains).
+BCstate5,881,856->4,571,136;output2,752,512->1,703,936. KVD-to-TSM112/80MiB
+fixed. StateKVD/L2store98->66MiB,logical/L2-to-LLC50MiBfixed: transaction
+amplification,not removed output. Hostproduction publisher128Bfootprint
+matches difference; service granularity remains explicitly an inference.
+Registers124/94->122/78,stack0;activewarps14.09/37.00->14.19/36.98.
+Both changed native PC streams bound,15/15 opcode sums closed;
+8source+6native negatives red. No device code executed here.
 
 Published41ab78e with tree66bb1aaa0e508d7b6c401fa8a9eaa60369926891 identical
 to the tested committed tree. Lesson7e137fe also published. No device run or
