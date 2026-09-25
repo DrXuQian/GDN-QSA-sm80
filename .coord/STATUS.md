@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-25 09:06:34 UTC
-working-on: HV-layout ACU analysis validated; final replay and documentation publication
+updated-at: 2026-09-25 09:09:37 UTC
+working-on: HV-layout ACU verdict and machine-readable evidence published; next hypothesis is state input-ready/metadata overlap
 blocked-on: none; no kernel or default routing changes
-last-commit: 58b2e29 (published implementation checkpoint; local81b1451 has identical tree)
+last-commit: 32c2765 (published HV ACU report/data; exact validated1d6acea/6171b55 tree, current edit metadata only)
 
 Upload76dfc9d0022b87e0696142b04da250b105eabfa1feb6c4624c725e821e829bf6
 copied intact to /workspace/gdn-warps8-hvlayout-acu-analysis-20260925.
@@ -20,6 +20,13 @@ All15nativeopcode sums and both changed PC bodies bound;12source/binding
 +6native negatives red. Next hypothesis:state input-ready/metadata overlap;
 no kernel/default edit or new box request. Only PPU-specific skill counterexample.
 First verified numbers09:00UTC;within09:35UTC handoff budget.
+
+Final native replay,summary regeneration and committed JSON byte-equality PASS.
+Published report32c276577c5061a8c4050f9ff65cebeb5fa4dc85;
+tree2b23c285e4d93e4c4c400efab62c769513c5323e.
+PPU-only publisher/BC counterexample skill9a8260e also published.
+User causality question:cannot assign gain solely/mainly to BC; state readBC
+increased while store amplification fell. No isolated latency attribution.
 
 ## Previous implementation handoff
 
