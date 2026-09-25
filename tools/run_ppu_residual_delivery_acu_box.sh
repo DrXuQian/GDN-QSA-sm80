@@ -8,7 +8,7 @@ PPU_SDK_ROOT="${PPU_SDK:-${PPU_SDK_ROOT:-/usr/local/PPU_SDK}}"
 ACU="${ACU:-/sim/eec/shared/junfu.qx/asight/bin/acu}"
 CANDIDATE="${CANDIDATE:-residual-v16}"
 case "$CANDIDATE" in
-  residual-prefetch|residual-operands|residual-v16|residual-blayout|residual-warps8|residual-warps8-blayout|residual-warps8-operands|residual-warps8-hlayout) DELIVERY="${CANDIDATE#residual-}" ;;
+  residual-prefetch|residual-operands|residual-v16|residual-blayout|residual-warps8|residual-warps8-blayout|residual-warps8-operands|residual-warps8-hlayout|residual-warps8-hvlayout) DELIVERY="${CANDIDATE#residual-}" ;;
   *) echo "[residual delivery ACU] FAIL: unknown CANDIDATE=$CANDIDATE" >&2; exit 1 ;;
 esac
 if [[ -e "$RUN" || ! -x "$ACU" ]]; then
@@ -62,6 +62,13 @@ if [[ "$CANDIDATE" == residual-warps8-hlayout ]]; then
     | tee "$RUN/warps8-hlayout-native.log"
 fi
 extensions=("$RUN/build"/_gdn_wy_ppu*.so)
+if [[ "$CANDIDATE" == residual-warps8-hvlayout ]]; then
+  cmake --build "$RUN/build" --target l030_wy_residual_warps8_hvlayout -j"${JOBS:-16}" \
+    | tee "$RUN/warps8-hvlayout-host-build.log"
+  "$RUN/build/l030_wy_residual_warps8_hvlayout" | tee "$RUN/warps8-hvlayout-paired-map.log"
+  python "$ROOT/dev/ppu/check_residual_warps8_hvlayout.py" --self-test --isa "$RUN/build/gdn_wy_ppu.isa" \
+    | tee "$RUN/warps8-hvlayout-native.log"
+fi
 if [[ ${#extensions[@]} != 1 || ! -f "${extensions[0]}" ]]; then
   echo "[residual delivery ACU] FAIL: unique WY extension missing" >&2
   exit 1

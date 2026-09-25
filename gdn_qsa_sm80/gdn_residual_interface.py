@@ -10,19 +10,22 @@ RESIDUAL_VARIANTS = {"residual": "scalar", "residual-prefetch": "prefetch",
                      "residual-blayout": "blayout", "residual-warps8": "warps8",
                      "residual-warps8-blayout": "warps8-blayout",
                      "residual-warps8-operands": "warps8-operands",
-                     "residual-warps8-hlayout": "warps8-hlayout"}
+                     "residual-warps8-hlayout": "warps8-hlayout",
+                     "residual-warps8-hvlayout": "warps8-hvlayout"}
 RESIDUAL_ENTRYPOINTS = {"scalar": "residual", "prefetch": "residual_prefetch",
                         "operands": "residual_operands", "v16": "residual_v16",
                         "blayout": "residual_blayout", "warps8": "residual_warps8",
                         "warps8-blayout": "residual_warps8_blayout",
                         "warps8-operands": "residual_warps8_operands",
-                        "warps8-hlayout": "residual_warps8_hlayout"}
+                        "warps8-hlayout": "residual_warps8_hlayout",
+                        "warps8-hvlayout": "residual_warps8_hvlayout"}
 # Same-geometry performance controls; scalar residual remains the numeric
 # anchor for every delivery. Do not profile the combination against four warps.
 RESIDUAL_CONTROLS = {name: "residual" for name in RESIDUAL_VARIANTS if name != "residual"}
 RESIDUAL_CONTROLS["residual-warps8-blayout"] = "residual-warps8"
 RESIDUAL_CONTROLS["residual-warps8-operands"] = "residual-warps8-blayout"
 RESIDUAL_CONTROLS["residual-warps8-hlayout"] = "residual-warps8-blayout"
+RESIDUAL_CONTROLS["residual-warps8-hvlayout"] = "residual-warps8-hlayout"
 PROFILE_VARIANTS = {**DELIVERIES, **dict.fromkeys(RESIDUAL_VARIANTS)}
 
 
