@@ -1,9 +1,32 @@
 # PPU original-structure port
 
-updated-at: 2026-09-25 02:30:13 UTC
-working-on: H-layout ACU analysis complete and published; next candidate is paired Vnew publication/output (not implemented)
-blocked-on: none; no kernel/default changes, no new device request
-last-commit: 8911d80 (published device report/data, exact local6bd892a tree; current edit is metadata only)
+updated-at: 2026-09-25 03:43:33 UTC
+working-on: paired Vnew implementation and complete local closure PASS; committing and publishing box handoff
+blocked-on: none; device performance NOT_RUN, defaults unchanged
+last-commit: 2432bf4 (tree matches published4b0aab4; new Vnew experiment not yet committed)
+
+User authorized continue. Source /workspace/gdn-wy-warps8-hvlayout-20260925;
+plan/evidence /workspace/gdn-wy-warps8-hvlayout-evidence-20260925.
+Private Vnew[v,time] only; H/K/math/rounding/grid/shared/barriers unchanged.
+Explicitly split Vnew reader from final-output writer alias. Existing
+RESIDUAL_READY retires original input-V before overwriting its shared buffer.
+Local closure complete03:43UTC, within04:15UTC handoff estimate. No device claim.
+
+NarrowSDK2.1.1 compilePASS:state122regs/0stack (unchanged),output78->70/0stack;
+state static1215->1194,recurring512/526->503/517;output1418->1405,panel247/254
+->241/248. Matrix sitesstate28normal/8trans unchanged,output52/8->60/0;
+MMA/AIU/BF16conversion/ordinarysharedglobalops/barriers unchanged.
+Host64tails,1,048,576input+producer values,131,072vectors,4,194,304output
+reads,532,480public-output values PASS;13host plants red.
+Full binding/build/native32old->34all closure PASS. No device result.
+
+Full first pass and subsequent full rebuild PASS:21/21CTest,91hostcontract,
+7dialect,45WY+61residual algebra,305original source,34WY+15original linked
+native images.32/32oldnative instruction+operand sequences IDENTICAL.
+Added two C++ old-variant/old-launcher binding negatives:12source/binding
+and6native plants red. Final clean replay after this checker edit EXIT0:
+final-closure.log; no subsequent kernel edits. LatestDSO01665ad8310766f1acccf499e7b1d9ee54d12c5235e193328fa541fa78e542de.
+Binding8a7c301e1448cc75de5d6f9a307125d69cb6b4789251d89d2731960b56407748.
 
 Published8911d8007beecae4d495339ad659d4a6eeaf587b; tree93ec0afa2cfab87c20a93f605d3ab77c93c0bc3f
 matches local committed evidence. Skill follow-up24910b9 also published.
