@@ -45,8 +45,8 @@ def check_source(control, subject, binding):
     if launch != block(c, 'gdn_wy_forward_residual_warps8_hvlayout('):
         raise AssertionError('metadata changed launcher/admission/other stages')
     b = code(binding)
-    for required in ('Variant<=10&&(!Variant||Residual)',
-                     'Variant==9?gdn_wy_forward_residual_warps8_hvlayout:gdn_wy_forward_residual_warps8_metadata;',
+    for required in ('Variant<=11&&(!Variant||Residual)',
+                     'Variant==9?gdn_wy_forward_residual_warps8_hvlayout:Variant==10?gdn_wy_forward_residual_warps8_metadata:',
                      'm.def("residual_warps8_metadata",&forward<true,10>,'):
         if b.count(required) != 1:
             raise AssertionError('metadata Python/C++ selector not bound to exact variant10')
@@ -161,7 +161,7 @@ def main():
             else: raise AssertionError(f'escaped source negative: {label}')
         for label,old,new in (
             ('old-variant','&forward<true, 10>','&forward<true, 9>'),
-            ('old-launcher','gdn_wy_forward_residual_warps8_metadata;','gdn_wy_forward_residual_warps8_hvlayout;'),
+            ('old-launcher','Variant == 10 ? gdn_wy_forward_residual_warps8_metadata :','Variant == 10 ? gdn_wy_forward_residual_warps8_hvlayout :'),
         ):
             if binding.count(old)!=1: raise AssertionError('negative binding seam not unique')
             try: check_source(control,subject,binding.replace(old,new,1))

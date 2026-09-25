@@ -9,6 +9,7 @@ It is not a substitute for RAW-BIT device admission.
 import argparse
 from pathlib import Path
 import re
+from check_state_pipeline import block
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -35,7 +36,10 @@ def check(control, subject, launcher):
             "for (int k = 0; k < Dim; k += 16)"):
         if code(expression) not in c or code(expression) not in s:
             raise AssertionError(f"KKT arithmetic changed: {expression}")
-    calls = re.findall(r"(gdn_wy_split_\w+)<<<", s)
+    # Restrict to the original launch chain: an isolated solve now reuses
+    # prefix through a second host-only entry, checked by check_solve_static.
+    chain = block(s, 'intlaunch_split_inverse(') + block(s, 'intlaunch_split_prepare(')
+    calls = re.findall(r"(gdn_wy_split_\w+)<<<", chain)
     if calls != ["gdn_wy_split_prefix", "gdn_wy_split_solve", "gdn_wy_split_wu"]:
         raise AssertionError("same-stream scratch producer/consumer launch order changed")
     for expression in (

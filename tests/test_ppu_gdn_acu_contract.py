@@ -63,7 +63,7 @@ class ACUContract(unittest.TestCase):
         backend=SimpleNamespace(**{name:Mock(return_value=('out','state')) for name in
             ('residual','residual_prefetch','residual_operands','residual_v16','residual_blayout',
              'residual_warps8','residual_warps8_blayout','residual_warps8_operands','residual_warps8_hlayout',
-             'residual_warps8_hvlayout','residual_warps8_metadata')})
+             'residual_warps8_hvlayout','residual_warps8_metadata','residual_solve_static')})
         with patch.object(api,'_backend',return_value=backend):
             for delivery,name in (('scalar','residual'),('prefetch','residual_prefetch'),
                                   ('operands','residual_operands'),('v16','residual_v16'),
@@ -72,7 +72,8 @@ class ACUContract(unittest.TestCase):
                                   ('warps8-operands','residual_warps8_operands'),
                                   ('warps8-hlayout','residual_warps8_hlayout'),
                                   ('warps8-hvlayout','residual_warps8_hvlayout'),
-                                  ('warps8-metadata','residual_warps8_metadata')):
+                                  ('warps8-metadata','residual_warps8_metadata'),
+                                  ('solve-static','residual_solve_static')):
                 self.assertEqual(api.gdn_chunk_residual(*inputs,delivery=delivery),('out','state'))
                 getattr(backend,name).assert_called_once()
             with self.assertRaises(ValueError): api.gdn_chunk_residual(*inputs,delivery='unknown')
@@ -92,7 +93,7 @@ class ACUContract(unittest.TestCase):
         runner = ROOT / 'tools/run_ppu_residual_delivery_acu_box.sh'
         for candidate in ('not-a-candidate', 'residual-v16', 'residual-blayout', 'residual-warps8',
                           'residual-warps8-blayout','residual-warps8-operands','residual-warps8-hlayout',
-                          'residual-warps8-hvlayout','residual-warps8-metadata'):
+                          'residual-warps8-hvlayout','residual-warps8-metadata','residual-solve-static'):
             out = directory / candidate
             env = os.environ | {'CANDIDATE': candidate, 'OUT': str(out),
                                 'ACU': str(directory / 'missing-site-acu')}
@@ -111,6 +112,28 @@ class ACUContract(unittest.TestCase):
         with patch.object(api,'_backend',return_value=backend),self.assertRaises(AttributeError):
             api.gdn_chunk_residual(*inputs,delivery='blayout')
         backend.residual.assert_not_called()
+
+    def test_static_solve_cannot_silently_fall_back_to_hv(self):
+        import torch
+        from unittest.mock import Mock
+        from gdn_qsa_sm80 import gdn_residual_interface as api
+        inputs=tuple(torch.zeros(1) for _ in range(5))
+        backend=SimpleNamespace(residual=Mock(),residual_warps8_hvlayout=Mock())
+        with patch.object(api,'_backend',return_value=backend),self.assertRaises(AttributeError):
+            api.gdn_chunk_residual(*inputs,delivery='solve-static')
+        backend.residual.assert_not_called()
+        backend.residual_warps8_hvlayout.assert_not_called()
+
+    def test_static_solve_native_helper_and_capture_are_bound(self):
+        from gdn_qsa_sm80 import gdn_residual_interface as api
+        self.assertEqual(api.RESIDUAL_CONTROLS['residual-solve-static'],'residual-warps8-hvlayout')
+        run=subprocess.run([sys.executable,str(ROOT/'dev/ppu/check_solve_static.py'),'--self-test'],
+                           capture_output=True,text=True)
+        self.assertEqual(run.returncode,0,run.stdout+run.stderr)
+        self.assertIn('wrong-binding EXPECTED-RED/PASS',run.stdout)
+        runner=(ROOT/'tools/run_ppu_residual_delivery_acu_box.sh').read_text()
+        self.assertIn('CANDIDATE" == residual-solve-static',runner)
+        self.assertIn('--host "$RUN/build/l032_wy_solve_static"',runner)
 
     def test_warps8_cannot_silently_use_scalar_backend(self):
         import torch

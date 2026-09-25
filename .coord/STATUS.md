@@ -1,9 +1,36 @@
 # PPU original-structure port
 
-updated-at: 2026-09-25 15:00:06 UTC
-working-on: metadata ACU verdict and PPU wait-transfer lesson published; retain HV, next separate experiment is solve indexing
-blocked-on: none; no kernel/default changes, keep HV as measured control
-last-commit: e92ed54 (published metadata ACU report/data; tested698d64b/9720389 tree identical)
+updated-at: 2026-09-25 15:23:12 UTC
+working-on: solve static-index full local replay PASS; committing/publishing isolated A/B handoff
+blocked-on: none; local SDK compile only, HV retained and default routing unchanged
+last-commit: 704e72f (pre-edit experiment checkpoint; parent a96bf0d)
+
+User authorized next step. Worktree /workspace/gdn-wy-solve-static-20260925;
+plan/evidence /workspace/gdn-wy-solve-static-evidence-20260925. Only diagonal
+register indexing; same arithmetic order/3TF32products/grid/shared/barriers.
+Native screen target15:35UTC, fully verified published handoff target16:15UTC.
+No device run. Candidate timing/RAW-BIT device admission stillNOT_RUN.
+
+15:16UTC native SDK2.1.1 screen:diagonal612->405sites,ivreg12->0,
+pipe_flush42->0,no backedge;120coefficientwords/120rtteFMAs/16stores.
+Whole solve1678->1472sites,84regs/0stack unchanged,3TF32 products retained.
+Host65536contexts/1048576values/7864320orderedproducts/524288stores RAW-BIT;
+wrong index/order/term/publisher plants allred.10source+5native plants red.
+Linked36-image/full suite running; only new solve, same actualHV state/output.
+Native results are compile evidence,not a speed or device-numerics verdict.
+
+Complete replay-local.log exit0 at15:23UTC:23/23CTest,95contracts,7dialect,
+45WY+61residualalgebra,305originalcontrols,36WY+15originalnativeimages PASS.
+35/35parent native instructions+operands IDENTICAL.5host negatives(including
+actual omitted-context run),10source/binding and5targetednative plants red.
+Old ambiguous-negative prefix fixed to exactsymbol,fullsuite rerun,no skips.
+DSO19c45454,binding62e1ce3a;fullhashes inPPU_GDN_SOLVE_STATIC_INDEX.md.
+PPU-only compilelesson published6c4d0d4,quick_validatePASS; no speed claim.
+Box command:CANDIDATE=residual-solve-static DEVICE=0 JOBS=16 bash
+tools/run_ppu_residual_delivery_acu_box.sh;30scalar+30HV+30subject numerics
+then same-binary4/4/7kernel siteACU. Source/publication in progress.
+
+## Previous metadata verdict
 
 New upload762112d7ce83fd0bb4de02e41751204215eb3521dae54e6cfe2636bced94e1f9
 preserved in /workspace/gdn-metadata-acu-analysis-20260925. Reports name6a102fd,

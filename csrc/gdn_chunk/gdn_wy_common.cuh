@@ -27,6 +27,7 @@ int launch_state_pipeline(Inputs p, Workspace ws, float* final, gdn_arch::Stream
 // Reuse admitted native solve/output bodies for the opt-in residual algorithm.
 // Inverse and state snapshots MUST be separate allocations.
 int launch_split_inverse(Inputs p, Workspace ws, gdn_arch::Stream stream);
+int launch_split_prefix(Inputs p, Workspace ws, gdn_arch::Stream stream);
 int configure_aiu_output();
 int launch_aiu_output(Inputs p, Workspace ws, BF16* output, gdn_arch::Stream stream);
 

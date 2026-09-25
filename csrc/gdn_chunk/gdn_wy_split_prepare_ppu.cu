@@ -211,6 +211,13 @@ gdn_wy_split_wu(Inputs p, Workspace ws) {
 }  // namespace gdn_qsa::wy::split_prepare
 
 namespace gdn_qsa::wy {
+// Host-only reuse for isolated solve experiments; existing launchers and
+// all three admitted device bodies remain unchanged.
+int launch_split_prefix(Inputs p, Workspace ws, gdn_arch::Stream stream) {
+  using namespace split_prepare;
+  gdn_wy_split_prefix<<<unsigned(p.shape.groups()), Plan::PrefixThreads, 0, stream>>>(p, ws);
+  return int(hggcGetLastError());
+}
 int configure_split_prepare() {
   using namespace split_prepare;
   int rc = int(hggcFuncSetAttribute(gdn_wy_split_solve,

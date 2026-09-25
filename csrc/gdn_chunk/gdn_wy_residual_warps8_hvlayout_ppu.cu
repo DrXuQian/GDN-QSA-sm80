@@ -246,6 +246,17 @@ gdn_wy_residual_warps8_hvlayout_output(Inputs p, Workspace ws, BF16* output) {
   }
 }
 
+// Host-only entrypoints let a solve experiment reuse these exact device
+// symbols, rather than copying or recompiling the state/output math.
+int configure_hvlayout_state() {
+  return int(hggcFuncSetAttribute(gdn_wy_residual_warps8_hvlayout_state,
+      hggcFuncAttributeMaxDynamicSharedMemorySize, sizeof(Storage)));
+}
+int launch_hvlayout_state(Inputs p, Workspace ws, float* final, gdn_arch::Stream stream) {
+  unsigned const grid = unsigned(int64_t(p.shape.batch) * p.shape.value_heads * (Dim / ValueTile));
+  gdn_wy_residual_warps8_hvlayout_state<<<grid, Plan::Threads, sizeof(Storage), stream>>>(p, ws, final);
+  return int(hggcGetLastError());
+}
 int configure_hvlayout_output() {
   return int(hggcFuncSetAttribute(gdn_wy_residual_warps8_hvlayout_output,
       hggcFuncAttributeMaxDynamicSharedMemorySize, sizeof(TiledOutputStorage)));

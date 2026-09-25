@@ -74,7 +74,7 @@ def subset(counter,prefixes):
 def check_binding(text):
     binding=code(text)
     for expected in (
-        'Variant<=10&&(!Variant||Residual)',
+        'Variant<=11&&(!Variant||Residual)',
         'Variant==8?gdn_wy_forward_residual_warps8_hlayout:Variant==9?gdn_wy_forward_residual_warps8_hvlayout:',
         'm.def("residual_warps8_hvlayout",&forward<true,9>,',
     ):
