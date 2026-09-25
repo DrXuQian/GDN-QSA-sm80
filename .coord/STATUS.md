@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-25 01:28:51 UTC
-working-on: close UPDATE-lookahead no-gain report, native/per-PC validation and durable lesson
-blocked-on: none; no new kernel work; default routing unchanged
-last-commit: 9eac7bd (local merge; uploaded source 0755b93)
+updated-at: 2026-09-25 01:33:05 UTC
+working-on: UPDATE-lookahead upload adjudicated and report published; H/snapshot is next independent design
+blocked-on: none; no observed speed gain, no default promotion or new kernel work
+last-commit: 4e4f57e (published ACU verdict and phase-bound evidence; this checkpoint is metadata only)
 
 New upload SHA256 564de266956ef11c6cd548ccd26493666a9c81d016058a24f73bc08c0a32c354.
 Retained /workspace/gdn-warps8-operands-acu-analysis-20260925/capture.tar.gz.
@@ -17,6 +17,11 @@ Actual UPDATE lead improved and immediate reuse3->0; other KH/PR7/3 sites
 remain. TFU-WAR.39->.40; UPDATE load compute samples444->379 but whole-kernel
 3565->3620. Samples are not cycles.15/15 opcode sums/36load-site mappings PASS;
 6source+5native negatives red. No uploaded executable or PPU code run here.
+Final host replay PASS and summary byte-equal to committed evidence.
+Report published4e4f57e, exact treef9df7c49a962971c27ff5015c1750265ecbedcfb;
+skill lesson8b51d13. Only docs/data/STATUS/skill changed; no device request.
+
+## Previous implementation handoff (superseded by measured verdict above)
 
 Published7cfeb06 through authorizedGitHubAPI; remote/localtreeboth
 b0856e41ad09fc852878657295793010b41e8d30. HTTPSfetch+treecomparisonPASS,
