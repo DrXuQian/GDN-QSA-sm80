@@ -16,6 +16,7 @@ from check_residual_warps8_operands import check_native as check_warps8_operands
 from check_residual_warps8_hlayout import check_native as check_warps8_hlayout_native
 from check_residual_warps8_hvlayout import check_native as check_warps8_hvlayout_native
 from check_residual_metadata import check_native as check_metadata_native
+from check_solve_static import check_native as check_solve_static_native
 
 
 def kernel_sequences(isa):
@@ -32,8 +33,8 @@ def kernel_sequences(isa):
 
 def compare_controls(before, after):
     old, new = kernel_sequences(before), kernel_sequences(after)
-    if len(old) != 34 or len(new) != 35:
-        raise AssertionError("control comparison must cover all34 old and all35 current images")
+    if len(old) != 35 or len(new) != 36:
+        raise AssertionError("control comparison must cover all35 old and all36 current images")
     for name, sequence in old.items():
         if new.get(name) != sequence:
             raise AssertionError(f"admitted control native instructions changed: {name}")
@@ -191,10 +192,11 @@ def audit(isa, resources, symbols):
     check_warps8_hlayout_native(isa)
     check_warps8_hvlayout_native(isa)
     check_metadata_native(isa)
+    check_solve_static_native(isa)
     funcs = re.findall(r"Func \d+ (\S+) RESOURCE INFO:\n(.*?)(?=Func \d+ \S+ RESOURCE INFO:|\Z)",
                        resources, flags=re.S)
-    if len(funcs) != 35:
-        raise AssertionError(f"WY image denominator must be34 controls +1 metadata state image, got {len(funcs)}")
+    if len(funcs) != 36:
+        raise AssertionError(f"WY image denominator must be35 controls +1 static solve image, got {len(funcs)}")
     rows = []
     mma_counts = {}
     for role, packed in ((role, packed) for role in ("prepare", "state", "output") for packed in (False, True)):
@@ -507,19 +509,29 @@ def audit(isa, resources, symbols):
         rows.append(dict(role="output",algorithm="residual",delivery=delivery,registers=regs,
                          stack=stack,static_instructions=len(ops),aiu_sites=7,bf16_mma_sites=40,
                          cta_barrier_sites=6,shared_bytes=49408,rounding="RESIDUAL-UNCHANGED"))
+    matches=[(name,body) for name,body in funcs if "gdn_wy_split_solve_staticE" in name]
+    if len(matches)!=1: raise AssertionError("static solve resource image missing/ambiguous")
+    name,body=matches[0]
+    regs=int(re.search(r"vreg_number:(\d+)",body)[1])
+    stack=int(re.search(r"STACK SIZE:(\d+)",body)[1])
+    if stack or regs>84 or name not in sequences:
+        raise AssertionError("static solve spills, exceeds84regs control budget, or lacks exact native body")
+    rows.append(dict(role="solve",algorithm="residual",delivery="solve-static",registers=regs,
+                     stack=stack,static_instructions=len(sequences[name]),shared_bytes=49664,
+                     diagonal_ordered_fmas=120,tf32_mma_sites=12,indirect_register_reads=0))
     for name in ("gdn_wy_forward", "gdn_wy_forward_delivery", "gdn_wy_forward_residual",
                  "gdn_wy_forward_residual_prefetch", "gdn_wy_forward_residual_operands", "gdn_wy_forward_residual_v16",
                  "gdn_wy_forward_residual_blayout", "gdn_wy_forward_residual_warps8",
                  "gdn_wy_forward_residual_warps8_blayout", "gdn_wy_forward_residual_warps8_operands",
                  "gdn_wy_forward_residual_warps8_hlayout", "gdn_wy_forward_residual_warps8_hvlayout",
-                 "gdn_wy_forward_residual_warps8_metadata"):
+                 "gdn_wy_forward_residual_warps8_metadata", "gdn_wy_forward_residual_solve_static"):
         if not re.search(rf"\b{name}$", symbols, re.M):
             raise AssertionError(f"WY launcher missing from linked library: {name}")
     for name in ("configure_tiled", "launch_tiled_prepare", "launch_tiled_state", "launch_tiled_output",
                  "configure_state_ab", "launch_state_ab", "configure_stage_address",
                  "launch_address_prepare", "launch_address_output", "configure_prepare_rows", "launch_prepare_rows",
                  "forward_aiu", "configure_split_prepare", "launch_split_prepare",
-                 "configure_state_pipeline", "launch_state_pipeline", "launch_split_inverse",
+                 "configure_state_pipeline", "launch_state_pipeline", "launch_split_inverse", "launch_split_prefix",
                  "configure_aiu_output", "launch_aiu_output"):
         if not re.search(rf"\b_ZN7gdn_qsa2wy\d+{name}E\S*$", symbols, re.M):
             raise AssertionError(f"tiled cross-TU launcher missing from linked library: {name}")
@@ -569,7 +581,7 @@ def main():
             ("aiu-wrong-reader", (plant_in_kernel(isa, "gdn_wy_aiu_output",
                 "tsm.ld.swzl.b32x4.s0.t1.trans1", "tsm.ld.ncom.b32x4"), resources, symbols)),
             ("split-missing-link", (isa, resources, symbols.replace("launch_split_prepare", "MISSING_split"))),
-            ("split-residual-missing", (plant_in_kernel(isa, "gdn_wy_split_solve",
+            ("split-residual-missing", (plant_in_kernel(isa, "gdn_wy_split_solveE",
                 "v.mma.f32.tf32.m16n16k8", "MISSING_RESIDUAL"), resources, symbols)),
             ("split-wu-scalar-store", (plant_in_kernel(isa, "gdn_wy_split_wu",
                 "vmem.st.b32x4", "vmem.st.b16"), resources, symbols)),
@@ -615,6 +627,8 @@ def main():
             ("hvlayout-missing-link", (isa,resources,symbols.replace("gdn_wy_forward_residual_warps8_hvlayout","MISSING_HV_LINK"))),
             ("metadata-missing-state", (isa.replace("gdn_wy_residual_warps8_metadata_state","MISSING_METADATA_STATE"),resources,symbols)),
             ("metadata-missing-link", (isa,resources,symbols.replace("gdn_wy_forward_residual_warps8_metadata","MISSING_METADATA_LINK"))),
+            ("solve-static-missing-image", (isa.replace("gdn_wy_split_solve_staticE","MISSING_STATIC_SOLVE"),resources,symbols)),
+            ("solve-static-missing-link", (isa,resources,symbols.replace("gdn_wy_forward_residual_solve_static","MISSING_STATIC_SOLVE_LINK"))),
             ("v16-wrong-reader", (plant_in_kernel(isa,"gdn_wy_residual_v16_state",
                 "tsm.ld.swzl","tsm.ld.ncom"),resources,symbols)),
         ):
