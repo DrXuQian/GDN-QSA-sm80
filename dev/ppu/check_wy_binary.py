@@ -15,6 +15,7 @@ from check_residual_warps8_blayout import check_native as check_warps8_blayout_n
 from check_residual_warps8_operands import check_native as check_warps8_operands_native
 from check_residual_warps8_hlayout import check_native as check_warps8_hlayout_native
 from check_residual_warps8_hvlayout import check_native as check_warps8_hvlayout_native
+from check_residual_metadata import check_native as check_metadata_native
 
 
 def kernel_sequences(isa):
@@ -31,8 +32,8 @@ def kernel_sequences(isa):
 
 def compare_controls(before, after):
     old, new = kernel_sequences(before), kernel_sequences(after)
-    if len(old) != 32 or len(new) != 34:
-        raise AssertionError("control comparison must cover all32 old and all34 current images")
+    if len(old) != 34 or len(new) != 35:
+        raise AssertionError("control comparison must cover all34 old and all35 current images")
     for name, sequence in old.items():
         if new.get(name) != sequence:
             raise AssertionError(f"admitted control native instructions changed: {name}")
@@ -189,10 +190,11 @@ def audit(isa, resources, symbols):
     check_warps8_operands_native(isa)
     check_warps8_hlayout_native(isa)
     check_warps8_hvlayout_native(isa)
+    check_metadata_native(isa)
     funcs = re.findall(r"Func \d+ (\S+) RESOURCE INFO:\n(.*?)(?=Func \d+ \S+ RESOURCE INFO:|\Z)",
                        resources, flags=re.S)
-    if len(funcs) != 34:
-        raise AssertionError(f"WY image denominator must be32 controls +2 paired HV state/output images, got {len(funcs)}")
+    if len(funcs) != 35:
+        raise AssertionError(f"WY image denominator must be34 controls +1 metadata state image, got {len(funcs)}")
     rows = []
     mma_counts = {}
     for role, packed in ((role, packed) for role in ("prepare", "state", "output") for packed in (False, True)):
@@ -458,7 +460,8 @@ def audit(isa, resources, symbols):
             ("warps8-blayout", "gdn_wy_residual_warps8_blayout_stateE", (4,20,5,5,36), 45568),
             ("warps8-operands", "gdn_wy_residual_warps8_operands_stateE", (4,20,5,5,36), 45568),
             ("warps8-hlayout", "gdn_wy_residual_warps8_hlayout_stateE", (4,20,5,5,36), 45568),
-            ("warps8-hvlayout", "gdn_wy_residual_warps8_hvlayout_stateE", (4,20,5,5,36), 45568)):
+            ("warps8-hvlayout", "gdn_wy_residual_warps8_hvlayout_stateE", (4,20,5,5,36), 45568),
+            ("warps8-metadata", "gdn_wy_residual_warps8_metadata_stateE", (4,20,5,5,36), 45568)):
         matches=[(name,body) for name,body in funcs if marker in name]
         if len(matches)!=1: raise AssertionError(f"residual {delivery} image absent/ambiguous")
         name,body=matches[0]
@@ -466,6 +469,8 @@ def audit(isa, resources, symbols):
         stack=int(re.search(r"STACK SIZE:(\d+)",body)[1])
         if stack or regs>256 or name not in sequences:
             raise AssertionError(f"residual {delivery} spills or lacks native body")
+        if delivery=="warps8-metadata" and regs>122:
+            raise AssertionError("metadata lookahead exceeded its HV register budget")
         ops=[line.split()[0] for line in sequences[name]]
         counts=(ops.count("vmem.aiu.ld.tsm.l0.t0.p0.s0.m0.2d.b16.kp1"),
                 ops.count("v.mma.f32.bf16.m16n16k16"),ops.count("v.exp2.f32"),
@@ -506,7 +511,8 @@ def audit(isa, resources, symbols):
                  "gdn_wy_forward_residual_prefetch", "gdn_wy_forward_residual_operands", "gdn_wy_forward_residual_v16",
                  "gdn_wy_forward_residual_blayout", "gdn_wy_forward_residual_warps8",
                  "gdn_wy_forward_residual_warps8_blayout", "gdn_wy_forward_residual_warps8_operands",
-                 "gdn_wy_forward_residual_warps8_hlayout", "gdn_wy_forward_residual_warps8_hvlayout"):
+                 "gdn_wy_forward_residual_warps8_hlayout", "gdn_wy_forward_residual_warps8_hvlayout",
+                 "gdn_wy_forward_residual_warps8_metadata"):
         if not re.search(rf"\b{name}$", symbols, re.M):
             raise AssertionError(f"WY launcher missing from linked library: {name}")
     for name in ("configure_tiled", "launch_tiled_prepare", "launch_tiled_state", "launch_tiled_output",
@@ -607,6 +613,8 @@ def main():
             ("hvlayout-missing-state", (isa.replace("gdn_wy_residual_warps8_hvlayout_state","MISSING_HV_STATE"),resources,symbols)),
             ("hvlayout-missing-output", (isa.replace("gdn_wy_residual_warps8_hvlayout_output","MISSING_HV_OUTPUT"),resources,symbols)),
             ("hvlayout-missing-link", (isa,resources,symbols.replace("gdn_wy_forward_residual_warps8_hvlayout","MISSING_HV_LINK"))),
+            ("metadata-missing-state", (isa.replace("gdn_wy_residual_warps8_metadata_state","MISSING_METADATA_STATE"),resources,symbols)),
+            ("metadata-missing-link", (isa,resources,symbols.replace("gdn_wy_forward_residual_warps8_metadata","MISSING_METADATA_LINK"))),
             ("v16-wrong-reader", (plant_in_kernel(isa,"gdn_wy_residual_v16_state",
                 "tsm.ld.swzl","tsm.ld.ncom"),resources,symbols)),
         ):
@@ -626,7 +634,8 @@ def main():
                 print("[WY binary negative] changed-control EXPECTED-RED/PASS")
             else:
                 raise AssertionError("control-comparison negative escaped")
-        print("[WY binary controls] 32/32 native instruction+operand sequences IDENTICAL")
+        count = len(kernel_sequences(before))
+        print(f"[WY binary controls] {count}/{count} native instruction+operand sequences IDENTICAL")
     print("[WY binary] PASS device_execution=NOT_RUN")
 
 

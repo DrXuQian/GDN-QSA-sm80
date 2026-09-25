@@ -74,8 +74,8 @@ def subset(counter,prefixes):
 def check_binding(text):
     binding=code(text)
     for expected in (
-        'Variant<=9&&(!Variant||Residual)',
-        'Variant==8?gdn_wy_forward_residual_warps8_hlayout:gdn_wy_forward_residual_warps8_hvlayout;',
+        'Variant<=10&&(!Variant||Residual)',
+        'Variant==8?gdn_wy_forward_residual_warps8_hlayout:Variant==9?gdn_wy_forward_residual_warps8_hvlayout:',
         'm.def("residual_warps8_hvlayout",&forward<true,9>,',
     ):
         if binding.count(expected)!=1:
@@ -128,8 +128,8 @@ def main():
     if args.self_test:
         for label,old,new in (
             ('cpp-old-variant','&forward<true, 9>','&forward<true, 8>'),
-            ('cpp-old-launcher','gdn_wy_forward_residual_warps8_hlayout :\n                                             gdn_wy_forward_residual_warps8_hvlayout;',
-             'gdn_wy_forward_residual_warps8_hlayout :\n                                             gdn_wy_forward_residual_warps8_hlayout;'),
+            ('cpp-old-launcher','Variant == 9 ? gdn_wy_forward_residual_warps8_hvlayout :',
+             'Variant == 9 ? gdn_wy_forward_residual_warps8_hlayout :'),
         ):
             if binding.count(old)!=1: raise AssertionError('binding negative target absent/ambiguous')
             try: check_binding(binding.replace(old,new,1))

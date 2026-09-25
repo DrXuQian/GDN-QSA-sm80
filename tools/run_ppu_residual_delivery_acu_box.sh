@@ -8,7 +8,7 @@ PPU_SDK_ROOT="${PPU_SDK:-${PPU_SDK_ROOT:-/usr/local/PPU_SDK}}"
 ACU="${ACU:-/sim/eec/shared/junfu.qx/asight/bin/acu}"
 CANDIDATE="${CANDIDATE:-residual-v16}"
 case "$CANDIDATE" in
-  residual-prefetch|residual-operands|residual-v16|residual-blayout|residual-warps8|residual-warps8-blayout|residual-warps8-operands|residual-warps8-hlayout|residual-warps8-hvlayout) DELIVERY="${CANDIDATE#residual-}" ;;
+  residual-prefetch|residual-operands|residual-v16|residual-blayout|residual-warps8|residual-warps8-blayout|residual-warps8-operands|residual-warps8-hlayout|residual-warps8-hvlayout|residual-warps8-metadata) DELIVERY="${CANDIDATE#residual-}" ;;
   *) echo "[residual delivery ACU] FAIL: unknown CANDIDATE=$CANDIDATE" >&2; exit 1 ;;
 esac
 if [[ -e "$RUN" || ! -x "$ACU" ]]; then
@@ -72,6 +72,13 @@ fi
 if [[ ${#extensions[@]} != 1 || ! -f "${extensions[0]}" ]]; then
   echo "[residual delivery ACU] FAIL: unique WY extension missing" >&2
   exit 1
+fi
+if [[ "$CANDIDATE" == residual-warps8-metadata ]]; then
+  cmake --build "$RUN/build" --target l031_wy_residual_metadata -j"${JOBS:-16}" \
+    | tee "$RUN/metadata-host-build.log"
+  "$RUN/build/l031_wy_residual_metadata" | tee "$RUN/metadata-lifetime.log"
+  python "$ROOT/dev/ppu/check_residual_metadata.py" --self-test --isa "$RUN/build/gdn_wy_ppu.isa" \
+    | tee "$RUN/metadata-native.log"
 fi
 export CUDA_VISIBLE_DEVICES="${DEVICE:-0}"
 export LD_LIBRARY_PATH="$PPU_SDK_ROOT/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
