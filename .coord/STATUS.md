@@ -1,9 +1,17 @@
 # PPU original-structure port
 
-updated-at: 2026-09-25 15:00:06 UTC
-working-on: metadata ACU verdict and PPU wait-transfer lesson published; retain HV, next separate experiment is solve indexing
-blocked-on: none; no kernel/default changes, keep HV as measured control
-last-commit: e92ed54 (published metadata ACU report/data; tested698d64b/9720389 tree identical)
+updated-at: 2026-09-25 15:06:51 UTC
+working-on: isolated solve static-index experiment; native diagonal audit before kernel edit
+blocked-on: none; local SDK compile only, HV retained and default routing unchanged
+last-commit: a96bf0d (published metadata verdict synchronized)
+
+User authorized next step. Worktree /workspace/gdn-wy-solve-static-20260925;
+plan/evidence /workspace/gdn-wy-solve-static-evidence-20260925. Only diagonal
+register indexing; same arithmetic order/3TF32products/grid/shared/barriers.
+Native screen target15:35UTC, fully verified published handoff target16:15UTC.
+No device run. Candidate timing/RAW-BIT device admission stillNOT_RUN.
+
+## Previous metadata verdict
 
 New upload762112d7ce83fd0bb4de02e41751204215eb3521dae54e6cfe2636bced94e1f9
 preserved in /workspace/gdn-metadata-acu-analysis-20260925. Reports name6a102fd,
