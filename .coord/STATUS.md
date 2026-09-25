@@ -1,9 +1,30 @@
 # PPU original-structure port
 
-updated-at: 2026-09-25 01:33:05 UTC
-working-on: UPDATE-lookahead upload adjudicated and report published; H/snapshot is next independent design
-blocked-on: none; no observed speed gain, no default promotion or new kernel work
-last-commit: 4e4f57e (published ACU verdict and phase-bound evidence; this checkpoint is metadata only)
+updated-at: 2026-09-25 01:58:23 UTC
+working-on: H paired-layout final full rerun PASS; publishing exact tested tree and box handoff
+blocked-on: none; device numerics/performance NOT_RUN, defaults unchanged
+last-commit: 9dac309 (paired H implementation; source worktree commit 8485cc8)
+
+User authorized next experiment. Source /workspace/gdn-wy-warps8-hlayout-20260925;
+plan/evidence /workspace/gdn-wy-warps8-hlayout-evidence-20260925. Control
+warps8-blayout, no ineffective UPDATE-lookahead combination. Private H[v,k]
+snapshot permits contiguous16B publication and paired output AIU reading;
+public initial/final H and math unchanged. Output H AIU cubes1->2 perpanel
+is an explicit native cost, not free. First local checkpoint02:00UTC,
+target local handoff02:30UTC; no device performance claim/default change.
+Narrow native state124->122regs,1313->1215sites;output94->78regs,1442->1418,
+stack0both,shared45568/49408fixed. Recurring sites512/526 and247/254;math,
+ordinary transfers/barriers fixed;outputAIU+1perpanel priced. Host32768writes/
+131072stateReads/4096vectors/131072outputReads PASS;10host,8source,6native
+negative controls red. Old-output dispatch plant exposed permissive source
+normalization; explicit new-call admission now precedes normalization.
+Final-local-complete.log finished exit0:20/20CTest,89hostcontracts,7dialect,45WY+
+61residual algebra,305original source;32WY+15original linked nativeimages.
+30/30oldWY instruction+operand sequences IDENTICAL. Final DSO0d2633c415be8d54a8de1d29dd65be10f476db3f26ccac0350e85fc0fe3ce170.
+Bindinga5cc49852044345411a78ef911079ba58910fd65b137cd7573439bc68f9ec131.
+No full-device correctness or speed claim. Command after publication:
+DEVICE=0 JOBS=16 CANDIDATE=residual-warps8-hlayout bash
+tools/run_ppu_residual_delivery_acu_box.sh.4/4/7kernels,siteACU only.
 
 New upload SHA256 564de266956ef11c6cd548ccd26493666a9c81d016058a24f73bc08c0a32c354.
 Retained /workspace/gdn-warps8-operands-acu-analysis-20260925/capture.tar.gz.
