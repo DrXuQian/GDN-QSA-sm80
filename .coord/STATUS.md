@@ -1,11 +1,25 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 14:10:45 UTC
-working-on: S31-S35 evidence sealed; final archive-member verification and handoff; retain S24, no default changes
+updated-at: 2026-09-26 14:24:04 UTC
+working-on: user requested continue; new S36 bounded32cell stage sweep on immutable S24; default/native admission passed, full builds starting
 blocked-on: native PPU1.7 SDK/model unavailable; fastest FlashInfer target not yet met
-last-commit: d48d33a; S35 kernel d5fda8b/head9a39fce; S34 head154925f; incumbent S24 bc3c154/head06b7471 unchanged
+last-commit: ca64e55 report; S36 kernel/tools4d84cfd; incumbent S24 bc3c154/head06b7471 unchanged
 
 ## Current checkpoint
+
+NEW S36, registered14:15:18 beforeedit after user continued. Dedicated
+/workspace/gdn-sm90-stage-sweep-20260926/source branchsm90-stage-sweep-20260926.
+32tuples:Q2,K2/3,V1/2,O1/2,alpha2/5,beta2/5; computation, precision,
+protocol/order/registerroles unchangedS24. Default tuple actual4native27856
+instructions/operands EXACTS24; maxstage tuple compiles and preservesmatrix/
+completion counts. Actual4types report stages/shared; 2hosttests include
+missingcell/duplicatestage/missingtype/wrongstage negatives. Fullremote32
+builds8CPUparallel starting, no simultaneous GPUjobs. Gates-.1/-1,14CPU,
+rawstress,8repeat,pairedeventscreening then nsysfinalists; neither a fullsweep
+nor speedclaim yet. Checkpoint14:35/handoff15:15UTC; preserve explicitpending.
+Old archive memberverification20/20traces,6/6binaries,175sources,10nativeinputs
+PASS. Alloldremoteexperimenttrees now fast-forwardedclean to publishedheads;
+two former finaltest copies safely retained in named stashes (no source lost).
 
 FINAL inventory: S34 reference-delivery128.8165vs120.704us loses; S35
 reference-state119.9985[118.847,120.863]vs120.831[119.967,121.375]us is
