@@ -1,4 +1,4 @@
-# SM90 follow-up: producer ownership and independent state issue
+# SM90 follow-up: producer ownership and full-chunk specialization
 
 Continuation of [the first SASS campaign](SM90_FLASHINFER_SASS_20260926.md).
 Same physical H800, CUDA12.8, B1/T2048/Hqk16/Hv32/D128/C64, scalar gates
@@ -7,7 +7,11 @@ Numbers below are **nsys sums of every GPU kernel in one full forward**,
 12 interleaved/reversed-order calls per role. They are not API/event times.
 No default routing or SM80/PPU1.0 changes. Native PPU1.7 remains unmeasured.
 
-## S16 is the new confirmed experimental incumbent
+Final incumbent: **S19, kernel64691d1**, branch`sm90-aux-full-tail-20260926`.
+It wins against S16 and fastest FlashQLA in both gate regimes, but still loses
+to fastest FlashInfer. **The requested two-library goal is NOT MET.**
+
+## S16: first confirmed improvement in this continuation
 
 S16 `e799c55`, branch `sm90-factor-owner-20260926`, combines cached identical
 gate coefficients with publication by the existing alpha-last warp, leaving
@@ -93,3 +97,74 @@ alone explains the remaining gap; it does not price other dependency waits.
 S16 also passes four actual bodies against the PPU CUTLASS3.6 dependency in
 CUDA source-check mode. Native PPU1.7 compile/execution/performance are still
 unavailable, not inferred from the H800 result.
+
+## S19: specialize full auxiliary chunks, retain the dynamic final chunk
+
+Branch `sm90-aux-full-tail-20260926`, kernel`64691d1`, parentS16. This follows
+the selected FlashInfer auxiliary structure, not a new gate algorithm. The
+same host/device visitor covers every length1..4096 exactly once; omitting
+its dynamic final block fails. Actual TiledMmaQK coordinates cover4096 cells
+once, all within64x64. Thus a nonfinal full chunk needs only the causal mask;
+the final chunk retains both row/column bounds and the safe exponent mask.
+The count uses `1+(length-1)/64` for positive int32 lengths; INT_MAX is a
+compile-time boundary check, not an overflow-prone `length+63` expression.
+The preliminary local build before that integer-boundary correction is NOT
+the admitted source/binary; `full-tail-local-r2` is the final local build.
+
+Native full-aux PC interval changes from S16`0x1500..0x62b0` to
+S19`0x15b0..0x5ce0`:1244→1140 static sites, ISETP84→69, same16 WGMMA,
+14 HMMA and21 LDS sites. It also changes compiler allocation: whole-body
+stack88/80→24/32B, while full-aux LDL0→3. State source is unchanged, but do
+not claim the eventual timing difference is solely the removed mask checks.
+The extra final-block body increases total code; static sites are not executed
+work. All four local/native remote bodies match,32,064 normalized instructions,
+SHA`782a2f0cb34b84b2d0528881d95a64c2901261d1d4964f6ec8caad60bccc61e8`.
+
+35 host tests and14 independent device CPU/fingerprint cases pass with
+unchanged errors. `full-tail-fi-weak` and `full-tail-fi-weak-r2` are INVALID:
+idle guards saw foreign PIDs150614 and153467 before capture. No foreign jobs
+were interrupted. Exclusive retry `full-tail-fi-weak-r3` is admitted:
+135.2965[134.880,136.641]us versus S16
+141.521[140.576,142.080]us, disjoint CANDIDATE-WINS (1.046x).
+FI no-CP113.185[112.737,113.664]us still wins. Final confirmations:
+
+| Paired capture | S16 control | S19 | Fastest reference | Verdict |
+|---|---:|---:|---:|---|
+| FI, g=-0.1 |141.5210 |135.2965 |113.1850 no-CP |S19 improves; FI wins |
+| FI, g=-1.0 |140.2720 |134.7690 |112.0000 no-CP |S19 improves; FI wins |
+| QLA, g=-0.1 |140.5445 |133.4560 |165.6320 auto-CP |S19 wins |
+| QLA, g=-1.0 |140.4480 |133.3600 |163.4405 auto-CP |S19 wins |
+
+Units:microseconds. Every stated win/loss has disjoint observed envelopes.
+Parent speedup1.041–1.053x; QLA speedup1.241x/1.226x. S19 remains
+1.195x/1.203x as slow as FI. Eight stable repeats and every captured output
+pass the fixed gates. Both S16 and S19 pass four-body PPU CUTLASS3.6 CUDA
+source checks; native PPU1.7 performance remains SKIP.
+Binary SHA`e9e2355f6b5d5a7f760c3b6b64d198c9b6607ea93de5621896ae2e5da0b6f0b7`.
+
+No new default selector is installed. The experimental branch keeps the full
+build/test/profile tools; the admitted H800 binary is under
+`/workspace/gdn-sm90-win-20260926/full-tail-build/`. Next investigation is
+the remaining **matched auxiliary full-body** instruction/operand lifetimes
+versus FI (1140 versus920 static sites, same matrix work), not another blind
+barrier deletion or register cap. Static differences alone do not locate the
+whole-call critical path. Keep native PPU and physical H800 conclusions apart.
+
+## Evidence packaging
+
+The eleven admitted follow-up captures contain744 complete forwards;
+all SQLite results were exactly re-extracted with the original Python3.12
+analyzer. Source, binary, receipt, SQLite and nsys hashes are in
+`dev/backends/sm90_sass_followup_20260926.json`. Numerical admissions are
+additional to that timing denominator; rejected idle attempts are excluded.
+Archive through09:09UTC:
+`/workspace/gdn-sm90-win-20260926/remote-evidence-followup-20260926T0909Z.tar.gz`,
+SHA`a0b24ed39f551c93f5335c17e44fe1198115a169fe58856d4ced3e883411fa8c`.
+All28 receipt/result/SQLite/nsys member hashes verify for the first archive. The source/binary
+archive includes the rejected attempts and S19's numerically admitted build;
+later S19 timing captures are in the separate supplement
+`remote-evidence-s19-confirmed-20260926T0914Z.tar.gz`, SHA
+`658786472f2c328eb2269b7a3eb4776fe3f638edb04952a083dd65b52b473d02`.
+Its16 member hashes also verify. The original campaign archive is retained
+unchanged. All experiment branches are pushed; no GPU job remains for this
+bounded inventory. Rejected and compile-only candidates are not promoted.

@@ -1,11 +1,28 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 08:58:31 UTC
-working-on: retain S16; S18 correct but UNRESOLVED; final S19 full/tail auxiliary specialization compiling
-blocked-on: native PPU1.7 SDK/model unavailable; H800 reconnected, idle guard required
-last-commit: 0427387 (main checkpoint); S16 e799c55 / S17 daabe62 / S18 f529083; defaults unchanged
+updated-at: 2026-09-26 09:18:22 UTC
+working-on: bounded follow-up closed; S19 confirmed incumbent, final evidence handoff
+blocked-on: native PPU1.7 SDK/model unavailable; two-library speed target remains NOT MET
+last-commit: e05397e (observed main before final checkpoint); S19 kernel64691d1; all experiment branches pushed
 
 ## Active SM90 campaign
+
+FINAL: S19 kernel64691d1, branchsm90-aux-full-tail-20260926. Paired FI
+windows135.2965/134.769us versus fastest noCP113.185/112us: LOSE.
+Paired QLA windows133.456/133.360us versus fastest auto165.632/163.4405us:
+WIN1.241x/1.226x. It improves S16 in all four paired windows. Target NOT MET.
+14/14 CPU+parent fingerprints,8repeat and every captured output pass;
+35host tests, actual chunk/fragment exact-once proof and native4body PASS.
+Both S16/S19 PPU CUTLASS3.6 CUDA source-check4body PASS; nativePPU17 SKIP.
+All11 follow-up captures/744forwards independently re-extracted; archive
+44/44 receipt/result/SQLite/nsys hashes verified. Failed idle attempts are
+preserved and excluded. S14/S17/S18 UNRESOLVED, S15 native-identical rejected.
+Main production/defaults and SM80 unchanged. No own GPU jobs remain.
+Full report:docs/SM90_SASS_FOLLOWUP_20260926.md. Next useful hypothesis is
+matched auxiliary inverse/epilogue instruction lifetimes, not another blind
+barrier deletion or register cap. Skill reference updated with scoped lessons.
+
+## Historical follow-up checkpoints (superseded)
 
 S18 timing retry142.016[140.257,143.009] versus S16
 142.321[140.993,143.616]us overlaps: UNRESOLVED. First attempt remains
