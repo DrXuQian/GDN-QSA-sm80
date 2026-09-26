@@ -185,7 +185,8 @@ struct ScalarGdnAux : Base {
                 // tails. Read and exponentiate independently of the predicate.
                 // Inactive intermediates may overflow; the final live selects
                 // below must discard them before either product is published.
-                // Keep standard exp2f, not an approximate/FTZ substitute.
+                // The producer-proved normal range selects the same hardware
+                // EX2 as standard exp2f. Wide ranges retain its fallback.
                 float row_log = alpha(row,0,ar.index());
                 float col_log = alpha(col,0,ar.index());
                 float row_beta = beta(row,br.index());

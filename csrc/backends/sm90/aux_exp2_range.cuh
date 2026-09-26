@@ -25,8 +25,11 @@ CUTE_DEVICE float auxiliary_exp2(float exponent) {
     // CUDA12.8's standard exp2f has this identical MUFU path for x >= -126.
     // The alternative preserves standard subnormal handling. Native target
     // equivalence is a compiled postcondition, not inferred from these names.
-    if constexpr (NormalSpan) return __exp2f(exponent);
-    else return exp2f(exponent);
+    if constexpr (NormalSpan) {
+        float result;
+        asm("ex2.approx.ftz.f32 %0, %1;" : "=f"(result) : "f"(exponent));
+        return result;
+    } else return exp2f(exponent);
 }
 
 } // namespace gdn::sm90
