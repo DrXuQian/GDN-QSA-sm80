@@ -14,23 +14,24 @@ struct PreparedProblem {
     int num_seqs, num_qk_heads, num_v_heads, head_size, sequence_length;
 };
 
-template<class Gate, bool Initial>
+template<class Gate, bool Initial, int ValueTile = 64>
 struct PrecomputedKernelTypes {
-    using Original = ValueKernelTypes<Gate,Initial,64,232>;
+    using Original = ValueKernelTypes<Gate,Initial,ValueTile,232>;
     using InputBase = typename ValueKernelTypes<Gate,false,64,232>::Builder::CollectiveMainloop;
     using Base = typename Original::Builder::CollectiveMainloop;
     using Collective = PrecomputedState<Base>;
     using Options = decltype(std::tuple_cat(typename Original::Options{},std::tuple<
         kda::sm90::kernel::Option<kda::sm90::kernel::Tag::kPrecomputedAuxiliary,cute::true_type>>{}));
-    using Kernel = kda::sm90::kernel::FlatKernelTmaWarpSpecializedKdaFwd<
-        Collective,ValueTileScheduler<64>,Options>;
+    using Scheduler = typename Original::Scheduler;
+    using Kernel = kda::sm90::kernel::FlatKernelTmaWarpSpecializedKdaFwd<Collective,Scheduler,Options>;
     using Prepare = PrepareAuxKernel<InputBase,PreparedProblem>;
-    static_assert(Kernel::MaxThreadsPerBlock == 256);
-    static_assert(Kernel::StateThreads == 128 && Kernel::AuxThreads == 0);
-    static_assert(Kernel::QKInputConsumers == 128 && Kernel::AlphaConsumers == 160 &&
-                  Kernel::BetaConsumers == 128);
-    static_assert(Kernel::SharedStorageSize <= 116224,
-                  "prepared state must fit half of H800 opt-in shared capacity");
+    static_assert(ValueTile == 64 || ValueTile == 128);
+    static_assert(Kernel::MaxThreadsPerBlock == 128+2*ValueTile);
+    static_assert(Kernel::StateThreads == 2*ValueTile && Kernel::AuxThreads == 0);
+    static_assert(Kernel::QKInputConsumers == 2*ValueTile && Kernel::AlphaConsumers == 2*ValueTile+32 &&
+                  Kernel::BetaConsumers == 2*ValueTile);
+    static_assert(Kernel::SharedStorageSize <= (ValueTile==64 ? 116224 : 232448),
+                  "prepared state exceeds registered H800 resource scope");
 };
 
 } // namespace gdn::sm90

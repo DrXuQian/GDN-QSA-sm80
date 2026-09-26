@@ -4,7 +4,7 @@
 #include <stdexcept>
 using namespace cute;
 using BF16 = cutlass::bfloat16_t;
-using Types = gdn::sm90::PrecomputedKernelTypes<BF16,false>;
+using Types = gdn::sm90::PrecomputedKernelTypes<BF16,false,128>;
 using Prepare = typename Types::Prepare;
 using Prep = typename Prepare::PrepBase;
 using State = typename Types::Collective;
@@ -61,7 +61,7 @@ void plane_map(Consumer consumer, int plant=0) {
             reloaded[word]=prepared[plant==1 ? word^1 : word];++state_writers[word];
         }
     for(int i=0;i<4096;++i) need(count[i]==1 && global_writers[i]==1 && state_writers[i]==1);
-    for(int slice=0;slice<2;++slice) for(int tid=0;tid<128;++tid) {
+    for(int tid=0;tid<size(consumer);++tid) {
         auto th=consumer.get_slice(tid);
         auto pos=th.partition_B(reader);
         auto coords=th.partition_B(make_identity_tensor(Shape<_64,_64>{}));
@@ -72,13 +72,13 @@ void plane_map(Consumer consumer, int plant=0) {
 }
 
 template<class Gate,bool Initial> void actual_type() {
-    using T=gdn::sm90::PrecomputedKernelTypes<Gate,Initial>;
+    using T=gdn::sm90::PrecomputedKernelTypes<Gate,Initial,128>;
     using K=typename T::Kernel;
-    static_assert(K::MaxThreadsPerBlock==256 && K::StateMmaRegisterRequirement==192);
+    static_assert(K::MaxThreadsPerBlock==384 && K::StateMmaRegisterRequirement==192);
     static_assert(K::NumAuxMmaWarpGroups==0 && K::LdStRegisterRequirement==24);
-    static_assert(K::QKInputConsumers==128 && K::AlphaConsumers==160 && K::BetaConsumers==128);
+    static_assert(K::QKInputConsumers==256 && K::AlphaConsumers==288 && K::BetaConsumers==256);
     static_assert(T::Collective::MainloopQKPipeline::Stages==1 && T::Collective::MainloopKKPipeline::Stages==1);
-    std::cout<<"S47 gate_fp32="<<std::is_same_v<Gate,float><<" initial="<<Initial
+    std::cout<<"S48 gate_fp32="<<std::is_same_v<Gate,float><<" initial="<<Initial
              <<" state_threads="<<K::MaxThreadsPerBlock<<" state_shared="<<K::SharedStorageSize
              <<" prepare_shared="<<sizeof(typename T::Prepare::SharedStorage)<<"\n";
 }

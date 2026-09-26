@@ -77,7 +77,10 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME,m) {
     m.attr("numeric_schedule")="scalar-GDN-BF16-WGMMA; unchanged FP16 inverse precomputed by auxiliary warpgroup";
     m.attr("device_admission")="UNVERIFIED";
 #ifdef GDN_SM90_PRECOMPUTED_AUX
-    m.attr("execution_structure")="chunk-parallel-aux+V64-state;2-kernels;private-physical-operands";
+    m.attr("execution_structure")=GDN_SM90_PRECOMPUTED_VALUE_TILE==64 ?
+        "chunk-parallel-aux+V64-state;2-kernels;private-physical-operands" :
+        "chunk-parallel-aux+V128-state;2-kernels;private-physical-operands";
+    m.attr("value_tile")=GDN_SM90_PRECOMPUTED_VALUE_TILE;
     m.def("resources",[](bool gate_fp32, bool initial) {
         auto r = gdn::sm90::precomputed_resources(gate_fp32,initial);
         auto fields = [](gdn::sm90::KernelResources x) {

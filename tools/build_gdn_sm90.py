@@ -75,12 +75,16 @@ def main():
                    help="two disjoint V64 CTAs, fixed state192, explicit auxiliary register budget")
     p.add_argument("--value-loader32",action="store_true",help="S41: loader32 with V64/aux232 only")
     p.add_argument("--precomputed-aux",action="store_true",help="S47: chunk-parallel aux + V64 state, complete two-launch forward")
+    p.add_argument("--precomputed-value-tile",type=int,choices=(64,128),default=64,
+                   help="explicit prepared-state geometry;128 is S48, not a new default")
     p.add_argument("--reuse-device",action="store_true",help="reuse only an exactly hash-bound device object; recheck target/codegen/link/import")
     args=p.parse_args()
     if args.value_loader32 and args.value_split != 232:
         p.error("--value-loader32 requires --value-split 232")
     if args.precomputed_aux and (args.value_split is not None or args.value_loader32):
         p.error("--precomputed-aux has its own explicit geometry; no split/register flag composition")
+    if args.precomputed_value_tile!=64 and not args.precomputed_aux:
+        p.error("--precomputed-value-tile requires --precomputed-aux")
     out=args.out.resolve(); out.mkdir(parents=True,exist_ok=True)
     scratch=out/"scratch"; scratch.mkdir(exist_ok=True)
     env=os.environ|{"TMPDIR":str(scratch)}
@@ -103,6 +107,7 @@ def main():
         options += ["-DGDN_SM90_VALUE_LOADER_REGS=32"]
     if args.precomputed_aux:
         options += ["-DGDN_SM90_PRECOMPUTED_AUX=1"]
+        options += [f"-DGDN_SM90_PRECOMPUTED_VALUE_TILE={args.precomputed_value_tile}"]
     identity=dict(target=args.target,mode=args.mode,compiler=str(compiler),compiler_sha256=sha(compiler),
                   dependency=str(dep),flags=options,include=include,device_admission="NOT_RUN")
     identity["dependency_version_sha256"]=sha(dep/"include/cutlass/version.h")

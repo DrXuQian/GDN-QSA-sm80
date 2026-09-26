@@ -18,7 +18,7 @@ using BF16 = cutlass::bfloat16_t;
 template <class Gate, bool Initial>
 void run(Arguments const& a, cudaStream_t stream) {
 #ifdef GDN_SM90_PRECOMPUTED_AUX
-    using Types = PrecomputedKernelTypes<Gate,Initial>;
+    using Types = PrecomputedKernelTypes<Gate,Initial,GDN_SM90_PRECOMPUTED_VALUE_TILE>;
 #elif defined(GDN_SM90_VALUE_SPLIT_AUX_REGS)
     using Types = ValueKernelTypes<Gate,Initial,64,GDN_SM90_VALUE_SPLIT_AUX_REGS>;
 #else
@@ -78,7 +78,7 @@ void run(Arguments const& a, cudaStream_t stream) {
 #ifdef GDN_SM90_PRECOMPUTED_AUX
 template<class Gate, bool Initial>
 PreparedResources query_precomputed_resources() {
-    using Types = PrecomputedKernelTypes<Gate,Initial>;
+    using Types = PrecomputedKernelTypes<Gate,Initial,GDN_SM90_PRECOMPUTED_VALUE_TILE>;
     using Kernel = typename Types::Kernel;
     using Prepare = typename Types::Prepare;
     cudaFuncAttributes pa{},sa{};

@@ -76,7 +76,7 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
     static constexpr bool PrecomputedAuxiliary =
         find_option_t<Tag::kPrecomputedAuxiliary, cute::false_type, Options>::value;
     static_assert(!PrecomputedAuxiliary ||
-                  (NumAuxMmaWarpGroups == 0 && NumStateMmaWarpGroups == 1));
+                  (NumAuxMmaWarpGroups == 0 && (NumStateMmaWarpGroups == 1 || NumStateMmaWarpGroups == 2)));
 
     static constexpr int NeedsAlpha = CollectiveMainloop::NeedsAlpha;
     static constexpr int NeedsBeta = CollectiveMainloop::NeedsBeta;
@@ -201,7 +201,7 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
     using BetaPipelineState =
         std::conditional_t<NeedsBeta, cutlass::PipelineState<MainloopBetaPipeline::Stages>, Unused>;
 
-    static constexpr int MinBlocksPerMultiprocessor = PrecomputedAuxiliary ? 2 : 1;
+    static constexpr int MinBlocksPerMultiprocessor = PrecomputedAuxiliary && NumStateMmaWarpGroups==1 ? 2 : 1;
     static constexpr int MaxThreadsPerBlock =
         (NumLoadWarpGroups + NumStateMmaWarpGroups + NumAuxMmaWarpGroups) * cutlass::NumThreadsPerWarpGroup;
 
@@ -209,7 +209,7 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
         get_register_requirements(MaxThreadsPerBlock, MinBlocksPerMultiprocessor, NumStateMmaWarpGroups);
     static constexpr uint32_t LdStRegisterRequirement = get<0>(RegisterRequirements);
     static constexpr uint32_t StateMmaRegisterRequirement =
-        NumStateMmaWarpGroups == 1 ? 192 : get<1>(RegisterRequirements);
+        (PrecomputedAuxiliary || NumStateMmaWarpGroups == 1) ? 192 : get<1>(RegisterRequirements);
     static constexpr int DefaultAuxMmaRegisterRequirement = get<2>(RegisterRequirements);
     static constexpr uint32_t AuxMmaRegisterRequirement =
         find_option_t<Tag::kAuxRegisters, Int<DefaultAuxMmaRegisterRequirement>, Options>::value;

@@ -13,7 +13,7 @@ namespace gdn::sm90 {
 template<class Base>
 struct PreparedStateBase : Base {
     using Element = typename Base::Element;
-    static_assert(Base::ValueTile == 64);
+    static_assert(Base::ValueTile == 64 || Base::ValueTile == 128);
     static constexpr int NumAuxMmaWarpGroups = 0;
     static constexpr int NumAuxMmaThreads = 0;
     using SmemLayoutQK = SingleStage<typename Base::SmemLayoutQK>;

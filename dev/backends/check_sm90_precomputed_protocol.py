@@ -40,11 +40,13 @@ def explore(chunks):
               ['aQK','aKK','cQK','cKK','aB','cB'], ['wO','rO'],
               ['wA','wQ','rQ','wK','wV','wKK','wB','rV','rKK','rB',
                'wQK','rQK','aO','cO','wL','rK','rA','rL']]
+    programs.append(programs[-1].copy()) # the second existing V64 state WG
     programs=[tuple(p*chunks) for p in programs]
     capacities={'Q':2,'K':2,'V':1,'A':2,'L':2,'QK':1,'KK':1,'B':2,'O':1}
-    readers={'Q':(4,),'K':(4,),'V':(4,),'A':(1,4),'L':(4,),
-             'QK':(4,),'KK':(4,),'B':(4,),'O':(3,)}
-    producers={'Q':0,'K':0,'V':0,'A':1,'L':1,'QK':2,'KK':2,'B':2,'O':4}
+    readers={'Q':(4,5),'K':(4,5),'V':(4,5),'A':(1,4,5),'L':(4,5),
+             'QK':(4,5),'KK':(4,5),'B':(4,5),'O':(3,)}
+    producers={'Q':(0,),'K':(0,),'V':(0,),'A':(1,),'L':(1,),
+               'QK':(2,),'KK':(2,),'B':(2,),'O':(4,5)}
     counts=[]
     for program in programs:
         rows=[{}]
@@ -54,7 +56,7 @@ def explore(chunks):
     def n(pc,actor,op):return counts[actor][pc[actor]].get(op,0)
     def ready(pc,actor,op):
         kind,pipe=op[0],op[1:]
-        if kind=='w':return n(pc,producers[pipe],'c'+pipe)>n(pc,actor,op)
+        if kind=='w':return min(n(pc,p,'c'+pipe) for p in producers[pipe])>n(pc,actor,op)
         if kind=='r':return n(pc,actor,'w'+pipe)>n(pc,actor,op)
         if kind=='c' and actor!=0:return n(pc,actor,'a'+pipe)>n(pc,actor,op)
         return n(pc,actor,op)<min(n(pc,r,'r'+pipe) for r in readers[pipe])+capacities[pipe]
