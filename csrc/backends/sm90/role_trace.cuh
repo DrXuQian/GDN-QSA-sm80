@@ -6,7 +6,8 @@ namespace gdn::sm90 {
 #ifdef GDN_SM90_ROLE_TRACE
 // Diagnostic-only: unique writer per (CTA, chunk, role, point), no atomics or
 // synchronization. Never use these probe intervals as uninstrumented timing.
-extern __device__ unsigned long long role_trace_data[TraceWords];
+// This header is instantiated only in launch.cu; host bindings include launch.h.
+static __device__ unsigned long long role_trace_data[TraceWords];
 #endif
 
 CUTE_DEVICE void trace_role(int chunk, int role, int point) {

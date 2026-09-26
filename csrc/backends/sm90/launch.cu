@@ -14,7 +14,6 @@ using namespace kda::sm90::kernel;
 using BF16 = cutlass::bfloat16_t;
 
 #ifdef GDN_SM90_ROLE_TRACE
-__device__ unsigned long long role_trace_data[TraceWords];
 void reset_role_trace(cudaStream_t stream) {
     std::vector<unsigned long long> zero(TraceWords, 0);
     if (cudaMemcpyToSymbolAsync(role_trace_data, zero.data(), TraceWords*8, 0,
