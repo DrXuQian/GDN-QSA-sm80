@@ -54,9 +54,13 @@ initial state). Actual state248/aux232/loader24 options are emitted.
 Removing the converted H operand did not remove H128+O64+SK64 FP32 live
 accumulators: already256 registers before control. No timing was run.
 Retain this failed branch, do not describe its generic compile PASS as a
-valid asynchronous candidate. The bounded S43 followup retains two state
-WGs, shared H and state160/aux168; at this checkpoint it is **compile-only
-in progress**, not a performance result.
+valid asynchronous candidate. S43 retains two state WGs with state160/aux168,
+but all4 bodies still emit C7512 (stack192/248B); rejected before GPU.
+The last registered resource point S44 state176/aux136 removes C7512, yet
+stack120/96B and spill128/272B stores,192/300B loads violate its predeclared
+parent-spill ceiling. No GPU timing or measured-slowdown claim for S42–S44.
+All actual maps pass16384cells and3 negatives; map correctness is not
+resource admission. The shared-H direction is closed under those gates.
 
 ## Evidence
 

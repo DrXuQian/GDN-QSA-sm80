@@ -1,11 +1,22 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 17:34:47 UTC
-working-on: S41 six nsys captures closed; S42 native-rejected; S43 two-state-WG shared-H compile/map checks
+updated-at: 2026-09-26 17:51:41 UTC
+working-on: S42-S44 shared-H closed; S46 native-rejected; S45 late-O1 native/progress PASS, remote build then 14-case admission
 blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: 06757fb matrix checkpoint; matrix5180295, S42bbddadd, S43 isolated worktree in progress
+last-commit: e37be37 followup report; S42bbddadd/S4374e2e8c/S44a3a6089/S45-S4661093ac; harness5bbaefc
 
 ## Current checkpoint
+
+17:51 UTC: S43 C7512 andS44 parent-spill ceilingFAIL, no GPU. S45 onlymoves
+unchanged O1 betweenNewV/O2, sourcebinding+3negatives PASS; changed QKV/QKKK
+subgraph allreachable states for1..8chunks terminates, not a memory-order
+proof. S45 all4native matrix/TMA/retirementcounts match S24,noC7512, but
+stack96/112B (extra spills honestly retained). S46state168/aux152 all4C7512
+=> rejected. OnlyS45 goes to14CPU/2stress then4graphscreens. No promotion.
+R6 SSH socketexpired; reused existingverified h800-19819.sock. At17:50
+host/UUID exactmatch, H800idle0%,0MiB. No shutdown command sent.
+Remote build uses valid shallow relative-source git root; old nonshallow
+import rootworktree creation failed missinghistory, sourceunchanged.
 
 17:34 UTC: S41 six captures/408 full forwards exactSQLite local re-extraction.
 One narrow parent win at T8192weak, five UNRESOLVED; neither long cell beats
