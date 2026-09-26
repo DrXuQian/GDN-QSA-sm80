@@ -31,6 +31,10 @@ bool schedule(int length, bool omit_tail) {
     return true;
 }
 int main() {
+    // The independently published products must never share live storage.
+    using Storage = B::CollectiveMainloop::SharedStorage;
+    static_assert(offsetof(Storage, smem_qk) + sizeof(Storage::smem_qk)
+                  <= offsetof(Storage, smem_kk));
     static_assert(gdn::sm90::aux_chunk_count(INT_MAX)==33554432);
     static_assert(gdn::sm90::aux_chunk_count(1)==1);
     static_assert(gdn::sm90::aux_chunk_count(64)==1);
