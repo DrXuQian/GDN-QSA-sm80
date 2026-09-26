@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 #include "scalar_gdn_aux.cuh"
+#ifdef GDN_SM90_STATE_OUTPUT_STASH
+#include "output_stash.cuh"
+#endif
 
 namespace gdn::sm90 {
 
@@ -15,7 +18,14 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
     using Element = typename Base::Element;
     using Inverse = typename Base::InverseType;
     using Params = typename Base::Params;
+#ifdef GDN_SM90_STATE_OUTPUT_STASH
+    struct SharedStorage : Parent::SharedStorage {
+        cute::array_aligned<float, 128 * 64> output_partial;
+    };
+    static_assert(Base::NumStateMmaWarpGroups == 2);
+#else
     using SharedStorage = typename Parent::SharedStorage;
+#endif
 
     template<class Problem, class Work>
     CUTE_DEVICE void compute(
@@ -126,6 +136,9 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
                     auto [dv,t] = c_output(i);
                     acc_o(i) *= smem.gate_factors[ar.index()*128+64+t];
                 }
+#ifdef GDN_SM90_STATE_OUTPUT_STASH
+                output_stash_copy<true>(smem.output_partial.data(), tid, acc_o);
+#endif
             }
             qp.consumer_release(qr); ++qr;
 
@@ -176,6 +189,10 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
 
             auto operand_delta = kda::sm90::collective::make_acc_into_op<Element>(acc_delta,typename Base::TiledMmaKV::LayoutA_TV{});
             qkp.consumer_wait(qkr);
+#ifdef GDN_SM90_STATE_OUTPUT_STASH
+            if constexpr (!first)
+                output_stash_copy<false>(smem.output_partial.data(), tid, acc_o);
+#endif
             warpgroup_fence_operand(operand_delta);
             warpgroup_fence_operand(acc_o);
             order.ordered_or_wait(wg);

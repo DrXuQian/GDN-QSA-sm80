@@ -48,7 +48,13 @@ get_register_requirements(
 #endif
     // Leave two 192-register state warpgroups alongside LD/ST24 + auxiliary104.
     // The auxiliary role must release its share before state can acquire it.
+#if defined(GDN_SM90_STATE_OUTPUT_STASH) && GDN_SM90_STATE_OUTPUT_STASH == 2
+    // S40: O1 is no longer live across SK/NewV. Native asynchronous-path
+    // admission must prove160 is enough; never ignore a C7512 warning.
+    uint32_t total_aux_load_budget = 192;
+#else
     uint32_t total_aux_load_budget = 128;
+#endif
     uint32_t aux_registers = total_aux_load_budget - load_registers;  // (24 + X) or (40 + X)
 
     uint32_t total_registers =
