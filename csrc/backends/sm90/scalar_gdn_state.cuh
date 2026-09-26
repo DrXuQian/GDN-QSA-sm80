@@ -117,24 +117,6 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             constexpr bool last = decltype(last_tag)::value;
             int valid = last ? int(work.seq_len-chunk*64) : 64;
             ap.consumer_wait(ar);
-            qp.consumer_wait(qr);
-            auto acc_o = partition_fragment_C(o1_thread,Shape<Value,_64>{});
-            if constexpr (!first) {
-                auto operand_h = kda::sm90::collective::make_acc_into_op<Element>(h,typename Base::TiledMmaO1::LayoutA_TV{});
-                warpgroup_fence_operand(operand_h);
-                warpgroup_fence_operand(acc_o);
-                order.ordered_or_wait(wg);
-                warpgroup_arrive();
-                gemm_zero_acc(o1_mma,operand_h,q_desc(_,_,_,qr.index()),acc_o);
-                warpgroup_commit_batch(); order.notify_next_blocked(wg);
-                warpgroup_wait<0>(); warpgroup_fence_operand(acc_o);
-                CUTE_UNROLL
-                for (int i=0; i<size(acc_o); ++i) {
-                    auto [dv,t] = c_output(i);
-                    acc_o(i) *= smem.gate_factors[ar.index()*128+64+t];
-                }
-            }
-            qp.consumer_release(qr); ++qr;
 
             kp.consumer_wait(kr);
             auto acc_sk = partition_fragment_C(sk_thread,Shape<Value,_64>{});
@@ -182,6 +164,27 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             bp.consumer_release(br); ++br;
 
             auto operand_delta = kda::sm90::collective::make_acc_into_op<Element>(acc_delta,typename Base::TiledMmaKV::LayoutA_TV{});
+            // O1 uses the unchanged old H, independent of SK/NewV. Keep its
+            // accumulation/scaling identical, but do not retain acc_o across
+            // those earlier products. Q is released only after this read retires.
+            qp.consumer_wait(qr);
+            auto acc_o = partition_fragment_C(o1_thread,Shape<Value,_64>{});
+            if constexpr (!first) {
+                auto operand_h = kda::sm90::collective::make_acc_into_op<Element>(h,typename Base::TiledMmaO1::LayoutA_TV{});
+                warpgroup_fence_operand(operand_h);
+                warpgroup_fence_operand(acc_o);
+                order.ordered_or_wait(wg);
+                warpgroup_arrive();
+                gemm_zero_acc(o1_mma,operand_h,q_desc(_,_,_,qr.index()),acc_o);
+                warpgroup_commit_batch(); order.notify_next_blocked(wg);
+                warpgroup_wait<0>(); warpgroup_fence_operand(acc_o);
+                CUTE_UNROLL
+                for (int i=0; i<size(acc_o); ++i) {
+                    auto [dv,t] = c_output(i);
+                    acc_o(i) *= smem.gate_factors[ar.index()*128+64+t];
+                }
+            }
+            qp.consumer_release(qr); ++qr;
             qkp.consumer_wait(qkr);
             warpgroup_fence_operand(operand_delta);
             warpgroup_fence_operand(acc_o);

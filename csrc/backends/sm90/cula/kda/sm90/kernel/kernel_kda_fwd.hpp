@@ -204,11 +204,17 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
     static constexpr auto RegisterRequirements =
         get_register_requirements(MaxThreadsPerBlock, MinBlocksPerMultiprocessor, NumStateMmaWarpGroups);
     static constexpr uint32_t LdStRegisterRequirement = get<0>(RegisterRequirements);
+#ifdef GDN_SM90_LATE_O1_REBALANCE
+    static_assert(NumStateMmaWarpGroups == 2 && MaxThreadsPerBlock == 512);
+    static constexpr uint32_t StateMmaRegisterRequirement = 168;
+    static constexpr uint32_t AuxMmaRegisterRequirement = 152;
+#else
     static constexpr uint32_t StateMmaRegisterRequirement =
         NumStateMmaWarpGroups == 1 ? 192 : get<1>(RegisterRequirements);
     static constexpr int DefaultAuxMmaRegisterRequirement = get<2>(RegisterRequirements);
     static constexpr uint32_t AuxMmaRegisterRequirement =
         find_option_t<Tag::kAuxRegisters, Int<DefaultAuxMmaRegisterRequirement>, Options>::value;
+#endif
     static_assert((LdStRegisterRequirement + AuxMmaRegisterRequirement +
                    NumStateMmaWarpGroups*StateMmaRegisterRequirement)*128 <= 65536);
 #ifdef GDN_SM90_VALUE_LOADER_REGS
