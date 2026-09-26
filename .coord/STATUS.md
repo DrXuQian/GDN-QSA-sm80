@@ -1,9 +1,22 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 05:46:35 UTC
-working-on: complete; comparison and next SM90 target published, H800 idle, no production routing changes
-blocked-on: none for H800 measurement; native PPU1.7 still unavailable
-last-commit: 7c4e760 (published measured FlashQLA/FlashInfer verdict and evidence; this is a status-only checkpoint)
+updated-at: 2026-09-26 06:20:08 UTC
+working-on: isolated SM90 scalar-GDN optimization; must beat BOTH FlashInfer and FlashQLA fastest admitted paths
+blocked-on: native PPU1.7 SDK/model unavailable; H800 candidate compilation ongoing
+last-commit: 6bebe1d (main remains unchanged except this checkpoint; candidate b609e03 in dedicated worktree)
+
+## Active SM90 campaign
+
+Source /workspace/gdn-sm90-win-20260926/state-source; plan/resume/records in
+the parent task directory. R1 register-only24/104/192/192 passes14cases with
+raw equality but LOSES:401.563/401.404us vs357.436/356.861us. Reject as a
+standalone optimization. S1 scalar full-BF16 QK/KK passes14CPU-oracle cases and
+8repeat/72captured calls per gate:210.782/211.343us vs355.149/355.038us;
+FI noCP112.479/112.847us still wins. S2 removes whole Q/K staging in state
+via scalar factorization.72FP64 cases PASS; first compile exposed C7510 and
+1520B call stack; corrected with explicit hot-lambda inlining before timing.
+No new production routing or SM80 changes, all old binaries immutable.
+H800 nsys sums, idle/concurrent-PID guarded; no native PPU1.7 speed claim.
 
 ## FlashQLA / FlashInfer comparison
 
