@@ -29,15 +29,24 @@ def bodies(path):
 
 def inspect(rows):
     events = []
-    for pc, op, args in rows:
+    retries = []
+    for i, (pc, op, args) in enumerate(rows):
         if op == "SYNCS.ARRIVE.TRANS64.A1T0" and "+0x29080]" in args:
             events.append((pc, "KK-ready"))
         elif op == "SYNCS.PHASECHK.TRANS64.TRYWAIT" and "+0x29070]" in args:
-            events.append((pc, "QK-empty"))
+            if rows[i+1][1] == "NANOSLEEP.SYNCS":
+                # nvcc outlines each blocking retry after the role bodies.
+                # Retain/count it; it is not another independent acquire.
+                assert rows[i+2][1] == "SYNCS.PHASECHK.TRANS64"
+                assert "+0x29070]" in rows[i+2][2]
+                retries.append(pc)
+            else:
+                events.append((pc, "QK-empty"))
         elif op == "SYNCS.ARRIVE.TRANS64.A1T0" and "+0x29060]" in args:
             events.append((pc, "QK-ready"))
     assert [e[1] for e in events] == ["KK-ready", "QK-empty", "QK-ready"]*2, events
-    return events
+    assert len(retries) == 2, retries
+    return dict(events=events, outlined_retry_pcs=retries)
 
 
 def main():
