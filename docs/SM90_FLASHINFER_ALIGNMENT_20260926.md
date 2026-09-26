@@ -73,3 +73,78 @@ code-generation differences in **writing the same computation**, not a new
 GDN algorithm. The next bounded source-alignment arm S35 tests these together
 on S24, without adopting losing S34's delivery profile. It must preserve each
 chunk's valid rows (first min(T,64), final tail), RNE and exact parent output.
+
+## Measured closure, 2026-09-26 14:05 UTC
+
+Neither alignment profile establishes a new winner. Keep the admitted S24
+binary immutable. These are complete-forward **nsys kernel sums**, not API
+wall time, not estimates from static instructions. Each row has12interleaved
+calls per role under the same idle-device/watch contract as prior experiments.
+
+| Profile, g=-0.1 | Candidate median [range],us | Paired S24,us | Fastest FI no-CP,us | Decision |
+|---|---:|---:|---:|---|
+|S34 reference stages and publication|128.8165 [127.425,129.601]|120.704 [120.129,121.761]|113.089|CONTROL-WINS|
+|S35 reference state-body writing|119.9985 [118.847,120.863]|120.831 [119.967,121.375]|112.927|UNRESOLVED|
+
+S35 is numerically and structurally admitted, but a0.7% median improvement
+with overlapping ranges is not a speed admission. It remains6.3% slower than
+the fastest FI median in this paired capture. We did not spend strong-gate or
+FlashQLA confirmation on either screened-out profile. The goal of beating both
+fastest libraries remains **NOT MET**. Previous QLA wins are historical here.
+
+S35's actual BF16/no-initial body shrinks6656→5904sites, removes128scalar F2F
+casts, and has100instead of112static HGMMA sites because one first-chunk clone
+disappears. The actual chunk iterator covers266240visits (T1..4096, initial
+state yes/no), including min(T,64) on the first body; missedfirst/unclampedfirst
+plants fail. Every remaining native matrix batch retains wait0. Four negative
+native plants reject old clones/casts, missing specialization, lost wait and
+relaxed wait. This is **not fewer runtime GEMMs**.
+
+Resources expose a real tradeoff: target/no-initial stack24→16B and spill
+stores/loads20→12B, but initial-state stack32→80B and spills28/28→92/144B.
+Do not promote the initial-state specialization from the no-initial timing.
+Its correctness passed; its speed has not been admitted. S34 instead uses
+224256B shared and48B spill stores/loads, versus S24's shallower stage profile.
+Neither resource change by itself proves the causal cost of the timing delta.
+
+Both profiles pass14CPU<2% O/state cases with exact S24 input/output/error
+fingerprints; two direct-byte stress pairs at g=-8/-10000;8raw repeat launches
+and every captured output. Host suites41(S34)/38(S35) PASS. Local and measured
+H800 native streams match all4gate/initial-state specializations:
+
+- S34 kernel1736ecb, final head154925f;27424sites,
+  normalized SHA `22a3da861b62788300d426a02409d1769d8e8d923e1d52bbe6f14a94122addc9`.
+- S35 kerneld5fda8b, final head9a39fce;24352sites,
+  normalized SHA `c0cea0400e0fe639e4bc97206801d88aa2f6630eb95181dc502102f4ee6235ee`.
+
+PPU CUTLASS3.6 CUDA source-check compiles both profiles; **native PPU1.7 is
+SKIP because its SDK/model is unavailable**, not PASS. Actual SM80 and default
+shipping dispatch remain unchanged. Source branches are
+`sm90-flashinfer-pipeline-20260926` and `sm90-flashinfer-state-form-20260926`.
+The [raw-derived manifest](../dev/backends/sm90_alignment_campaign_20260926.json)
+re-extracts both SQLite captures (144complete forwards), without inventing a
+second threshold or claiming that a smaller SASS listing must be faster.
+
+## Configuration sweep: missing, and separate from source alignment
+
+**No complete configuration sweep has been performed.** S1–S35 are an
+implementation inventory, not35configurations or proof of an optimum. S34
+adds real options for O/alpha/beta stages, but compiling one reference profile
+is not enumerating the space. Its coupled ordering/participant changes must
+not be mixed into a claimed stage-only sweep.
+
+Next bounded inventory should retain S24's admitted computation, publication
+order and register allocation; expose only stage options independently:
+Q=2, K∈{2,3}, V∈{1,2}, O∈{1,2}, alpha∈{2,5}, beta∈{2,5}: **32prospective
+tuples before admission**. This is a proposed bounded search, **NOT32built or
+legal cells**. Compile the actual4types, record shared/register resources,
+reject oversize or serialized-WGMMA codegen explicitly, then keep numeric
+and measured/rejected counts with a denominator of32. The S24 tuple must
+reproduce its native image; otherwise the sweep harness changed the control.
+Measure weak and strong gates; use cheap screening first and complete-forward
+nsys confirmation for finalists. Keep every existing per-shape winner.
+
+Chunk64, head-dim128 and512threads/two state WGs are still mathematical/layout
+constraints in this implementation, not implemented sweep axes. Extending
+them requires a separately proved decomposition and consumer layout. Do not
+emit unsupported rows or silently call a reference's one setting optimal.
