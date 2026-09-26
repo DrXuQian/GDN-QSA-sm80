@@ -34,7 +34,11 @@ def opcode_count(rows):
 
 
 def native_gate(path,parent,cell):
-    got=keyed_native(path)
+    return native_contract(keyed_native(path),parent,cell)
+
+
+def native_contract(got,parent,cell):
+    assert len(got)==len(parent)==4,'specialization denominator changed'
     assert got.keys()==parent.keys()
     if cell['id']==0:
         assert got==parent,'default native instructions/operands changed'

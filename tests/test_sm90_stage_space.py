@@ -5,6 +5,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'tools'))
 from sm90_stage_space import space, validate, admit_types
+from build_sm90_stage_sweep import native_contract
 
 
 class StageSpace(unittest.TestCase):
@@ -27,6 +28,20 @@ class StageSpace(unittest.TestCase):
             bad=copy.deepcopy(actual);bad[0]['stages'][1] += 1
             # deepcopy preserves aliasing inside actual; the cell remains intact.
             with self.assertRaises(ValueError): admit_types(cell,bad)
+
+    def test_completion_defect_is_not_a_resource_skip(self):
+        # Synthetic rows test checker behavior; actual SASS is checked separately.
+        body=['SYNCS.EXCH.64 R0, [R1], R2']*32+[
+            'HGMMA.64x64x16.F32.BF16 R0, R1, R2',
+            'WARPGROUP.DEPBAR.LE gsb0, 0x0']
+        parent={(g,h):body for g in ('float','cutlass::bfloat16_t') for h in ('false','true')}
+        native_contract(parent,parent,space()[0])
+        key=next(iter(parent))
+        lost=dict(parent);lost[key]=body[:-1]
+        relaxed=dict(parent);relaxed[key]=body[:-1]+['WARPGROUP.DEPBAR.LE gsb0, 0x1']
+        missing=dict(parent);missing.pop(key)
+        for plant in (lost,relaxed,missing):
+            with self.assertRaises(AssertionError):native_contract(plant,parent,space()[0])
 
 
 if __name__ == '__main__': unittest.main()
