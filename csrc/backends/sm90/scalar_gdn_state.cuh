@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 #include "scalar_gdn_aux.cuh"
+#include "state_chunk_loop.cuh"
+#include "fragment_convert.cuh"
 
 namespace gdn::sm90 {
 
@@ -108,7 +110,7 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
         auto body = [&](int chunk, auto first_tag, auto last_tag) __attribute__((always_inline)) {
             constexpr bool first = decltype(first_tag)::value;
             constexpr bool last = decltype(last_tag)::value;
-            int valid = last ? int(work.seq_len-chunk*64) : 64;
+            int valid = last ? state_chunk_valid(int(work.seq_len),chunk) : 64;
             ap.consumer_wait(ar);
             qp.consumer_wait(qr);
             auto acc_o = partition_fragment_C(o1_thread,Shape<_128,_64>{});
@@ -174,7 +176,8 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             kkp.consumer_release(kkr); ++kkr;
             bp.consumer_release(br); ++br;
 
-            auto operand_delta = kda::sm90::collective::make_acc_into_op<Element>(acc_delta,typename Base::TiledMmaKV::LayoutA_TV{});
+            auto delta_bf16 = convert_fragment<Element>(acc_delta);
+            auto operand_delta = kda::sm90::collective::make_acc_into_op<Element>(delta_bf16,typename Base::TiledMmaKV::LayoutA_TV{});
             qkp.consumer_wait(qkr);
             warpgroup_fence_operand(operand_delta);
             warpgroup_fence_operand(acc_o);
@@ -218,12 +221,7 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             alp.consumer_release(alr); ++alr;
         };
 
-        int chunks = ceil_div(work.seq_len,64);
-        if (chunks==1) body(0,cute::bool_constant<!Base::kInitStateFromInput>{},cute::true_type{});
-        else body(0,cute::bool_constant<!Base::kInitStateFromInput>{},cute::false_type{});
-        CUTE_NO_UNROLL
-        for (int chunk=1; chunk<chunks-1; ++chunk) body(chunk,cute::false_type{},cute::false_type{});
-        if (chunks>1) body(chunks-1,cute::false_type{},cute::true_type{});
+        for_each_state_chunk<Base::kInitStateFromInput>(int(work.seq_len),body);
         if (params.ptr_output_state) {
             auto global_h = make_tensor(make_gmem_ptr(params.ptr_output_state),
                 state_layout<128,128>(problem.num_v_heads,problem.num_seqs))(
