@@ -132,6 +132,11 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             kp.consumer_wait(kr);
             auto acc_sk = partition_fragment_C(sk_thread,Shape<_128,_64>{});
             if constexpr (!first) {
+                // Compiler-only CSE boundary: retire O1's packed H operand
+                // instead of keeping32 extra registers across its epilogue.
+                // The FP32 state is unchanged; repeat the SAME RNE conversion.
+                // This helper is empty asm, not a hardware fence or wait.
+                warpgroup_fence_operand(h);
                 auto operand_h = kda::sm90::collective::make_acc_into_op<Element>(h,typename Base::TiledMmaSK::LayoutA_TV{});
                 warpgroup_fence_operand(operand_h);
                 warpgroup_fence_operand(acc_sk);
