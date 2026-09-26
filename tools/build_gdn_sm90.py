@@ -71,6 +71,7 @@ def main():
     p.add_argument("--cutlass-root",default=os.getenv("PPU_CUTLASS_ROOT"))
     p.add_argument("--device-only",action="store_true")
     p.add_argument("--release",action="store_true",help="explicit NDEBUG candidate; flags remain hash-bound")
+    p.add_argument("--role-trace",action="store_true",help="H800 diagnostic only; never performance-rank this image")
     p.add_argument("--reuse-device",action="store_true",help="reuse only an exactly hash-bound device object; recheck target/codegen/link/import")
     args=p.parse_args()
     out=args.out.resolve(); out.mkdir(parents=True,exist_ok=True)
@@ -89,6 +90,10 @@ def main():
     # Keep wrapper path: SDK nvcc wrappers may locate their runtime relative to it.
     include=[f"-I{SOURCE}",f"-I{SOURCE/'cula'}",f"-I{dep/'include'}"]
     options=flags(args.target,args.mode,args.release)
+    if args.role_trace:
+        if args.target != "cuda_sm90":
+            raise ValueError("role timestamps are H800 diagnostic only, not native PPU evidence")
+        options.append("-DGDN_SM90_ROLE_TRACE=1")
     identity=dict(target=args.target,mode=args.mode,compiler=str(compiler),compiler_sha256=sha(compiler),
                   dependency=str(dep),flags=options,include=include,device_admission="NOT_RUN")
     identity["dependency_version_sha256"]=sha(dep/"include/cutlass/version.h")

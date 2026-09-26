@@ -6,6 +6,7 @@
 #include "ordered_pair.cuh"
 #include "aux_chunk_loop.cuh"
 #include "relative_gate_layout.cuh"
+#include "role_trace.cuh"
 
 namespace gdn::sm90 {
 
@@ -144,17 +145,20 @@ struct ScalarGdnAux : Base {
         auto tq = store_qk.get_thread_slice(tid);
         auto tk = store_kk.get_thread_slice(tid);
 
-        for_each_aux_chunk(int(work.seq_len), [&](int, auto valid_tag) __attribute__((always_inline)) {
+        for_each_aux_chunk(int(work.seq_len), [&](int chunk, auto valid_tag) __attribute__((always_inline)) {
             int valid = int(valid_tag);
             auto acc_qk = partition_fragment_C(mma, Shape<_64,_64>{});
             auto acc_kk = partition_fragment_C(mma, Shape<_64,_64>{});
 
+            trace_role(chunk,0,0);
             kp.consumer_wait(kr);
+            trace_role(chunk,0,1);
             warpgroup_fence_operand(acc_kk);
             warpgroup_arrive();
             kda::sm90::collective::gemm_zero_acc(mma, ka(_,_,_,kr.index()), kb(_,_,_,kr.index()), acc_kk);
             warpgroup_commit_batch();
             qp.consumer_wait(qr);
+            trace_role(chunk,0,2);
             warpgroup_fence_operand(acc_qk);
             warpgroup_arrive();
             kda::sm90::collective::gemm_zero_acc(mma, qa(_,_,_,qr.index()), kb(_,_,_,kr.index()), acc_qk);
@@ -163,11 +167,13 @@ struct ScalarGdnAux : Base {
             warpgroup_fence_operand(acc_qk);
             warpgroup_fence_operand(acc_kk);
             // Inputs can be overwritten only after both WGMMA groups retire.
+            trace_role(chunk,0,3);
             kp.consumer_release(kr); ++kr;
             qp.consumer_release(qr); ++qr;
 
             ap.consumer_wait(ar);
             bp.consumer_wait(br);
+            trace_role(chunk,0,4);
             auto out_qk = make_fragment_like<Element>(acc_qk);
             auto out_kk = make_fragment_like<Inverse>(acc_kk);
             CUTE_UNROLL
@@ -192,6 +198,7 @@ struct ScalarGdnAux : Base {
             }
             kkp.producer_acquire(kw);
             qkp.producer_acquire(qw);
+            trace_role(chunk,0,5);
             copy(store_qk, tq.retile_S(out_qk), tq.partition_D(qk(_,_,qw.index())));
             copy(store_kk, tk.retile_S(out_kk), tk.partition_D(kk(_,_,kw.index())));
             if constexpr (AuxInverse) {
@@ -199,9 +206,11 @@ struct ScalarGdnAux : Base {
                 // its beta-column conversion finish. State must not repeat it.
                 using Barriers = kda::sm90::collective::KdaNamedBarriers;
                 cutlass::arch::NamedBarrier::arrive_and_wait(128,Barriers::AuxMath);
+                trace_role(chunk,0,6);
                 typename Base::CollectiveInverse solve(Barriers::AuxMath);
                 solve.compute(kk(_,_,kw.index()));
                 cutlass::arch::NamedBarrier::arrive_and_wait(128,Barriers::AuxMath);
+                trace_role(chunk,0,7);
                 auto ld = make_tiled_copy_C(Copy_Atom<SM75_U32x4_LDSM_N,Inverse>{},mma);
                 auto l = ld.get_thread_slice(tid);
                 auto inv = make_fragment_like<Inverse>(acc_kk);
@@ -221,6 +230,7 @@ struct ScalarGdnAux : Base {
             kkp.producer_commit(kw); ++kw;
             ap.consumer_release(ar); ++ar;
             bp.consumer_release(br); ++br;
+            trace_role(chunk,0,8);
         });
     }
 };

@@ -16,4 +16,10 @@ struct Arguments {
     bool gate_fp32;
 };
 void launch(Arguments const&, cudaStream_t);
+#ifdef GDN_SM90_ROLE_TRACE
+constexpr int TraceCtas=64, TraceChunks=64, TraceRoles=3, TracePoints=16;
+constexpr int TraceWords=TraceCtas*TraceChunks*TraceRoles*TracePoints;
+void reset_role_trace(cudaStream_t);
+void read_role_trace(void*, cudaStream_t);
+#endif
 } // namespace gdn::sm90

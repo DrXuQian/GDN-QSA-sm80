@@ -61,6 +61,18 @@ std::vector<torch::Tensor> forward(torch::Tensor q, torch::Tensor k, torch::Tens
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME,m) {
     m.def("forward",&forward);
+#ifdef GDN_SM90_ROLE_TRACE
+    m.attr("role_trace_enabled")=true;
+    m.def("reset_role_trace",[]() {
+        gdn::sm90::reset_role_trace(at::cuda::getCurrentCUDAStream());
+    });
+    m.def("read_role_trace",[]() {
+        auto result=torch::empty({gdn::sm90::TraceCtas,gdn::sm90::TraceChunks,
+            gdn::sm90::TraceRoles,gdn::sm90::TracePoints}, torch::TensorOptions().dtype(torch::kInt64).device(torch::kCPU));
+        gdn::sm90::read_role_trace(result.data_ptr(), at::cuda::getCurrentCUDAStream());
+        return result;
+    });
+#endif
     m.attr("target")=GDN_SM90_TARGET_NAME;
     m.attr("math_contract")="cula-scalar-gdn-fused-bf16-v1";
     m.attr("numeric_schedule")="scalar-GDN-BF16-WGMMA; unchanged FP16 inverse precomputed by auxiliary warpgroup";

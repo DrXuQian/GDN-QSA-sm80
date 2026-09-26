@@ -6,11 +6,27 @@
 #include "scalar_gdn_state.cuh"
 #include <climits>
 #include <stdexcept>
+#include <vector>
 
 namespace gdn::sm90 {
 using namespace cute;
 using namespace kda::sm90::kernel;
 using BF16 = cutlass::bfloat16_t;
+
+#ifdef GDN_SM90_ROLE_TRACE
+__device__ unsigned long long role_trace_data[TraceWords];
+void reset_role_trace(cudaStream_t stream) {
+    std::vector<unsigned long long> zero(TraceWords, 0);
+    if (cudaMemcpyToSymbolAsync(role_trace_data, zero.data(), TraceWords*8, 0,
+            cudaMemcpyHostToDevice, stream) != cudaSuccess || cudaStreamSynchronize(stream) != cudaSuccess)
+        throw std::runtime_error("role trace reset failed");
+}
+void read_role_trace(void* destination, cudaStream_t stream) {
+    if (cudaMemcpyFromSymbolAsync(destination, role_trace_data, TraceWords*8, 0,
+            cudaMemcpyDeviceToHost, stream) != cudaSuccess || cudaStreamSynchronize(stream) != cudaSuccess)
+        throw std::runtime_error("role trace read failed");
+}
+#endif
 
 template <class Gate, bool Initial>
 void run(Arguments const& a, cudaStream_t stream) {
@@ -50,6 +66,10 @@ void run(Arguments const& a, cudaStream_t stream) {
 }
 
 void launch(Arguments const& a, cudaStream_t stream) {
+#ifdef GDN_SM90_ROLE_TRACE
+    if (int64_t(a.batch)*a.v_heads > TraceCtas || a.length > TraceChunks*64)
+        throw std::invalid_argument("diagnostic trace capacity exceeded");
+#endif
     if (a.batch <= 0 || a.length <= 0 || a.qk_heads <= 0 || a.v_heads <= 0 ||
         a.v_heads % a.qk_heads || int64_t(a.batch)*a.length > INT32_MAX ||
         int64_t(a.batch)*a.v_heads > INT32_MAX)

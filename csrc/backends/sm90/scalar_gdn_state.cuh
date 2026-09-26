@@ -109,8 +109,10 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             constexpr bool first = decltype(first_tag)::value;
             constexpr bool last = decltype(last_tag)::value;
             int valid = last ? int(work.seq_len-chunk*64) : 64;
+            trace_role(chunk,wg+1,0);
             ap.consumer_wait(ar);
             qp.consumer_wait(qr);
+            trace_role(chunk,wg+1,1);
             auto acc_o = partition_fragment_C(o1_thread,Shape<_128,_64>{});
             if constexpr (!first) {
                 auto operand_h = kda::sm90::collective::make_acc_into_op<Element>(h,typename Base::TiledMmaO1::LayoutA_TV{});
@@ -128,6 +130,7 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
                 }
             }
             qp.consumer_release(qr); ++qr;
+            trace_role(chunk,wg+1,2);
 
             kp.consumer_wait(kr);
             auto acc_sk = partition_fragment_C(sk_thread,Shape<_128,_64>{});
@@ -141,7 +144,9 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
                 warpgroup_commit_batch(); order.notify_next_blocked(wg);
                 warpgroup_wait<0>(); warpgroup_fence_operand(acc_sk);
             }
+            trace_role(chunk,wg+1,3);
             vp.consumer_wait(vr);
+            trace_role(chunk,wg+1,4);
             auto residual = make_fragment_like<Element>(acc_sk);
             copy(load_v,lv.partition_S(v)(_,_,_,vr.index()),lv.retile_D(residual));
             if constexpr (!first) {
@@ -151,8 +156,10 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
                     residual(i) = residual(i)-Element(acc_sk(i)*smem.gate_factors[ar.index()*128+t]);
                 }
             }
+            trace_role(chunk,wg+1,5);
             kkp.consumer_wait(kkr);
             bp.consumer_wait(br);
+            trace_role(chunk,wg+1,6);
             if constexpr (!AuxInverse) {
                 if (wg==0) inverse();
                 cutlass::arch::NamedBarrier::arrive_and_wait(256,Barriers::StateMath);
@@ -173,9 +180,11 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             vp.consumer_release(vr); ++vr;
             kkp.consumer_release(kkr); ++kkr;
             bp.consumer_release(br); ++br;
+            trace_role(chunk,wg+1,7);
 
             auto operand_delta = kda::sm90::collective::make_acc_into_op<Element>(acc_delta,typename Base::TiledMmaKV::LayoutA_TV{});
             qkp.consumer_wait(qkr);
+            trace_role(chunk,wg+1,8);
             warpgroup_fence_operand(operand_delta);
             warpgroup_fence_operand(acc_o);
             order.ordered_or_wait(wg);
@@ -185,6 +194,7 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             warpgroup_commit_batch(); order.notify_next_blocked(wg);
             warpgroup_wait<0>(); warpgroup_fence_operand(acc_o);
             qkp.consumer_release(qkr); ++qkr;
+            trace_role(chunk,wg+1,9);
             {
                 auto output = make_fragment_like<Element>(acc_o);
                 copy(acc_o,output);
@@ -193,10 +203,12 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
                 cutlass::arch::fence_view_async_shared();
                 op.producer_commit(ow); ++ow;
             }
+            trace_role(chunk,wg+1,10);
 
             // Consume the inherited alpha-last pipeline even though the scalar
             // prefix supplies the same value; do not change barrier counts.
             alp.consumer_wait(alr);
+            trace_role(chunk,wg+1,11);
             float decay_h = smem.gate_factors[ar.index()*128+valid-1];
             CUTE_UNROLL
             for (int i=0; i<size(h); ++i) h(i) *= decay_h;
@@ -216,6 +228,7 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             kp.consumer_release(kr); ++kr;
             ap.consumer_release(ar); ++ar;
             alp.consumer_release(alr); ++alr;
+            trace_role(chunk,wg+1,12);
         };
 
         int chunks = ceil_div(work.seq_len,64);
