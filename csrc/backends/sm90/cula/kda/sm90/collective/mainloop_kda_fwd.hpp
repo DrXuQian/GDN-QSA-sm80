@@ -103,7 +103,7 @@ struct FlatMainloopTmaWarpSpecializedKdaFwd {
     static constexpr bool SharedStateOperand =
         find_option_t<Tag::kSharedStateOperand, false_type, Options>::value;
     static_assert(NumStateMmaWarpGroups == 1 || NumStateMmaWarpGroups == 2);
-    static_assert(!SharedStateOperand || (ValueTile == 128 && NumStateMmaWarpGroups == 1));
+    static_assert(!SharedStateOperand || ValueTile == 128);
     static constexpr int NumAuxMmaWarpGroups = 1;
     using StateSchedule = std::conditional_t<NumStateMmaWarpGroups == 2,
         cutlass::gemm::KernelTmaWarpSpecializedCooperative,

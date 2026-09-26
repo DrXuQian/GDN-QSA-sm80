@@ -14,7 +14,9 @@ using BF16 = cutlass::bfloat16_t;
 
 template <class Gate, bool Initial>
 void run(Arguments const& a, cudaStream_t stream) {
-#ifdef GDN_SM90_SHARED_STATE
+#if defined(GDN_SM90_SHARED_STATE) && GDN_SM90_SHARED_STATE == 2
+    using Types = ValueKernelTypes<Gate,Initial,128,168,true,2,160>;
+#elif defined(GDN_SM90_SHARED_STATE)
     using Types = ValueKernelTypes<Gate,Initial,128,232,true>;
 #elif defined(GDN_SM90_VALUE_SPLIT_AUX_REGS)
     using Types = ValueKernelTypes<Gate,Initial,64,GDN_SM90_VALUE_SPLIT_AUX_REGS>;

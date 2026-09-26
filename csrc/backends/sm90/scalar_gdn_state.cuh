@@ -147,7 +147,7 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             constexpr bool last = decltype(last_tag)::value;
             int valid = last ? int(work.seq_len-chunk*64) : 64;
             if constexpr (SharedH && !first) {
-                static_assert(AuxInverse && Base::NumStateMmaThreads == 128);
+                static_assert(AuxInverse);
                 auto shared_h = make_tensor(make_smem_ptr(smem.state_operand.data()),
                     typename SharedHLayout::Layout{})(_,_,_0{});
                 auto store_h = typename SharedHLayout::Store{};
@@ -156,8 +156,10 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
                 copy(h,rounded_h);
                 copy(store_h,sh.retile_S(rounded_h),sh.partition_D(shared_h));
                 cutlass::arch::fence_view_async_shared();
-                // StateMathWG0 is disjoint from the auxiliary inverse barrier.
-                cutlass::arch::NamedBarrier::arrive_and_wait(128,Barriers::StateMathWG0);
+                // The cooperative publication includes both actual state WGs;
+                // its barrier is disjoint from the auxiliary inverse barrier.
+                cutlass::arch::NamedBarrier::arrive_and_wait(Base::NumStateMmaThreads,
+                    Base::NumStateMmaThreads == 128 ? Barriers::StateMathWG0 : Barriers::StateMath);
             }
             ap.consumer_wait(ar);
             qp.consumer_wait(qr);

@@ -5,7 +5,8 @@
 #include "scalar_gdn_state.cuh"
 
 namespace gdn::sm90 {
-template<class Gate, bool Initial, int ValueTile = 128, int AuxRegs = 104, bool SharedH = false>
+template<class Gate, bool Initial, int ValueTile = 128, int AuxRegs = 104,
+         bool SharedH = false, int StateWGs = 1, int StateRegs = 248>
 struct ValueKernelTypes {
     using BF16 = cutlass::bfloat16_t;
     using OriginalOptions = std::tuple<
@@ -16,12 +17,14 @@ struct ValueKernelTypes {
         kda::sm90::kernel::Option<kda::sm90::kernel::Tag::kValueTile,cute::Int<ValueTile>>,
         kda::sm90::kernel::Option<kda::sm90::kernel::Tag::kAuxRegisters,cute::Int<AuxRegs>>>{}));
     using SharedOptions = decltype(std::tuple_cat(SplitOptions{},std::tuple<
-        kda::sm90::kernel::Option<kda::sm90::kernel::Tag::kNumMmaWarpGroups,cute::_1>,
-        kda::sm90::kernel::Option<kda::sm90::kernel::Tag::kStateRegisters,cute::Int<248>>,
+        kda::sm90::kernel::Option<kda::sm90::kernel::Tag::kNumMmaWarpGroups,cute::Int<StateWGs>>,
+        kda::sm90::kernel::Option<kda::sm90::kernel::Tag::kStateRegisters,cute::Int<StateRegs>>,
         kda::sm90::kernel::Option<kda::sm90::kernel::Tag::kSharedStateOperand,cute::true_type>>{}));
     using Options = std::conditional_t<SharedH,SharedOptions,
         std::conditional_t<ValueTile == 128,OriginalOptions,SplitOptions>>;
-    static_assert(!SharedH || (ValueTile == 128 && AuxRegs == 232));
+    static_assert(!SharedH || (ValueTile == 128 &&
+        ((StateWGs == 1 && AuxRegs == 232 && StateRegs == 248) ||
+         (StateWGs == 2 && AuxRegs == 168 && StateRegs == 160))));
     using Stride = cute::tuple<int64_t,cute::_1,int32_t>;
     using Builder = kda::sm90::kernel::FlatBuilderKdaFwd<BF16,float,float,
         cute::Shape<cute::_64,cute::_64,cute::_128>,Stride,Stride,Stride,Stride,
