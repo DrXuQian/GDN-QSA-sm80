@@ -1,11 +1,22 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 10:15:24 UTC
-working-on: S21 final-mask device timing; S22 inverse in-place native proof; S20 measured loss
-blocked-on: native PPU1.7 SDK/model unavailable; physical H800 speed target remains NOT MET
-last-commit: 0c4983a (prior final status); immutable incumbent S19 kernel64691d1
+updated-at: 2026-09-26 10:23:42 UTC
+working-on: S21 wins both FI control windows; S22/S23 native proof and pending device timing
+blocked-on: H800 foreign workload parent139996/176476; native PPU1.7 SDK/model unavailable
+last-commit: a71922b (S20/S21/S22 checkpoint); immutable incumbent S19 kernel64691d1
 
 ## Current checkpoint
+
+S21 weak129.0085 vs133.5365us; strong128.945 vs133.6005us, both disjoint
+wins over S19. Fastest FI112.848/112.88us still wins: target NOT MET.
+S22 14cases/parent fingerprints PASS, timing attempts inplace-fi-weak and
+inplace-fi-weak-r2 rejected before capture for foreignPIDs175958/176303.
+Parent139996 ->176476 repeatedly creates GPU children; do not launch timing
+while it remains active or stop their work. User notified/asked for5minidle.
+S21/S22 both4-body PPU CUTLASS3.6 CUDA source-check PASS; native PPU17 SKIP.
+S23(9af20e1) composes in-place update on admittedS21, no default promotion;
+local/remote builds in progress, numerics/timing pending. Local/actual remote
+native4body equality established forS20/S21/S22. Last line below is historical.
 
 S20 kernel973c23b:14cases/parent fingerprints +8replay/everycall PASS;
 full-forward nsys136.1445us vs S19control133.457us, disjoint LOSE. No promotion.
