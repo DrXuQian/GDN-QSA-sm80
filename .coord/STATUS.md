@@ -1,11 +1,31 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 15:14:53 UTC
-working-on: S37/S38 all14CPU+2rawstresses+8replay PASS; events94.7/92.5us vs117us; final paired FI/QLA nsys running
-blocked-on: native PPU1.7 SDK/model unavailable; fastest FlashInfer target not yet met
-last-commit: f3c6a87 stage report; S36a1b880d; S37/S38 kernelc490c8d tests c352173; S24 control unchanged
+updated-at: 2026-09-26 15:39:00 UTC
+working-on: frozen S24/S38 multi-workload admission; 14 workloads x2 gates x2 libraries, sequential nsys captures
+blocked-on: native PPU1.7 SDK/model unavailable; expanded speed coverage pending (not blocked on user)
+last-commit: 9f9db1b checkpoint; multi-workload harness388f212 pushed; S38 kernelc490c8d immutable
 
 ## Current checkpoint
+
+15:39 UTC: primary closure7captures/480forwards EXACT_SQLITE_REEXTRACTION,
+allS38 referenceswin inclfreshFI confirmations101.457/101.329 vs112.737us.
+Fullrawarchive local+remote SHA792bd85452be5a326fafe48486d1d03819009fdc0635f1502994a70ec1d702d4.
+Report docs/SM90_VALUE_SPLIT_20260926.md. This primary win alone DOES NOT
+authorize shutdown: latest user requires multiple cases. New14workloads/
+28scenarios/56captures registered15:26, harness388f212 only; no kernel change.
+ActualCPU adapter9testsPASS, localnoTorch5PASS/4SKIP. Anchor+batch2 first8
+captures active session29154;1/56 complete atlastpoll, nofail. Explicitbatch
+boundaries/GVA/initialVK conversion; missingdenominator negative red.
+H800 remainsON; no concurrentGPUjobs, noautomaticroutingchange.
+
+15:22 UTC NEW USER SCOPE: test cases must not be single-shape. H800 staysON;
+the primaryshape win alone no longer closes the task or authorizes shutdown.
+S38 firstsameinput nsys: FIweak101.3765vs113.1045,FIstrong100.689vs112.0175us;
+QLAweak99.3445vs165.3295,QLAstrong99.4565vs163.442us. All disjoint, default
+recompile14CPU parentbitspass despite nonidentical native. Independent FI
+confirmations running/finishing. Kernel stays immutable while expanding
+registered B/T/head/GVA/tail cells, bothgate regimes, identicaloracle+nsys
+percell. No universal selector/default claim from primaryshape.
 
 15:15 checkpoint: both V64 variants all14CPU/parentfingerprints + two direct
 byte overflow stresspairs + 8replay/everycapturedoutput PASS;38hosttestsPASS.
