@@ -97,6 +97,7 @@ def main():
             torch.save(pair, a.out / f"{role}.pt")
             print(f"[reference numeric] {role} {row}", flush=True)
         torch.save(dict(inputs=cpu, initial=state_cpu, reference=want), a.out / "fixture.pt")
+        result["tensor_artifacts"] = {path.name: sha(path) for path in a.out.glob("*.pt")}
         result["images"] = reference_binaries("flashqla", a.out)
         if result["roles"]["ours-cuda"]["fingerprint"] != result["roles"]["ours-candidate"]["fingerprint"]:
             raise ValueError("candidate differs from parent")
