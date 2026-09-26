@@ -31,10 +31,11 @@ def tilelang_images(kernels, out):
             pending.extend(module.imports)
             if module.kind != "cuda":
                 continue
-            formats = list(module.get_write_formats())
-            if "cubin" not in formats:
-                raise RuntimeError(f"live CUDA module has no assembled cubin: {formats}")
             path = output / f"tilelang-{key_hash}-{count}.cubin"
+            # This pinned TVM's CUDA module does not override GetWriteFormats
+            # (it reports []). WriteToFile itself asserts fmt == stored fmt_,
+            # and saves the same data_ passed to cuModuleLoadData. Do not rely
+            # on the empty capability-list method or compile a replacement.
             module.write_to_file(str(path), "cubin")
             data = path.read_bytes()
             if len(data) < 20 or data[:4] != b"\x7fELF" or int.from_bytes(data[18:20], "little") != 190:

@@ -15,6 +15,7 @@ import subprocess
 import time
 
 from sm90_workloads import WORKLOADS, GATES, FAMILIES, validate_inventory
+from sm90_measurement_epochs import repair, epochs, cell_key
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -39,6 +40,8 @@ def main():
     p.add_argument("--family", choices=FAMILIES)
     p.add_argument("--gate", type=float, choices=GATES)
     p.add_argument("--cell-timeout", type=int, default=1800)
+    p.add_argument("--repair-jit-identity", action="store_true",
+                   help="one explicit, AST-proved metadata repair; preserve four old attempts")
     args = p.parse_args()
     validate_inventory(WORKLOADS)
     args.out.mkdir(parents=True, exist_ok=True)
@@ -48,6 +51,9 @@ def main():
                 "adapters": sha(ROOT / "benchmarks/sm90_library_inputs.py"),
                 "harness": sha(ROOT / "benchmarks/profile_sm90_libraries.py")}
     state_file = args.out / "matrix.json"
+    if args.repair_jit_identity:
+        repair(args.out, ROOT, bindings)
+    metadata = {}
     # Reorder only: the anchor and genuine batch boundary must run first.
     order = sorted(WORKLOADS, key=lambda w: (w.name not in ("seq2048", "batch2"),
                                             w.name != "seq2048", WORKLOADS.index(w)))
@@ -58,10 +64,12 @@ def main():
         old = json.loads(state_file.read_text())
         if old["bindings"] != bindings:
             raise RuntimeError("resume input/code/binary identity changed")
-        index = {row["directory"]: row for row in old["cells"]}
-        if set(index) != {row["directory"] for row in cells}:
+        epochs(args.out, old)
+        metadata = {k: old[k] for k in ("identity_epochs", "identity_repair") if k in old}
+        index = {cell_key(row): row for row in old["cells"]}
+        if len(old["cells"]) != 56 or set(index) != {cell_key(row) for row in cells}:
             raise RuntimeError("resume denominator changed")
-        cells = [index[row["directory"]] for row in cells]
+        cells = [index[cell_key(row)] for row in cells]
 
     def save():
         counts = {status: sum(row["status"] == status for row in cells)
@@ -70,6 +78,7 @@ def main():
                     registered_numerical_scenarios=28, bindings=bindings,
                     status_counts=counts, cells=cells, routing="UNCHANGED",
                     shutdown_authorized=False)
+        data.update(metadata)
         temp = state_file.with_suffix(".json.new")
         temp.write_text(json.dumps(data, indent=2) + "\n")
         temp.replace(state_file)
@@ -114,7 +123,10 @@ def main():
                 raise RuntimeError("capture bound to wrong candidate")
             if receipt["device_watch"]["errors"] or not receipt["candidate_requires_raw_bit"]:
                 raise RuntimeError("concurrency or raw-bit admission incomplete")
+            if receipt["harness_sha256"] != bindings["harness"]:
+                raise RuntimeError("capture bound to wrong measurement epoch")
             row.update(status="PASS", candidate_beats_all=result["candidate_beats_all_reference_paths"],
+                       measurement_epoch=bindings["harness"],
                        vs_parent=result["comparisons"]["ours-candidate"]["verdict"],
                        references=result["candidate_vs_references"],
                        summary=result["summary"],

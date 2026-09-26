@@ -9,6 +9,7 @@ import sqlite3
 
 from analyze_sm90_nsys import extract
 from sm90_workloads import WORKLOADS, GATES, FAMILIES, BY_NAME, validate_inventory
+from sm90_measurement_epochs import epochs
 
 ROOT = Path(__file__).resolve().parents[1]
 UUID = "GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c"
@@ -32,6 +33,7 @@ def record(root):
     if len(rows) != 56 or {(r["workload"], r["gate"], r["family"]) for r in rows} != expected:
         raise ValueError("matrix denominator is not the registered 56 captures")
     bindings = state["bindings"]
+    versions = epochs(root, state)
     for role, file in (("authority", "tools/sm90_workloads.py"),
                        ("adapters", "benchmarks/sm90_library_inputs.py"),
                        ("harness", "benchmarks/profile_sm90_libraries.py")):
@@ -48,6 +50,21 @@ def record(root):
             if sha(directory / name) != digest:
                 raise ValueError("evidence modified")
         receipt = json.loads((directory / "receipt.json").read_text())
+        version = versions.get(receipt["harness_sha256"])
+        if version is None or row.get("measurement_epoch", receipt["harness_sha256"]) != receipt["harness_sha256"]:
+            raise ValueError("capture uses an unadmitted measurement epoch")
+        if row["family"] == "flashqla":
+            images = receipt["reference_binaries"]
+            if not images:
+                raise ValueError("missing reference binaries")
+            if "collector" in version:
+                for image in images:
+                    if image.get("identity_collector_sha256") != version["collector"]:
+                        raise ValueError("unbound live-module collector")
+                    if sha(directory / "jit-binaries" / Path(image["path"]).name) != image["sha256"]:
+                        raise ValueError("changed captured CUDA image")
+            elif "TileLang begins to compile kernel" in (directory / "run.log").read_text():
+                raise ValueError("old mapped-only identity cannot admit fresh JIT")
         result = json.loads((directory / "result.json").read_text())
         workload = BY_NAME[row["workload"]]
         if receipt["workload"] != json.loads(json.dumps(workload.receipt())):
@@ -107,6 +124,8 @@ def record(root):
                 reanalysis="EXACT_SQLITE_ALL_COMPLETED_CAPTURES", rows=complete,
                 unfinished=[r for r in rows if r["status"] != "PASS"],
                 candidate_all_workloads_win=complete_win(rows),
+                identity_epochs=state.get("identity_epochs", []),
+                superseded_attempts=[r for r in rows if r.get("prior_attempts")],
                 native_ppu17="SKIP_SDK_MODEL_UNAVAILABLE", routing="UNCHANGED")
 
 
