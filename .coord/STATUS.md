@@ -1,11 +1,24 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 14:24:04 UTC
-working-on: user requested continue; new S36 bounded32cell stage sweep on immutable S24; default/native admission passed, full builds starting
+updated-at: 2026-09-26 14:52:10 UTC
+working-on: S36 all32 builds/native gates passed;28/32 numerical+event screens complete,4 pending; then preregistered nsys finalists
 blocked-on: native PPU1.7 SDK/model unavailable; fastest FlashInfer target not yet met
-last-commit: ca64e55 report; S36 kernel/tools4d84cfd; incumbent S24 bc3c154/head06b7471 unchanged
+last-commit: 8d3bdbe main checkpoint; S36 source8f513e2; incumbent S24 bc3c154/head06b7471 unchanged
 
 ## Current checkpoint
+
+14:52 UTC: S36 compiled32/32, actual shared168960..224256 <=232448B;
+native gates32/32 PASS. Screen28/32 complete,4 pending, no numerical failure.
+All completed cells pass14CPU cases/parent fingerprints,2direct-byte stress
+pairs,8repeated outputs. Event screen currently shows no clear improvement;
+it is not final speed admission. Top2 per gate still require paired fullforward
+nsys. No concurrentGPU jobs or foreign-work interference allowed.
+User explicitly requests autonomous continuation until goal:15:15 is a progress
+checkpoint, NOT a stop deadline. If S36 fails, select next bounded experiment
+from evidence, without asking user to continue. Target NOT MET: H800 stays on.
+Shutdown permission checked read-only; no power-off or termination signal sent.
+Any later authorized shutdown requires goal admission, full local/remote
+archival, exact-instance validation and no foreign tasks; no Trash cleanup.
 
 NEW S36, registered14:15:18 beforeedit after user continued. Dedicated
 /workspace/gdn-sm90-stage-sweep-20260926/source branchsm90-stage-sweep-20260926.
