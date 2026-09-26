@@ -86,8 +86,27 @@ def reference_binaries(family, out):
                                sha256=digest, bytes=len(data)))
 
         for compiled in _in_mem_compile_cache.values():
+            before = len(result)
             for symbol in compiled.kernel_info:
                 walk_module_and_get_cubin_data(compiled.ir_module, symbol, record)
+            if len(result) == before:
+                # TVM-FFI lowering embeds the GPU images into the host object;
+                # kernel_info/gpu.binary need not survive that lowering.
+                data = bytes(compiled.dump_to_object("gdn_reference"))
+                digest = hashlib.sha256(data).hexdigest()
+                path = output / f"{digest}.o"
+                path.write_bytes(data)
+                gpu_elfs = []
+                start = data.find(b"\x7fELF", 1)
+                while start != -1:
+                    if start + 20 <= len(data) and int.from_bytes(data[start+18:start+20], "little") == 190:
+                        gpu_elfs.append(start)
+                    start = data.find(b"\x7fELF", start+4)
+                if not gpu_elfs:
+                    raise RuntimeError("exported JIT object contains no CUDA ELF image")
+                result.append(dict(function=compiled.function_name, path=str(path),
+                                   sha256=digest, bytes=len(data),
+                                   kind="JIT_OBJECT_WITH_EMBEDDED_CUDA_ELF", cuda_elf_offsets=gpu_elfs))
     if not result:
         raise RuntimeError("reference JIT binary identity unavailable")
     return result
