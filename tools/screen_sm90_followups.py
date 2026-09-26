@@ -28,8 +28,11 @@ def main():
     p.add_argument("--out", type=Path, required=True)
     a = p.parse_args()
     admission = json.loads(a.admission.read_text())
-    if admission["denominator"] != 3 or any(row["status"] != "PASS" for row in admission["rows"]):
-        raise ValueError("all three registered candidates must first pass numerical admission")
+    inventory = [r["id"] for r in admission["rows"]]
+    if (inventory not in (["s39", "s40", "s41"], ["s45"])
+            or admission["denominator"] != len(inventory)
+            or any(row["status"] != "PASS" for row in admission["rows"])):
+        raise ValueError("every candidate in the registered inventory must first pass numerical admission")
     a.out.mkdir()
     import torch
     from bench_sm90_hopper import DeviceWatch
@@ -45,7 +48,8 @@ def main():
         raise ValueError("require the unremapped single H800 host")
     watch = DeviceWatch(0)
     rows = []
-    result = dict(scope="H800_GRAPH_SCREEN_NOT_NSYS_ADMISSION", denominator=12,
+    denominator = 4 * len(inventory)
+    result = dict(scope="H800_GRAPH_SCREEN_NOT_NSYS_ADMISSION", denominator=denominator,
                   admission_sha256=sha(a.admission), harness_sha256=sha(__file__),
                   rows=rows, status="INCOMPLETE", routing="UNCHANGED")
     try:
@@ -130,7 +134,7 @@ def main():
                     (a.out / "screen.json").write_text(json.dumps(result, indent=2) + "\n")
                     print(f"[screen] {candidate['id']} {name} g={gate} parent={summary['parent']['median']:.3f} "
                           f"candidate={summary['candidate']['median']:.3f} {verdict} NSYS_REQUIRED", flush=True)
-        if len(rows) != 12:
+        if len(rows) != denominator:
             raise ValueError("screen denominator changed")
         result["status"] = "PASS_SCREEN_COMPLETED_NOT_SPEED_ADMISSION"
     except Exception as error:
