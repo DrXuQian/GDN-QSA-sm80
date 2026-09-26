@@ -36,10 +36,10 @@ def main():
     p.add_argument('--control',type=Path,required=True)
     p.add_argument('--parent-data',type=Path,required=True)
     p.add_argument('--out',type=Path,required=True)
-    p.add_argument('--stop-starting-at',required=True,help='UTC ISO time reserving time for final nsys/handoff')
+    p.add_argument('--stop-starting-at',help='optional UTC ISO budget; the fixed32cell inventory always bounds the run')
     a=p.parse_args()
-    deadline=datetime.fromisoformat(a.stop_starting_at)
-    if deadline.tzinfo is None:p.error('deadline must specify UTC timezone')
+    deadline=datetime.fromisoformat(a.stop_starting_at) if a.stop_starting_at else None
+    if deadline is not None and deadline.tzinfo is None:p.error('deadline must specify UTC timezone')
     if a.out.exists():p.error('preserve existing numerical/screening receipts')
     a.out.mkdir(parents=True)
     index=json.loads((a.builds/'index.json').read_text())
@@ -80,7 +80,7 @@ def main():
     for config in order:
         row=rows[config]
         if row['state']!='ADMISSION_PENDING':continue
-        if datetime.now(timezone.utc)>=deadline:break
+        if deadline is not None and datetime.now(timezone.utc)>=deadline:break
         directory=a.out/f'cell-{config:02d}';directory.mkdir()
         extension=next(Path(row['build']).glob('_gdn_fused_sm90*.so'))
         assert hashlib.sha256(extension.read_bytes()).hexdigest()==row['binary_sha256']
