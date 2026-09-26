@@ -1,9 +1,19 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 05:46:35 UTC
-working-on: complete; comparison and next SM90 target published, H800 idle, no production routing changes
-blocked-on: none for H800 measurement; native PPU1.7 still unavailable
-last-commit: 7c4e760 (published measured FlashQLA/FlashInfer verdict and evidence; this is a status-only checkpoint)
+updated-at: 2026-09-26 05:58:25 UTC
+working-on: isolated SM90 R1 register redistribution compile; goal is beat BOTH libraries' fastest admitted paths
+blocked-on: physical H800 idle window must be rechecked; native PPU1.7 SDK/model unavailable
+last-commit: 6bebe1d (published comparison checkpoint; R1 not yet admitted or promoted)
+
+## SM90 strongest-path target
+
+Task worktree /workspace/gdn-sm90-win-20260926/source; preregistered contract,
+candidate inventory and 07:30 UTC checkpoint in ../docs/plan.md. Priority is
+g=-0.1/-1 at B1/T2048/Hqk16/Hv32/D128, full-forward nsys kernel sums. Must beat
+FlashInfer no-CP (~111-112us) as well as FlashQLA auto (~164-166us), not only
+their slower paths. R1 copies the role register allocation24/104/192/192;
+arithmetic, synchronization, ABI and SM80 untouched. Native compile pending,
+numerics/timing NOT_RUN. Existing main binaries remain immutable.
 
 ## FlashQLA / FlashInfer comparison
 

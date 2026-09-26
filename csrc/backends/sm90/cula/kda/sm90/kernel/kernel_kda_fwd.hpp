@@ -46,8 +46,9 @@ get_register_requirements(
 #else
     uint32_t load_registers = 40;
 #endif
-    // TODO: better tuning
-    uint32_t total_aux_load_budget = 176;
+    // Leave two 192-register state warpgroups alongside LD/ST24 + auxiliary104.
+    // The auxiliary role must release its share before state can acquire it.
+    uint32_t total_aux_load_budget = 128;
     uint32_t aux_registers = total_aux_load_budget - load_registers;  // (24 + X) or (40 + X)
 
     uint32_t total_registers =
@@ -591,7 +592,7 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
         } else if (warp_group_role == WarpGroupRole::MathA) {
             DPRINTF0_WG(
                 "Compute[aux]: warp_group_idx:%d, RegisterRequirement:%d\n", warp_group_idx, AuxMmaRegisterRequirement);
-            cutlass::arch::warpgroup_reg_alloc<AuxMmaRegisterRequirement>();
+            cutlass::arch::warpgroup_reg_dealloc<AuxMmaRegisterRequirement>();
             auto work_desc = scheduler.get_next_work(params.scheduler, params.problem_size);
             CUTE_NO_UNROLL
             for (; work_desc.is_valid(params.scheduler);
