@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 05:33:38 UTC
-working-on: both libraries/gates measured; finalizing actual JIT image hashes and reproducible evidence
+updated-at: 2026-09-26 05:45:50 UTC
+working-on: comparison complete; final raw-trace replay and evidence publication
 blocked-on: none for H800 measurement; native PPU1.7 still unavailable
-last-commit: cd662dd (registered pinned reference harness and nsys denominator tests)
+last-commit: 05a08f5 (TVM-FFI actual CUDA image binding and host-only negative)
 
 ## FlashQLA / FlashInfer comparison
 
@@ -36,6 +36,16 @@ algorithm/dataflow improvements should subsequently inform SM80/PPU1.0,
 without trying to share TMA/WGMMA with its AIU implementation.
 Source unchanged; final rerun binds actual in-memory CuTeDSL cubins and loaded
 TileLang executable images, not only Python source or environment labels.
+
+Final216 forwards/864 kernels/312 monitor observations admitted,19 host
+checks PASS. Final FlashInfer noCP112.014/111.279us; auto130.430/129.374us;
+FlashQLA auto166.252/163.598us; noCP175.853/174.750us. Same-window CUDA
+incumbent357.548/355.020us, PPU-fork CUDA335.020/332.172us. No native PPU
+claim. Weak FlashQLA error1.4563% retained explicitly; no threshold change.
+Full breakdown/resources/ABI caveats/next SM90->SM80 boundary are in
+docs/SM90_FLASHQLA_FLASHINFER_20260926.md. Raw evidence archive SHA
+1a45f3c8507e94513c65e8fd7da63c96ab52d5f57fbc72adf4d38c032667ab8e.
+H800 idle at finish; no other work was killed or settings changed.
 
 ## cuLA / nsys comparison checkpoint
 
