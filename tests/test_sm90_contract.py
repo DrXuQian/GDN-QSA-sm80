@@ -88,8 +88,25 @@ class Contracts(unittest.TestCase):
     def test_scalar_gate_is_not_tma_byte_counted(self):
         src=(ROOT/"csrc/backends/sm90/cula/kda/sm90/kernel/kernel_kda_fwd.hpp").read_text()
         self.assertIn("alpha_pipeline_params.producer_arv_count = cutlass::NumThreadsPerWarp",src)
-        self.assertIn("alpha_pipeline_params.consumer_arv_count = NumStateMathThreads + NumAuxMathThreads + cutlass::NumThreadsPerWarp",src)
+        self.assertIn("alpha_pipeline_params.consumer_arv_count = AlphaConsumerThreads",src)
+        self.assertIn("+ (UsesAlphaLastPipeline ? cutlass::NumThreadsPerWarp : 0)",src)
         self.assertNotIn("alpha_pipeline_params.transaction_bytes",src)
+
+    def test_scalar_alpha_has_one_lifetime_channel(self):
+        aux=(ROOT/"csrc/backends/sm90/scalar_gdn_aux.cuh").read_text()
+        state=(ROOT/"csrc/backends/sm90/scalar_gdn_state.cuh").read_text()
+        self.assertIn("UsesAlphaLastPipeline = false",aux)
+        self.assertNotIn("smem_alpha_last",aux)
+        self.assertNotIn("ap.consumer_wait(ar)",aux.split("load_scalar_alpha",1)[1].split("compute_aux_safe",1)[0])
+        self.assertNotIn("alp.consumer_",state)
+        # The real alpha channel, unlike the redundant one, must outlive the
+        # update's WGMMA. Removing that release wait is a real data race.
+        def valid(text):
+            update=text.split("gemm(kv_mma,operand_delta",1)[1]
+            self.assertLess(update.index("warpgroup_wait<0>()"),update.index("ap.consumer_release(ar)"))
+        valid(state)
+        with self.assertRaises((AssertionError,ValueError)):
+            valid(state.replace("warpgroup_wait<0>(); warpgroup_fence_operand(h);", ""))
 
     def test_new_build_graph_and_single_launch_runner(self):
         launch=(ROOT/"csrc/backends/sm90/launch.cu").read_text()
