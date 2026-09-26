@@ -1,11 +1,26 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 11:16:52 UTC
-working-on: resumed S25 guarded auxiliary EX2 on immutable S24; no global fastmath
+updated-at: 2026-09-26 11:45:29 UTC
+working-on: S26 timing UNRESOLVED; S27/S25 sequential paired screenings; retain S24
 blocked-on: native PPU1.7 SDK/model unavailable; fastest FlashInfer target not yet met
-last-commit: 39218c9 (sealed prior evidence); S24 kernel bc3c154, test/native head06b7471
+last-commit: 9b8a5ba (resumed plan); S25 ab11c9b/S26 360bd17/S27 80b6d6f kernels
 
 ## Current checkpoint
+
+S25/S26/S27 all14CPU+parentfingerprint cases and2direct raw overflow stresses
+PASS; same errors. EX2 seam1,572,874inputs RAW/PASS, unguarded negative262560
+differences; actual197prefix-cases/all32lanes PASS. S25 C++guard if-converts
+both epilogues,124EX2sites vs64 and112Bstack; not compact. S27 single-path
+guard restores64EX2 and24/32Bstack, but range folded into still-executed
+FSETP.LT.AND (NOT comparator elimination). S26 stages identical arithmetic;
+full/tail553/635sites vs547/610, tail has15extra F2FP/45PRMT instead60FSEL.
+Its paired122.288[120.672,122.944]vsS24control120.655[119.903,121.151]us
+is UNRESOLVED, no promotion. FastestFI112.672us still wins.
+S26/S27 PPU3.6 CUDA source-check4body PASS; nativePPU17SKIP.
+S27thenS25weak nsys screening now sequential; no other ownGPUjobs.
+Inventory ends atS27; preserve S24 and all failed/inert evidence.
+
+### Resume registration
 
 User continued. Plan registered S25 before edit: per-chunk finite-prefix-range
 proof may bypass redundant per-element CUDAexp2f underflow sequence; preserve
