@@ -148,3 +148,22 @@ Chunk64, head-dim128 and512threads/two state WGs are still mathematical/layout
 constraints in this implementation, not implemented sweep axes. Extending
 them requires a separately proved decomposition and consumer layout. Do not
 emit unsupported rows or silently call a reference's one setting optimal.
+
+## Evidence archive
+
+`/workspace/gdn-sm90-win-20260926/remote-evidence-alignment-20260926T1410Z.tar.gz`
+is retained on both the local host and the authorized H800. It includes the
+S31–S35 raw builds/binaries, all five nsys captures and SQLite exports, numerical
+cases/stress captures/parent controls, source snapshots and the re-extraction
+programs. Initial failing build/check logs are preserved, not relabeled SKIP.
+Its nested `local-alignment-evidence-20260926T1408Z.tar.gz` contains actual
+native listings/identity gates, compiler proofs, CPU negatives and PPU3.6 CUDA
+source-check builds. No credentials or GPU-control changes are included.
+
+Outer archive:50,259,809bytes; SHA256
+`637488522cfff5e1b8b64e47d9d89fa79dd52169afff3300e4a127be01fa14f5`.
+Nested local evidence SHA256
+`fb5ae28956e7b7596c61976e48db212acf480bed64f8c69fcb251ec39f389a9b`.
+The two campaign manifests re-extract5captures/360complete forwards;
+`benchmark.csv` matches all5raw-derived records exactly. Strong-gate and QLA
+confirmation are intentionally NOT_RUN for these non-winning screenings.

@@ -1,11 +1,26 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 14:03:00 UTC
-working-on: S34 rejected by paired timing; S35 reference state-body writing passed 14 cases and native identity, final native gate then paired profile
+updated-at: 2026-09-26 14:10:45 UTC
+working-on: S31-S35 evidence sealed; final archive-member verification and handoff; retain S24, no default changes
 blocked-on: native PPU1.7 SDK/model unavailable; fastest FlashInfer target not yet met
-last-commit: a6eb544; S35 kernel d5fda8b/proof ee029a4; S34 head154925f; incumbent S24 bc3c154/head06b7471 unchanged
+last-commit: d48d33a; S35 kernel d5fda8b/head9a39fce; S34 head154925f; incumbent S24 bc3c154/head06b7471 unchanged
 
 ## Current checkpoint
+
+FINAL inventory: S34 reference-delivery128.8165vs120.704us loses; S35
+reference-state119.9985[118.847,120.863]vs120.831[119.967,121.375]us is
+UNRESOLVED. FI noCP112.927us wins. No new promotion; beat-both NOT MET.
+All5captures/360fullforwards exactly re-extracted; CSV5/5 matches. Each of
+S31-S35 passed14CPU+parentfingerprints,2direct-byte stresspairs,8replay and
+everycapturedoutput; host suites38/38/39/41/38 PASS. Failed initialchecks
+retained. S35 static4->3clones/F2F128->0 is not less dynamic GEMM work.
+All5 PPU3.6 CUDA source-check PASS, nativePPU1.7 SKIP unavailable.
+No fullconfig sweep: next bounded space proposed is32stage tuples before
+admission; geometry/2stateWGs still fixed. Main/default/actualSM80 unchanged.
+Archive local/remote50,259,809B, SHA
+637488522cfff5e1b8b64e47d9d89fa79dd52169afff3300e4a127be01fa14f5.
+Reports SM90_INVERSE_PROTOCOL_20260926.md / SM90_FLASHINFER_ALIGNMENT_20260926.md.
+H800 idle on query; no ownGPUjob. OwnSSHcontrol-r6 remains for finalclosure.
 
 14:03 checkpoint: S34 complete reference stages/publication profile loses
 128.8165[127.425,129.601]us vs S24 120.704[120.129,121.761]; no promotion.

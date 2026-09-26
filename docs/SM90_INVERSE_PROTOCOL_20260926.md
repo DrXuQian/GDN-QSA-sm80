@@ -79,3 +79,8 @@ pipeline** differences before more micro-edits. The subsequent source/SASS
 ledger and coupled reference profile are separate work in
 [SM90_FLASHINFER_ALIGNMENT_20260926.md](SM90_FLASHINFER_ALIGNMENT_20260926.md).
 There has not yet been a complete configuration sweep.
+
+All S31–S33 raw evidence is sealed together with S34/S35; the archive path,
+hashes and explicit no-promotion conclusions are recorded in that alignment
+report's Evidence archive section. This closes the inventory, not the
+remaining fastest-FlashInfer performance gap.
