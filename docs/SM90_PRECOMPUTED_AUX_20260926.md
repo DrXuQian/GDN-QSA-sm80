@@ -1,7 +1,8 @@
 # S47/S48: independent auxiliary preparation, complete-forward accounting
 
 S47 is **not promoted**. Its B2 counterexample survives same-input nsys.
-S48 is a separate registered geometry experiment, currently device-pending.
+S48 is also rejected: it produces no new winner in the registered four-cell
+screen against S24/S38/S47. Both unsuccessful candidates remain archived.
 The expanded14-workload goal remains unmet; H800 remains on. This is CUDA
 SM90a/H800 evidence, not native PPU1.7 performance.
 
@@ -91,7 +92,7 @@ reject extra kernels. Missing prepare, missing build binding, wrong ordering/
 stream or a reduced denominator fails. A constructed fast-state/slower-total
 trace is correctly a loss, not an apparent speed win.
 
-## S48 hypothesis and current boundary
+## S48 hypothesis and closed screen
 
 Registered before edits in
 `/workspace/gdn-sm90-precomputed-v128-20260926/docs/plan.md`; source164560e.
@@ -104,6 +105,25 @@ to one CTA/SM: an explicit underfill tradeoff, not free sharing.
 
 Local CUDA all six bodies pass with zero stack/spill. State168static registers,
 explicit state192/state192/load24,384threads,118528Bdynamicshared. Actual
-two-WG operand maps and source-bound pipeline progress pass. Device numerics,
-four-arm screen(S24,S38,S47,S48), and complete-call reference timing are still
-pending. No performance or routing claim is attached to these compile facts.
+two-WG operand maps and source-bound pipeline progress pass. All14 fixed
+parent-raw/CPU numerical cases and2 extreme-gate stresses pass. Actual resource
+queries confirm one state CTA/SM and four prepare CTAs/SM. Local and remote
+CUDA SASS are identical, SHA256
+`97138b7088da794c020118c178b2bda8701e75e952aab120e4735bde85150fcb`.
+PPU CUTLASS3.6 source-check passes; native PPU1.7 remains SKIP.
+
+The registered graph screen counts both launches, checks8 direct repeats and
+all64 captured outputs per cell, and alternates/reverses the four arms:
+
+| Workload/gate | S24 us | S48 us | S47 us | S38 us |
+|---|---:|---:|---:|---:|
+| B1,-0.1 |115.750|114.252|104.710|91.302|
+| B1,-1 |116.104|114.188|104.392|91.060|
+| B2,-0.1 |117.570|164.126|157.700|191.546|
+| B2,-1 |117.662|163.986|157.612|191.490|
+
+S48 loses S47 and the best immutable incumbent in all four cells. Lower
+logical duplicate traffic is real but did not produce a speed improvement.
+No full reference-matrix rerun is justified for this rejected candidate.
+These graph values are screening spans, not replacements for the frozen
+matrix's nsys kernel sums. No default routing or SM80 change.

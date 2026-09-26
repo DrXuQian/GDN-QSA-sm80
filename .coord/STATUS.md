@@ -1,11 +1,21 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 18:53:03 UTC
-working-on: S47 complete-call diagnostics closed/rejected; S48 V128 native/maps pass, remote build then fixed numerics underway
+updated-at: 2026-09-26 19:06:00 UTC
+working-on: S47/S48 closed with no new winner; archive evidence, inspect bounded paired O1/SK scheduling on immutable S24
 blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: 57aa0b1 main; S47 8bd9fe4; S48 164560e; prepared harness364535e
+last-commit: 6315f2f main; S47 8bd9fe4; S48 164560e; prepared harness364535e
 
 ## Current checkpoint
+
+2026-09-26 19:06:00 UTC: S48 all14fixedCPUparentraw+2stressPASS, four-arm
+screen4/4complete, all8direct/64graphoutputsPASS. B1 S48~114us losesS38~91
+andS47~104; B2 S48~164 losesS24~117 andS47~157. Reject, no reference-matrix
+rerun for this nonfinalist. Local/remote native SASS identical, zero spills;
+PPU3.6CUDA sourcecheckPASS/nativePPU17SKIP. Allraw S48 artifacts copiedlocal.
+S47 also closed/rejected; best old incumbents retained. Next readonly check:
+O1 andSK use identical rounded H operands but retire separately; inspect
+paired issue/liveness before a bounded candidate, not another traffic-only
+rewrite. Device19:02:46 exacthost/UUID,0MiB/0%/no computeprocess. H800ON.
 
 2026-09-26 18:53:03 UTC: S47 14CPUparentraw+2extremesPASS, actualprepare4/state2
 CTA slots,69CPUharness testsPASS(CUDAhidden). Graph2B1winsS24/2B2losses.
