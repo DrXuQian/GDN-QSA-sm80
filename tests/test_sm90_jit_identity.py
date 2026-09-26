@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "benchmarks"))
-from sm90_jit_identity import tilelang_images
+from sm90_jit_identity import tilelang_images as collect, cuda_image
 
 
 class MemoryPath:
@@ -20,16 +20,20 @@ class MemoryPath:
         pass
     def read_bytes(self):
         return self.files[self.name]
+    def write_bytes(self, data):
+        self.files[self.name] = data
 
 
 class Module:
     def __init__(self, kind, children=(), machine=190):
         self.kind, self.imports, self.machine = kind, list(children), machine
-    def get_write_formats(self):
-        return ["cubin"]
-    def write_to_file(self, path, fmt):
-        assert self.kind == "cuda" and fmt == "cubin"
-        MemoryPath.files[path] = b"\x7fELF" + bytes(14) + self.machine.to_bytes(2, "little") + bytes(44)
+    def packed(self):
+        data = b"\x7fELF" + bytes(14) + self.machine.to_bytes(2, "little") + bytes(44)
+        return b"serialized-metadata" + len(data).to_bytes(8, "little") + data
+
+
+def tilelang_images(kernels, out):
+    return collect(kernels, out, lambda m: m.packed())
 
 
 def kernel(executable):
@@ -63,6 +67,13 @@ class Identity(unittest.TestCase):
             tilelang_images({"wrong": kernel(Module("cuda", machine=62))}, MemoryPath())
         with self.assertRaisesRegex(RuntimeError, "no live TileLang"):
             tilelang_images({}, MemoryPath())
+
+    def test_truncated_or_unbound_serialized_extent_is_red(self):
+        packed = Module("cuda").packed()
+        self.assertEqual(len(cuda_image(packed)), 64)
+        for bad in (packed[:-1], packed + b"extra", packed.replace((64).to_bytes(8, "little"), (63).to_bytes(8, "little"))):
+            with self.assertRaisesRegex(RuntimeError, "exact serialized extent"):
+                cuda_image(bad)
 
 
 if __name__ == "__main__":
