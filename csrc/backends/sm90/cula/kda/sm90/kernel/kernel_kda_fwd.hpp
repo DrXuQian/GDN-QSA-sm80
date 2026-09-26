@@ -46,9 +46,9 @@ get_register_requirements(
 #else
     uint32_t load_registers = 40;
 #endif
-    // Leave two 192-register state warpgroups alongside LD/ST24 + auxiliary104.
+    // S30: two184-register state WGs alongside LD/ST24 + auxiliary120.
     // The auxiliary role must release its share before state can acquire it.
-    uint32_t total_aux_load_budget = 128;
+    uint32_t total_aux_load_budget = 144;
     uint32_t aux_registers = total_aux_load_budget - load_registers;  // (24 + X) or (40 + X)
 
     uint32_t total_registers =
