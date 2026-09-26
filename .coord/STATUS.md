@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 12:01:47 UTC
-working-on: bounded S25-S27 inventory closed; S24 retained; final report push
+updated-at: 2026-09-26 12:03:26 UTC
+working-on: bounded S25-S27 inventory closed and pushed; S24 retained
 blocked-on: native PPU1.7 SDK/model unavailable; fastest FlashInfer target not yet met
-last-commit: 4aabba3 (exact nsys evidence); S25/S26/S27 test branches pushed
+last-commit: 813642d (completed report/evidence before this status-only seal)
 
 ## Current checkpoint
 
@@ -14,7 +14,7 @@ SHAea8b88aee11c3d8483ff0ce05f2d9695ad01967923a074a20df6c33c2185adf0.
 S25 testhead7685af4, S26 0c94a8f, S27 a82ddc1 pushed, clean.14cases each,
 2direct-byte stress pairs each,40/38/40host tests all PASS; device negative
 omittedprefix catches160laneflags. Skillreference scopedlesson updated and
-validated. Current H800 idle; only own SSH master awaits archive handoff.
+validated. H800 idle at handoff; own SSH control-r4 closed; no own GPU job.
 S24 still beats historical fastest QLA, still loses current fastest FI;
 beat-both target NOT MET. NativePPU17 SKIP; default/SM80unchanged.
 
