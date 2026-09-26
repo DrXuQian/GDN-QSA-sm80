@@ -30,6 +30,29 @@ void check(int plant) {
     constexpr auto layout = Mainloop::SmemLayoutKK{};
     auto mma = Mainloop::TiledMmaQK{};
     auto writer = make_tiled_copy_C(Copy_Atom<SM90_U32x4_STSM_N, cutlass::half_t>{}, mma);
+    using Writer = decltype(writer);
+    constexpr auto atom_source = typename Writer::AtomLayoutSrc{};
+    constexpr auto atom_destination = typename Writer::AtomLayoutDst{};
+    constexpr int atom_threads = Writer::AtomNumThr::value;
+    constexpr int atom_values = Writer::AtomNumVal::value;
+    static_assert(atom_threads == 32 && atom_values == 8);
+    // STSM is a cross-lane matrix operation: source and destination views
+    // cannot be zipped within one thread. Compose the real atom's TV maps.
+    std::array<std::pair<int, int>, atom_threads * atom_values> routes;
+    for (int lane = 0; lane < atom_threads; ++lane) {
+        for (int value = 0; value < atom_values; ++value) {
+            int hits = 0;
+            for (int dl = 0; dl < atom_threads; ++dl) {
+                for (int dv = 0; dv < atom_values; ++dv) {
+                    if (atom_source(lane, value) == atom_destination(dl, dv)) {
+                        routes[lane * atom_values + value] = {dl, dv};
+                        ++hits;
+                    }
+                }
+            }
+            require(hits == 1);
+        }
+    }
     auto identity = make_identity_tensor(Shape<_64, _64>{});
     // Real 16-bit shared-pointer view required by the actual STSM trait. Tags
     // are physical half-element offsets, not numeric fp16 values or bytes.
@@ -47,7 +70,12 @@ void check(int plant) {
                 require(size(source) == size(destination));
                 for (int i = 0; i < size(source); ++i) {
                     auto [row, col] = source(i);
-                    int r = int(row), c = int(col), offset = destination(i);
+                    auto [lane, value] = routes[(tid % atom_threads) * atom_values + i % atom_values];
+                    auto target = writer.get_slice((tid / atom_threads) * atom_threads + lane)
+                                        .partition_D(physical(_, _, stage));
+                    int offset = target((i / atom_values) * atom_values + value);
+                    if (plant == 5) offset = destination(i);  // stale lane-local zip
+                    int r = int(row), c = int(col);
                     require(r >= 0 && r < 64 && c >= 0 && c < 64);
                     require(offset == layout(r, c, stage));
                     ++owners.at(offset);
@@ -73,12 +101,12 @@ void check(int plant) {
 
 int main() {
     check(0);
-    for (int plant = 1; plant <= 4; ++plant) {
+    for (int plant = 1; plant <= 5; ++plant) {
         bool rejected = false;
         try { check(plant); } catch (std::runtime_error const&) { rejected = true; }
         require(rejected);
     }
     std::cout << "inverse unit input: actual MMA/STSM writer 64tails*2stages*4096cells "
                  "byte-equal normalized input; old-diagonal/upper/padded-diagonal/missing-owner "
-                 "EXPECTED_RED/PASS\n";
+                 "/lane-local-zip EXPECTED_RED/PASS\n";
 }
