@@ -1,11 +1,23 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 13:28:16 UTC
-working-on: S31 loss/S32 unresolved; S33 unused scalar alpha-last channel removal compiled, native/protocol audit
+updated-at: 2026-09-26 13:45:36 UTC
+working-on: user-directed full FlashInfer pipeline alignment S34; actual stages/resources compiled, raw admission next
 blocked-on: native PPU1.7 SDK/model unavailable; fastest FlashInfer target not yet met
-last-commit: 9f621ec; candidates S31 576d94f/S32 675983d/S33 0cb0091; incumbentS24 unchanged
+last-commit: 3397d00; S34 kernel1736ecb/proofb290d18; incumbentS24 bc3c154/head06b7471 unchanged
 
 ## Current checkpoint
+
+S31-S33 CLOSED loss/unresolved/unresolved;42CPUcases/6directstresses/216
+profiledforwards exactly re-extracted;no newwinner. User corrected methodology:
+source/SASS audit first,then modify,asks config sweep. Honest answer:NO full
+config sweep exists. Added docs/SM90_FLASHINFER_ALIGNMENT_20260926.md;
+unclosedstages Q/K/V/O2/2/1/1 vs2/3/2/2,metadata2vs5 are material omissions.
+S34 independently matches the FULL reference delivery profile inclKQV,
+KKpublishbeforeQKacquire,alpha384/beta128; no arithmetic/exp2/precisionchange.
+Actual4types compile Q2K3V2O2alpha5beta5,224256Bshared; local/fullremote build
+PASS, native/rawadmission inprogress. DefaultvectorKDAstage values retained
+via explicitoptions;actualSM80/routing untouched. This is a newly user-directed
+alignment inventory, not more blind inverse edits.14:00checkpoint/14:30handoff.
 
 S32 packedhalf all14CPU+parent fingerprints/2rawstress PASS. Actualfragment
 33,554,432scalar checks raw_bad0, swapped/dropped negatives red. All4native
