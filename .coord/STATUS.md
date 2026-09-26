@@ -1,11 +1,23 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 10:44:08 UTC
-working-on: S24 relative-decay cache admission completed; paired full-forward timing next
+updated-at: 2026-09-26 10:52:57 UTC
+working-on: S24 confirmed in all four paired windows; sealing source/native/raw-trace evidence
 blocked-on: native PPU1.7 SDK/model unavailable; fastest FlashInfer target not yet met
-last-commit: 87530ec (main checkpoint); S24 kernel bc3c154, native-gate cb682f3
+last-commit: 11b20a9 (main checkpoint); S24 kernel bc3c154, complete test/native head06b7471
 
 ## Current checkpoint
+
+S24 WIN versus S21 in all4 paired windows: FI123.681/121.281us vs control
+128.641/126.721, but fastestFI114.337/112.1765 still wins (~8.1% gap).
+QLA119.169/120.0965us vs fastestauto165.057/163.137:WIN1.385x/1.358x.
+Target NOT MET.14CPU+parentfingerprint cases,2direct byte-overflow stresses,
+8repeat/everycapturedoutput,38hosttests,compiled real-map negatives and4body
+native gates PASS. Eleven captures/744forwards exactly re-extracted using
+originalPython3.12. Ledger/CSV updated; sourcebranch06b7471 pushed.
+S22/S23 remain measured losses; no default/SM80 promotion. GPU work finished,
+only CPU evidence archival remains. NativePPU17 remains unavailable/SKIP.
+
+### Admission checkpoint (superseded)
 
 S21 is confirmed faster than S19 and QLA in both gate regimes, but slower
 than fastest FI. S22 valid retry139.5525 versus135.4085us LOSES; S23 combined
