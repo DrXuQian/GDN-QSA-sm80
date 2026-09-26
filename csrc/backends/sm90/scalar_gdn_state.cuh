@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 #include "scalar_gdn_aux.cuh"
+#include "fragment_convert.cuh"
 
 namespace gdn::sm90 {
 
@@ -148,8 +149,11 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
                 CUTE_UNROLL
                 for (int i=0; i<size(residual); ++i) {
                     auto [dv,t] = c_output(i);
-                    residual(i) = residual(i)-Element(acc_sk(i)*smem.gate_factors[ar.index()*128+t]);
+                    acc_sk(i) *= smem.gate_factors[ar.index()*128+t];
                 }
+                auto scaled_sk = convert_fragment<Element>(acc_sk);
+                CUTE_UNROLL
+                for (int i=0; i<size(residual); ++i) residual(i) = residual(i)-scaled_sk(i);
             }
             kkp.consumer_wait(kkr);
             bp.consumer_wait(br);
