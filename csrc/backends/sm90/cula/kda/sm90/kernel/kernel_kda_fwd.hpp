@@ -207,6 +207,11 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
     static constexpr uint32_t LdStRegisterRequirement = get<0>(RegisterRequirements);
     static constexpr uint32_t StateMmaRegisterRequirement = get<1>(RegisterRequirements);
     static constexpr uint32_t AuxMmaRegisterRequirement = get<2>(RegisterRequirements);
+#ifdef GDN_SM90_STATE_OUTPUT_STASH
+    static_assert(SharedStorageSize == 201728, "S24 shared plus exact32KiB FP32 stash");
+    static_assert((LdStRegisterRequirement + AuxMmaRegisterRequirement +
+                   2 * StateMmaRegisterRequirement) * 128 == 65536);
+#endif
 
     static size_t
     get_workspace_size(Arguments const& args) {
@@ -609,7 +614,13 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
         } else if (warp_group_role == WarpGroupRole::MathA) {
             DPRINTF0_WG(
                 "Compute[aux]: warp_group_idx:%d, RegisterRequirement:%d\n", warp_group_idx, AuxMmaRegisterRequirement);
+#if defined(GDN_SM90_STATE_OUTPUT_STASH) && GDN_SM90_STATE_OUTPUT_STASH == 2
+            // The role now requests more than the128-register entry budget.
+            // setmaxnreg.dec cannot express that allocation (C7406).
+            cutlass::arch::warpgroup_reg_alloc<AuxMmaRegisterRequirement>();
+#else
             cutlass::arch::warpgroup_reg_dealloc<AuxMmaRegisterRequirement>();
+#endif
             auto work_desc = scheduler.get_next_work(params.scheduler, params.problem_size);
             CUTE_NO_UNROLL
             for (; work_desc.is_valid(params.scheduler);
