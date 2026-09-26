@@ -1,9 +1,22 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 09:19:44 UTC
-working-on: bounded follow-up closed; S19 confirmed incumbent, final evidence handoff
-blocked-on: native PPU1.7 SDK/model unavailable; two-library speed target remains NOT MET
-last-commit: 15a7ed7 (completed report/evidence); S19 kernel64691d1; all experiment branches pushed
+updated-at: 2026-09-26 10:15:24 UTC
+working-on: S21 final-mask device timing; S22 inverse in-place native proof; S20 measured loss
+blocked-on: native PPU1.7 SDK/model unavailable; physical H800 speed target remains NOT MET
+last-commit: 0c4983a (prior final status); immutable incumbent S19 kernel64691d1
+
+## Current checkpoint
+
+S20 kernel973c23b:14cases/parent fingerprints +8replay/everycall PASS;
+full-forward nsys136.1445us vs S19control133.457us, disjoint LOSE. No promotion.
+S21 kernelc5907c6: full pre-inverse native621->547sites; exact math/conversion/
+data-barrier counts unchanged.14cases/parent fingerprints PASS; separate
+g=-8/-10000 overflow stress passes unchanged2% oracle and direct parent raw
+output/state comparison. Normal admitted[-1,0] harness remains unchanged.
+S22 kerneldb16d80: diagonal21FFMA/21SHFL unchanged; native in-place updates
+6->21, row copies35->0. Whole stack24->40B; not yet numerically/timing admitted.
+No default/SM80/nativePPU17 claim. H800 SSH socketssh-control-r3; candidates
+isolated under/workspace/gdn-sm90-win-20260926. Handoff11:15 UTC.
 
 ## Active SM90 campaign
 
