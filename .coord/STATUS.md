@@ -1,11 +1,24 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 13:18:00 UTC
-working-on: S31 measured loss; S32 registered packed-half inverse reduction on immutable S24
+updated-at: 2026-09-26 13:28:16 UTC
+working-on: S31 loss/S32 unresolved; S33 unused scalar alpha-last channel removal compiled, native/protocol audit
 blocked-on: native PPU1.7 SDK/model unavailable; fastest FlashInfer target not yet met
-last-commit: 9083af3; S31 branch576d94f pushed; immutable incumbentS24 bc3c154/head06b7471
+last-commit: 9f621ec; candidates S31 576d94f/S32 675983d/S33 0cb0091; incumbentS24 unchanged
 
 ## Current checkpoint
+
+S32 packedhalf all14CPU+parent fingerprints/2rawstress PASS. Actualfragment
+33,554,432scalar checks raw_bad0, swapped/dropped negatives red. All4native
+local/measured bodies identical; fullinverse16HADD2+8PRMT->8HADD2, but
+parenttail ALREADY8/0 (initial checker assumption rejected/corrected before
+timing). Pairednsys121.9365[120.800,122.624]vsS24
+120.592[119.776,121.536]us: UNRESOLVED, no promotion; FI113.0565us.
+S33 BEFOREEDIT registration at13:24: scalar state never reads alpha-last;
+remove duplicate128-float copy and dynamic wait/publication, alpha consumers
+416->384, vectorKDA unchanged. Realbuilder4specializations+all bounded ring
+interleavings proof compiled; stale416/omittedconsumer negatives. No math,
+sharedlayout,register budget or WGMMA ordering change. Native/build audit
+underway. Third/final candidate of inventory; checkpoint/handoff retained.
 
 S31 all14CPU/parent fingerprints,2overflow raw stresses,8replay/everycall
 PASS. Native diagonal selectors17/18->7 but wholebody+80sites and spills
