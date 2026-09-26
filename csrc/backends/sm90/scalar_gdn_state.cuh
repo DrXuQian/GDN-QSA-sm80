@@ -85,7 +85,7 @@ struct ScalarGdnState : ScalarGdnAux<Base> {
             clear(h);
         }
 
-        auto inverse = [&]() {
+        auto inverse = [&]() __attribute__((always_inline)) {
             auto slice = kk(_,_,kkr.index());
             typename Base::CollectiveInverse solve(Barriers::StateMathWG0);
             solve.compute(slice);
@@ -105,7 +105,7 @@ struct ScalarGdnState : ScalarGdnAux<Base> {
             copy(st,s.retile_S(operand_bf16),s.partition_D(kk_operand(_,_,kkr.index())));
         };
 
-        auto body = [&](int chunk, auto first_tag, auto last_tag) {
+        auto body = [&](int chunk, auto first_tag, auto last_tag) __attribute__((always_inline)) {
             constexpr bool first = decltype(first_tag)::value;
             constexpr bool last = decltype(last_tag)::value;
             int valid = last ? int(work.seq_len-chunk*64) : 64;

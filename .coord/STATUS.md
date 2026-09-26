@@ -1,9 +1,18 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 05:58:25 UTC
-working-on: isolated SM90 R1 register redistribution compile; goal is beat BOTH libraries' fastest admitted paths
-blocked-on: physical H800 idle window must be rechecked; native PPU1.7 SDK/model unavailable
-last-commit: 6bebe1d (published comparison checkpoint; R1 not yet admitted or promoted)
+updated-at: 2026-09-26 06:19:00 UTC
+working-on: SM90 scalar GDN state specialization; S1 passes numerics and improves210.8us but target112.5us remains unmet
+blocked-on: no H800 blocker currently; native PPU1.7 SDK/model unavailable
+last-commit: cc84c93 (S2 experiment, inline-lambda correction and device admission pending)
+
+R1 four bodies/noC7512/14cases raw-bit equal; nsys weak401.563/strong401.404us
+versus357.436/356.861us control: REJECT standalone register change. S1 full
+BF16 QK/KK then scalar gate:14/14CPU-oracle PASS, weak210.782us versus355.149us
+control/FI112.479us; strong confirmation running. S2 state gate specialization
+has72FP64 proofs + reverse-decay negative. First compile outlined a hot lambda,
+creating C7510 and1520Bstack; local gate caught it before device timing. Correct
+with explicit inlining, then recheck codegen and14cases. No route promotion,
+SM80 untouched; main/baseline binaries stay immutable.
 
 ## SM90 strongest-path target
 
