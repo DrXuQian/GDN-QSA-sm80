@@ -1,11 +1,28 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 15:45:33 UTC
+updated-at: 2026-09-26 16:05:08 UTC
 working-on: frozen S24/S38 multi-workload admission; 14 workloads x2 gates x2 libraries, sequential nsys captures
 blocked-on: native PPU1.7 SDK/model unavailable; expanded speed coverage pending (not blocked on user)
-last-commit: 8a4f454 primary result/expanded-scope report; multi-workload recorder71534d6; S38 kernelc490c8d immutable
+last-commit: c9be6ce multi-workload counterexample; matrix71534d6, stash81dac54, loaderc5c0584 published
 
 ## Current checkpoint
+
+16:03 checkpoint: frozenmatrix27/56PASS atlastreanalysis,0numericFAIL;
+1788fullforwards exactSQLite. T8192S38~359/361vsFIauto353/353us LOSESbothgates;
+tail2051S38~102vsFI113us winssofar. Completeall56 beforegeneralclaim.
+HostCPU suite48PASS (CUDA_VISIBLE_DEVICES empty). Localfullsuite cannotimport
+Torch:environmenterrors retained, notcalledPASS; newlocalmetadata6PASS/4SKIP.
+Followupseparatecandidates registeredbeforeedit, CPU-onlywhilematrixGPUruns:
+S39 FP32O1stash+32KiBshared/64KiBperchunktraffic; S40same+aux168/state160.
+S40firstcompileC7406 was incorrectdealloc168, fixedalloc; all4nativebodiesnow
+asynchronous/noC7512, but32..100Bspilltraffic => NOTapresumedwin. Native
+matrix/retirementcountsunchanged;actualshared201728Basserts;8192slotproof+
+3mapnegatives,4native negativesPASS. Local/remoteSASSidentical.
+S41loader24->32onS38:actualspillpairinloader,notaux; all4nativezero-spill,
+roles32/232/192literal,3negativesPASS,local/remoteSASSidentical.
+S39/S40/S41 device numerics/timing NOT_RUN; PPU3.6CUDA sourcechecksrunning
+locally sessions44653/63102/37097. NeveroverlapGPUwithmatrix52749.
+MachineON; expandedtargetNOTMET; noautomaticroutingorSM80changes.
 
 15:45 UTC: expanded matrix10/56 capturePASS,0numericFAIL,1running,45pending.
 Oldanchor4/4 reproducesS38win. B2bothgates: S38~194/197us vsS24~125/127us
