@@ -1,11 +1,21 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 15:09:09 UTC
-working-on: S36 closed32/32+4nsys no winner; S37/S38 V64 disjoint-CTA maps/local native pass, remote builds in progress
+updated-at: 2026-09-26 15:14:53 UTC
+working-on: S37/S38 all14CPU+2rawstresses+8replay PASS; events94.7/92.5us vs117us; final paired FI/QLA nsys running
 blocked-on: native PPU1.7 SDK/model unavailable; fastest FlashInfer target not yet met
-last-commit: 2a035c3 main checkpoint; S36 source8f513e2; S37/S38c490c8d; incumbent S24 unchanged
+last-commit: f3c6a87 stage report; S36a1b880d; S37/S38 kernelc490c8d tests c352173; S24 control unchanged
 
 ## Current checkpoint
+
+15:15 checkpoint: both V64 variants all14CPU/parentfingerprints + two direct
+byte overflow stresspairs + 8replay/everycapturedoutput PASS;38hosttestsPASS.
+Graph-screen S37~94.7/95.3us,S38~92.5/92.5us versus S24~117us; NOT final
+speed verdict. S37weakFI and S38bothgatesFI+QLA sequential nsys job36895.
+Local/remote native4bodies preserve matrix/completion;actual roles24/104or232/192,
+spill16B/8B,noC7512. PPU3.6S38 sourcecheckPASS;nativePPU17 unavailableSKIP.
+Off-flag default recompilation nativeidentity FAIL27840vs27856sites: retained
+as a failed check, not called unchanged. Actual control remains immutableS24;
+main production/SM80 untouched. Goal still unadmitted;H800 remainsON.
 
 15:09 UTC: S36 COMPLETE32/32 compiled/native/numeric/screened;0pending.
 4finalistcaptures/288fullforwards re-extracted EXACT; O2/beta5 candidates
