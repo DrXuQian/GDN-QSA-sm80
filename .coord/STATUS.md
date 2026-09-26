@@ -1,11 +1,18 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 17:12:07 UTC
-working-on: 56-case frozen inventory closed; three admitted followups in paired graph screening, nsys required for winners
+updated-at: 2026-09-26 17:23:36 UTC
+working-on: 56-attempt matrix archived locally; S41 six-cell nsys confirmation; S42 shared-H experiment registered before edits
 blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: 24c3bd8 reference-failure checkpoint; matrixd690350, stash81dac54, loaderc5c0584 published
+last-commit: 4b33948 full matrix report; matrix5180295, stash81dac54, loaderc5c0584
 
 ## Current checkpoint
+
+17:23 UTC: all12 paired graph screens complete. S39/S40 lose all4 cells each;
+S41 ~0.5us T2048 graph gain, T8192 UNRESOLVED. No speed promotion from graph.
+Six nsys confirmations registered, sequential H800 capture session84668.
+S42 V128/one state WG/shared BF16 H registered; CPU-only work while GPU busy.
+Frozen56-attempt archive copied locally, SHA7940961bd67962ca6cca1db3c0b9f27551cc397e82d3838fa0a7c05f14835792
+matches remote. All losses and reference numeric failure preserved. H800 ON.
 
 17:11 checkpoint: frozen matrix55valid captures/1reference numeric failure,
 0pending. All3636 validfullforwards exactSQLite re-extracted, localPython3.12
