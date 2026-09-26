@@ -11,9 +11,11 @@ SOURCE = Path(__file__).resolve().parents[1] / "csrc/backends/sm90/scalar_gdn_au
 
 
 def admit(text):
-    assert "float decay = exp2f(row_log-col_log);" in text
-    assert "Element(live ? acc_qk(i) * decay * params.scale : 0.f)" in text
-    assert "Inverse(live ? acc_kk(i) * row_beta * decay : 0.f)" in text
+    assert "float decay = exp2f(alpha(row,0,ar.index())-alpha(col,0,ar.index()));" in text
+    assert text.index("acc_kk(i) = acc_kk(i) * beta(row,br.index());") < text.index("acc_kk(i) = acc_kk(i) * decay;")
+    assert "acc_qk(i) = acc_qk(i) * decay * params.scale;" in text
+    assert "Element(live ? acc_qk(i) : 0.f)" in text
+    assert "Inverse(live ? acc_kk(i) : 0.f)" in text
     assert "__exp2f" not in text and "fast_math" not in text
 
 
@@ -21,8 +23,7 @@ class FinalMask(unittest.TestCase):
     def test_source_and_missing_final_select(self):
         text = SOURCE.read_text(); admit(text)
         with self.assertRaises(AssertionError):
-            admit(text.replace("Element(live ? acc_qk(i) * decay * params.scale : 0.f)",
-                               "Element(acc_qk(i) * decay * params.scale)"))
+            admit(text.replace("Element(live ? acc_qk(i) : 0.f)", "Element(acc_qk(i))"))
 
     def test_unused_overflow_cannot_escape(self):
         # Independent output-mask property: include Inf, NaN (0*Inf),
