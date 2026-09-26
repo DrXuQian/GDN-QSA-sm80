@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 03:57:37 UTC
-working-on: integration and H800 validation complete; publishing tested harnesses/raw evidence and handoff
+updated-at: 2026-09-26 04:00:08 UTC
+working-on: integration and H800 validation completed/published; no default promotion
 blocked-on: none for source/H800 numerical handoff; NCU permissions and native PPU1.7 SDK/model remain unavailable
-last-commit: ccd6703 (published integration; tested local 33b6b9c has identical tree)
+last-commit: be8f2d5 (published H800 validation; tested local 459bf12 has identical tree)
 
 ## SM90 algorithm integration
 
@@ -59,6 +59,8 @@ Final local replay:13 SM90 tests (72 algebra cases included),26 boundary tests
 PASS; no production kernel source changed since published integration. Final
 performance evidence is hash-bound to the committed benchmark script; earlier
 blocked/partial runs remain in the first archive, not used in the final table.
+Published be8f2d5c717b42eb46356cd03e3686378d80692e, tree1e6917b9 matches
+tested local459bf12. Remote GPU idle at handoff; no project GPU process remains.
 
 ## Boundary implementation in progress
 
