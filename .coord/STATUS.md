@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 05:45:50 UTC
-working-on: comparison complete; final raw-trace replay and evidence publication
+updated-at: 2026-09-26 05:46:35 UTC
+working-on: complete; comparison and next SM90 target published, H800 idle, no production routing changes
 blocked-on: none for H800 measurement; native PPU1.7 still unavailable
-last-commit: 05a08f5 (TVM-FFI actual CUDA image binding and host-only negative)
+last-commit: 7c4e760 (published measured FlashQLA/FlashInfer verdict and evidence; this is a status-only checkpoint)
 
 ## FlashQLA / FlashInfer comparison
 
