@@ -1,11 +1,21 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 10:56:15 UTC
-working-on: bounded S20-S24 inventory complete; S24 confirmed incumbent; beat-both target NOT MET
+updated-at: 2026-09-26 11:16:52 UTC
+working-on: resumed S25 guarded auxiliary EX2 on immutable S24; no global fastmath
 blocked-on: native PPU1.7 SDK/model unavailable; fastest FlashInfer target not yet met
-last-commit: 2ac547c (report/evidence pushed); S24 kernel bc3c154, test/native head06b7471 pushed
+last-commit: 39218c9 (sealed prior evidence); S24 kernel bc3c154, test/native head06b7471
 
 ## Current checkpoint
+
+User continued. Plan registered S25 before edit: per-chunk finite-prefix-range
+proof may bypass redundant per-element CUDAexp2f underflow sequence; preserve
+generic fallback, all rounding/masks and parent raw gates. ActualSASS has
+FSETP(x,-126)/half/MUFU/square; FI directMUFU. No fastmath flag or data-domain
+assumption. Need native CFG4body and exponent/boundary proof before timing.
+SSHcontrol-r4 connected; H800UUID unchanged and idle on query. Prior S24 stays
+immutable. Next checkpoint11:50UTC; bounded handoff12:30UTC,atmost3candidates.
+
+### Previous closed inventory
 
 FINAL: main report docs/SM90_AUXILIARY_SASS_20260926.md and hash-bound JSON
 are committed/pushed at2ac547c. Local/remote immutable archive matches SHA
