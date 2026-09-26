@@ -1,11 +1,20 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 16:38:33 UTC
+updated-at: 2026-09-26 16:47:08 UTC
 working-on: resumed frozen 56-capture matrix after actual fresh/cached JIT identity proof
 blocked-on: native PPU1.7 SDK/model unavailable; expanded performance goal not yet met
-last-commit: 7fe7df3 checkpoint; matrix4ea24d1, stash81dac54, loaderc5c0584 published
+last-commit: f959713 checkpoint; matrixb2101d2, stash81dac54, loaderc5c0584 published
 
 ## Current checkpoint
+
+16:46 checkpoint: 37/56 captures PASS, 1 running, 18 pending. Re-extracted
+36 completed captures/2376 full forwards exactly from SQLite. All four
+superseded identity attempts remain in the artifact history. H64/GVA4
+confirms the B2 grid-wave loss to FI; every completed QLA cell still wins.
+Registered followup screen12 cells (S39/S40 B1/B2; S41 T2K/T8K, both gates)
+prepared but NOT_RUN, waits for complete frozen matrix/numeric admission.
+New source-only analysis distinguishes long-sequence FI CP vs high-head
+non-CP; possible single-state-WG V128 shared-H idea is NOT implemented.
 
 16:38 UTC: actual fresh/cached FlashQLA proof PASS, four compiled/live CUDA
 images vs four cache-loaded images, all four SHA identical; five arms pass
