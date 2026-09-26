@@ -17,7 +17,8 @@ template<class Base, bool AuxInverse = false>
 struct ScalarGdnAux : Base {
     static constexpr bool SeparateScalarGateProducer = true;
     static_assert(Base::NumStateMmaWarpGroups == 2);
-    using OrderedMathBarriers = OrderedPair<Base::OrderedBarrierId0, Base::OrderedBarrierId1>;
+    using OrderedMathBarriers = std::conditional_t<AuxInverse, IndependentStateIssue,
+        OrderedPair<Base::OrderedBarrierId0, Base::OrderedBarrierId1>>;
     using Element = typename Base::Element;
     using Inverse = typename Base::InverseType;
     using Params = typename Base::Params;
