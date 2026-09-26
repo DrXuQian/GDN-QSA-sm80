@@ -15,7 +15,7 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
     using Element = typename Base::Element;
     using Inverse = typename Base::InverseType;
     using Params = typename Base::Params;
-    using SharedStorage = typename Base::SharedStorage;
+    using SharedStorage = typename Parent::SharedStorage;
 
     template<class Problem, class Work>
     CUTE_DEVICE void compute(
@@ -124,7 +124,7 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
                 CUTE_UNROLL
                 for (int i=0; i<size(acc_o); ++i) {
                     auto [dv,t] = c_output(i);
-                    acc_o(i) *= exp2f(alpha(t,0,ar.index()))*params.scale;
+                    acc_o(i) *= smem.gate_factors[ar.index()*128+64+t];
                 }
             }
             qp.consumer_release(qr); ++qr;
@@ -148,7 +148,7 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
                 CUTE_UNROLL
                 for (int i=0; i<size(residual); ++i) {
                     auto [dv,t] = c_output(i);
-                    residual(i) = residual(i)-Element(acc_sk(i)*exp2f(alpha(t,0,ar.index())));
+                    residual(i) = residual(i)-Element(acc_sk(i)*smem.gate_factors[ar.index()*128+t]);
                 }
             }
             kkp.consumer_wait(kkr);
@@ -198,7 +198,7 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             // prefix supplies the same value; do not change barrier counts.
             alp.consumer_wait(alr);
             float last_log = alpha(valid-1,0,ar.index());
-            float decay_h = exp2f(last_log);
+            float decay_h = smem.gate_factors[ar.index()*128+valid-1];
             CUTE_UNROLL
             for (int i=0; i<size(h); ++i) h(i) *= decay_h;
             CUTE_UNROLL
