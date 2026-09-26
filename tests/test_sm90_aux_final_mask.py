@@ -11,9 +11,8 @@ SOURCE = Path(__file__).resolve().parents[1] / "csrc/backends/sm90/scalar_gdn_au
 
 
 def admit(text):
-    assert "float decay = auxiliary_exp2<(decltype(normal_span)::value != 0)>(row_log-col_log);" in text
-    assert "if (smem.aux_normal_exp2[ar.index()]) apply_epilogue(Int<1>{});" in text
-    assert "else apply_epilogue(Int<0>{});" in text
+    assert "float decay = auxiliary_exp2_guarded(row_log-col_log, normal_span);" in text
+    assert "bool normal_span = smem.aux_normal_exp2[ar.index()] != 0;" in text
     assert "Element(live ? acc_qk(i) * decay * params.scale : 0.f)" in text
     assert "Inverse(live ? acc_kk(i) * row_beta * decay : 0.f)" in text
     assert "__exp2f" not in text and "fast_math" not in text

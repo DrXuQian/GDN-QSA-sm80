@@ -32,4 +32,21 @@ CUTE_DEVICE float auxiliary_exp2(float exponent) {
     } else return exp2f(exponent);
 }
 
+// CUDA12.8/SM90 native exp2f identity: if x < -126, evaluate
+// MUFU(x/2)^2 with RN multiplication; otherwise evaluate MUFU(x).
+// A producer-proved normal span makes the exceptional predicate false.
+// Keep one data path, so the compiler need not merge two full epilogues.
+CUTE_DEVICE float auxiliary_exp2_guarded(float exponent, bool normal_span) {
+    float result;
+    asm("{ .reg .pred scale; .reg .f32 x;\n"
+        "  setp.eq.u32 scale, %2, 0;\n"
+        "  @scale setp.lt.f32 scale, %1, 0fC2FC0000;\n"
+        "  mov.f32 x, %1;\n"
+        "  @scale mul.rn.f32 x, %1, 0f3F000000;\n"
+        "  ex2.approx.ftz.f32 %0, x;\n"
+        "  @scale mul.rn.f32 %0, %0, %0;\n"
+        "}" : "=f"(result) : "f"(exponent), "r"(int(normal_span)));
+    return result;
+}
+
 } // namespace gdn::sm90

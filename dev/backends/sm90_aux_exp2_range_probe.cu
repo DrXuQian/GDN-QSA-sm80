@@ -23,8 +23,8 @@ __global__ void candidate(const float* x,float* y,int n) {
   int i=blockIdx.x*blockDim.x+threadIdx.x;
   if(i<n) {
     bool safe=gdn::sm90::aux_normal_span(isfinite(x[i]),fabsf(x[i]));
-    y[i]=(!Guarded || safe) ? gdn::sm90::auxiliary_exp2<true>(x[i])
-                           : gdn::sm90::auxiliary_exp2<false>(x[i]);
+    if constexpr (Guarded) y[i]=gdn::sm90::auxiliary_exp2_guarded(x[i],safe);
+    else y[i]=gdn::sm90::auxiliary_exp2<true>(x[i]);
   }
 }
 __global__ void prefix_flags(const float* x,int* flags) {
