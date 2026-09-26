@@ -1,11 +1,27 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 07:52:03 UTC
-working-on: final handoff of bounded SM90 SASS campaign; S11 retained, target NOT MET
-blocked-on: native PPU1.7 SDK/model unavailable; no further H800 jobs required for this handoff
-last-commit: 59de89a (completed report/evidence commit; best candidate kernel 457267e / branch head d3cf13a; this status-only update may be newer)
+updated-at: 2026-09-26 08:25:33 UTC
+working-on: S14 UNRESOLVED; S15 native-identical rejected; S16 independent factor producer and S17 K-first TMA pending
+blocked-on: native PPU1.7 SDK/model unavailable; H800 reconnected, idle guard required
+last-commit: 2fa3d6d (main prior handoff); experiments107c0de /5ab062b /e799c55; defaults unchanged
 
 ## Active SM90 campaign
+
+08:25checkpoint: S14 14case fingerprints/CPU errors identical,8repeat and
+capturedoutputs PASS. Weak paired148.689us vs S11control147.2805us overlaps:
+UNRESOLVED,no promotion. Native constant barrier operands are real but other
+spills grew. S15 compiler-only H operand fence leaves all29768 native
+instructions identical (SHA96c0bf23a280c0cdf48d1a12368e2546bb3e125ad21303d6674806bbaa1e9ab5):
+reject; do not time/promote inert asm. S16 moves cached coefficient publication
+off TMA warp (parent S12),35 host tests/4native bodies PASS, device build in
+progress. S17 is an independent QKV->KQV issue-order test on S11, local build
+running. No concurrent GPU timing; source changes isolated from main/SM80.
+
+User authorized continuation after the closed inventory. New work stays in
+/workspace/gdn-sm90-win-20260926/immediate-source. S14 tests two constant-ID
+conditional barriers instead of spilled runtime IDs; exact protocol/counts
+unchanged. Native/old-image negative before14-case device raw admission.
+The following S11 result remains the incumbent, not a newly measured claim.
 
 S11 is the best confirmed both-gate candidate. Same-window nsys complete
 forward kernel sums:148.736/148.480us versus FlashInfer noCP113.440/113.248us
