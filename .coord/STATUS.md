@@ -1,11 +1,22 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 12:49:47 UTC
-working-on: D28/S29/S30 delivered; report5614e85 pushed; retain S24; no active work
+updated-at: 2026-09-26 12:59:04 UTC
+working-on: S31 registered inverse-input normalization moved into existing KK writer; local proofs before device
 blocked-on: native PPU1.7 SDK/model unavailable; fastest FlashInfer target not yet met
-last-commit: 5614e85; D28 tests6c05068; S29 testsadc1e3a; S30 testsf9163e4
+last-commit: f7cac7f; immutable incumbentS24 bc3c154/head06b7471
 
 ## Current checkpoint
+
+New bounded authorized turn: matched native inverse phases358vsFI286sites;
+8x8stage165vs127, same21SHFL/21FFMA and sameblocked matrix algorithm.
+Do not repeat in-place S22 or register S30. S31 before-edit registration in
+taskdocs/plan.md: move diagonal1 into existing KK writer, retain upper0 and
+all paddeddiagonal1, skip only now-redundant solver input normalization.
+Prove actualwriter/tails/negative controls, keep every rounding/protocol.
+All14CPU/raw gates and exclusive pairednsys required. Max3candidates,
+checkpoint13:30,handoff14:10UTC. No default/actualSM80 changes.
+
+### Previous sealed inventory
 
 SEALED: report5614e85 pushed; all main/experiment worktrees clean. H800 was
 idle on final query; own SSHcontrol-r5 closed. No own GPU/background build
