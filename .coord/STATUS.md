@@ -1,11 +1,16 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 12:48:36 UTC
-working-on: D28/S29/S30 inventory closed; verified evidence/report publication; retain S24
+updated-at: 2026-09-26 12:49:47 UTC
+working-on: D28/S29/S30 delivered; report5614e85 pushed; retain S24; no active work
 blocked-on: native PPU1.7 SDK/model unavailable; fastest FlashInfer target not yet met
-last-commit: e218fa6; D28 tests6c05068; S29 testsadc1e3a; S30 testsf9163e4
+last-commit: 5614e85; D28 tests6c05068; S29 testsadc1e3a; S30 testsf9163e4
 
 ## Current checkpoint
+
+SEALED: report5614e85 pushed; all main/experiment worktrees clean. H800 was
+idle on final query; own SSHcontrol-r5 closed. No own GPU/background build
+remains. Archive and source branches available; next turn resumes from S24,
+not either rejected/unresolved candidate. Do not repeat completed evidence.
 
 FINAL: S29 weak122.0485[120.608,122.881]us vs pairedS24
 120.464[119.360,122.208] is UNRESOLVED, not promoted. FastestFI112.720
