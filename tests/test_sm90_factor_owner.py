@@ -40,8 +40,9 @@ def admit(aux, gate, kernel):
         raise ValueError('TMA warp still claims alpha producer')
     if 'alpha_pipeline_params.role = MainloopAlphaPipeline::ThreadCategory::ProducerConsumer;' not in kernel:
         raise ValueError('prefix warp must both produce and consume')
-    if 'alpha_pipeline_params.consumer_arv_count = NumStateMathThreads + NumAuxMathThreads + cutlass::NumThreadsPerWarp;' not in kernel:
-        raise ValueError('alpha416 participant contract changed')
+    if ('alpha_pipeline_params.consumer_arv_count = AlphaConsumers;' not in kernel or
+            'AlphaConsumers = StateThreads+AuxThreads+32;' not in kernel):
+        raise ValueError('alpha actual-state+aux+producer participant contract changed')
 
 
 class FactorOwner(unittest.TestCase):
@@ -55,6 +56,7 @@ class FactorOwner(unittest.TestCase):
             (AUX, GATE, KERNEL.replace('ThreadCategory::ProducerConsumer', 'ThreadCategory::Consumer')),
             (AUX, GATE.replace('publish_factors(lane, lo, hi, stage.index());', ''), KERNEL),
             (AUX.replace('ap.consumer_release(ar);', ''), GATE, KERNEL),
+            (AUX, GATE, KERNEL.replace('StateThreads+AuxThreads+32;', '256+AuxThreads+32;')),
         ]
         for args in plants:
             with self.assertRaises(ValueError):
