@@ -1,11 +1,31 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 12:35:24 UTC
-working-on: S29 native/14-case admission passed; paired timing pending; S30 rejected by native protocol gate
+updated-at: 2026-09-26 12:48:36 UTC
+working-on: D28/S29/S30 inventory closed; verified evidence/report publication; retain S24
 blocked-on: native PPU1.7 SDK/model unavailable; fastest FlashInfer target not yet met
-last-commit: 8d0c047; D28 bd6f6a6; S29 c342ff9; S30 effb618
+last-commit: e218fa6; D28 tests6c05068; S29 testsadc1e3a; S30 testsf9163e4
 
 ## Current checkpoint
+
+FINAL: S29 weak122.0485[120.608,122.881]us vs pairedS24
+120.464[119.360,122.208] is UNRESOLVED, not promoted. FastestFI112.720
+still wins; no strong/QLA confirmation for this screened-out candidate.
+D28 perturbation8.174%weak/8.039%strong, diagnostic only. Raw timestamps
+re-extract16/16 records; three nsys captures/216fullforwards exactly recover.
+Final disabled-probe build all27856S24native instruction sites identical.
+S30 native C7512/protocol FAIL remains rejected; no device numerics/timing.
+Host41/38 tests PASS; S29 all14CPU+parent fingerprints,2direct-byte stresses,
+8repeats/everycapturedoutput PASS. S29/S30 PPU3.6CUDA source-check compile
+PASS; nativePPU17 SDK/model unavailable SKIP. No SM80/default change.
+Raw archive24,674,763bytes local/remote SHA
+10a8924f342fcf79823044069564187ca383b045c50525e04bc4580d20b268fa;
+12/12profilerrecords,3/3binaries,allnative inputs andtimestamp pairs verified.
+Report docs/SM90_ROLE_CRITICAL_PATH_20260926.md; main publication pending.
+No own GPU work remains. Target beat-both still NOT MET. Skill scopedlesson
+updated and validated. Next: matched inverse phase lifetimes/dependencies,
+not another blind coordinate rewrite or state-register reduction.
+
+### Admission checkpoint (superseded)
 
 Diagnostic D28: all14 parent fingerprints and8 direct-byte repeats at both
 gates PASS;35840 expected stamps/call. Weak paired nsys130.6395vs120.7675us
