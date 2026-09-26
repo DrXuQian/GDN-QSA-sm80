@@ -141,7 +141,7 @@ def main():
                     build / "codegen/image.sass", a.value_parent / "s38-build/codegen/image.sass",
                     "--aux", 232, "--loader", 32])
             run(directory, "cases", [ROOT / "tests/run_sm90_hopper_cases.py", "--extension", binary,
-                "--backend", "cuda_sm90", "--physical-batch", "--out", directory / "cases"])
+                "--backend", "cuda_sm90", "--out", directory / "cases"])
             actual = json.loads((directory / "cases/cases.json").read_text())
             assert actual["denominator"] == actual["completed"] == len(actual["cases"]) == 14
             for got, want in zip(actual["cases"], expected["cases"]):
