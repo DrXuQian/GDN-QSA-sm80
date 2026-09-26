@@ -37,6 +37,17 @@ class Inventory(unittest.TestCase):
         with self.assertRaises(ValueError):
             Workload("bad", 1, 65, 3, 4)
 
+    def test_goal_rejects_missing_loss_and_failed_capture(self):
+        from record_sm90_workloads import complete_win
+        rows = [dict(workload=w.name, gate=g, family=f, status="PASS", candidate_beats_all=True)
+                for w in WORKLOADS for g in GATES for f in FAMILIES]
+        self.assertTrue(complete_win(rows))
+        self.assertFalse(complete_win(rows[:-1]))
+        rows[-1]["candidate_beats_all"] = False
+        self.assertFalse(complete_win(rows))
+        rows[-1].update(candidate_beats_all=True, status="FAIL")
+        self.assertFalse(complete_win(rows))
+
 
 try:
     import torch
