@@ -101,13 +101,17 @@ struct ScalarGdnAux : Base {
             for (int i = 0; i < size(coords); ++i) {
                 auto [row, col] = coords(i);
                 bool live = row >= col && row < valid && col < valid;
-                // Mask BEFORE exp/cast: future/tail entries must never create
-                // infinities which could leak through a later zero multiply.
-                float decay = live ? exp2f(alpha(row,0,ar.index()) - alpha(col,0,ar.index())) : 0.f;
+                // Metadata rows are initialized for all64 positions, including
+                // tails. Load independently of the causal predicate to expose
+                // common row values; never exponentiate an invalid difference.
+                float row_log = alpha(row,0,ar.index());
+                float col_log = alpha(col,0,ar.index());
+                float row_beta = beta(row,br.index());
+                float decay = exp2f(live ? row_log-col_log : 0.f);
                 out_qk(i) = Element(live ? acc_qk(i) * decay * params.scale : 0.f);
                 // Inverse expects positive lower input, garbage diagonal and
                 // zero upper triangle, then applies beta along its columns.
-                out_kk(i) = Inverse(live ? acc_kk(i) * beta(row,br.index()) * decay : 0.f);
+                out_kk(i) = Inverse(live ? acc_kk(i) * row_beta * decay : 0.f);
             }
             kkp.producer_acquire(kw);
             qkp.producer_acquire(qw);
