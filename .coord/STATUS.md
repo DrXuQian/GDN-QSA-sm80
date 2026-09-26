@@ -1,11 +1,30 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 12:08:13 UTC
-working-on: D28 isolated role/chunk timestamp diagnostic on S24; no promotion
+updated-at: 2026-09-26 12:35:24 UTC
+working-on: S29 native/14-case admission passed; paired timing pending; S30 rejected by native protocol gate
 blocked-on: native PPU1.7 SDK/model unavailable; fastest FlashInfer target not yet met
-last-commit: b7be8ec; diagnostic parent06b7471/kernelbc3c154
+last-commit: 8d0c047; D28 bd6f6a6; S29 c342ff9; S30 effb618
 
 ## Current checkpoint
+
+Diagnostic D28: all14 parent fingerprints and8 direct-byte repeats at both
+gates PASS;35840 expected stamps/call. Weak paired nsys130.6395vs120.7675us
+is +8.174% probe overhead, NOT performance. Auxiliary inverse+sync measured
+~58us/32chunks inclusive; role intervals overlap and cannot be summed.
+Disabled trace preserves all4 actual S24 instruction streams.
+
+S29 simplifies only inverse warp coordinates: all1024 actual-helper positions
+and wrong-bit negative PASS; native4body matrix/protocol unchanged, inverse
+SHFL22->21. All14 CPU errors/input/output fingerprints match parent; overflow
+direct-byte stresses and weak paired nsys now running sequentially.
+S30 register split24/120/184/184 keeps total pool unchanged but triggers
+ptxas C7512 in all4 bodies: WARPGROUP.DEPBAR18->112 (noinitial),22->144
+(initial), matrix counts unchanged. Native protocol gate FAIL; reject before
+device numerics/timing, no weakening of the gate. Keep source/build evidence.
+Both PPU3.6 CUDA source-check builds running; nativePPU17 unavailable/SKIP.
+No default/SM80 change; no further candidates after S30 this turn.
+
+### Registration checkpoint (superseded)
 
 User requested next step. New bounded plan in task docs/plan.md: observe
 auxiliary inverse/publication versus state waiting/compute without removing
