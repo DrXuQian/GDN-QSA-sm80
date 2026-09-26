@@ -1,11 +1,19 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 10:52:57 UTC
-working-on: S24 confirmed in all four paired windows; sealing source/native/raw-trace evidence
+updated-at: 2026-09-26 10:56:15 UTC
+working-on: bounded S20-S24 inventory complete; S24 confirmed incumbent; beat-both target NOT MET
 blocked-on: native PPU1.7 SDK/model unavailable; fastest FlashInfer target not yet met
-last-commit: 11b20a9 (main checkpoint); S24 kernel bc3c154, complete test/native head06b7471
+last-commit: 2ac547c (report/evidence pushed); S24 kernel bc3c154, test/native head06b7471 pushed
 
 ## Current checkpoint
+
+FINAL: main report docs/SM90_AUXILIARY_SASS_20260926.md and hash-bound JSON
+are committed/pushed at2ac547c. Local/remote immutable archive matches SHA
+72ab926d3ce8ab3ec98086fa3ddba3d167d5cb342c06078e2ed9748d94f15b40;
+52,925,556bytes,all44archivedmemberhashes verified. Main/candidate worktrees
+clean; H800 no compute jobs at handoff; own SSHcontrol-r3 closed. No default
+promotion. Scoped lessons added to ppu17-hopper-porting/performance reference
+and skill validation PASS. This is a measured improvement, NOT goal completion.
 
 S24 WIN versus S21 in all4 paired windows: FI123.681/121.281us vs control
 128.641/126.721, but fastestFI114.337/112.1765 still wins (~8.1% gap).
