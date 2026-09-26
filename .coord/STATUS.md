@@ -1,11 +1,28 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 08:25:33 UTC
-working-on: S14 UNRESOLVED; S15 native-identical rejected; S16 independent factor producer and S17 K-first TMA pending
+updated-at: 2026-09-26 08:46:41 UTC
+working-on: S16 confirmed both regimes; S17 UNRESOLVED; S18 independent state issue passed host/native gates, device cases running
 blocked-on: native PPU1.7 SDK/model unavailable; H800 reconnected, idle guard required
-last-commit: 2fa3d6d (main prior handoff); experiments107c0de /5ab062b /e799c55; defaults unchanged
+last-commit: f104ae6 (main checkpoint); S16 e799c55 / S17 daabe62; defaults unchanged
 
 ## Active SM90 campaign
+
+Latest: S16 both-FI windows142.960/142.8805us versus S11
+147.6165/147.280us; QLA windows140.609/140.2405us versus
+165.361/163.6005us. All disjoint; fastest FI112.8005/112.880us still wins.
+S17 K-first four actual TMA bodies and14cases passed, but147.9845 versus
+146.865us overlaps; no promotion. S18 kernel642d353 tests independent state
+WG issue on S16: actual four-type owner proof, stale-WG negative,37 host
+tests and native4body gates PASS. Native data-completion/matrix families
+unchanged; only256-thread issue barriers disappear. Device cases running,
+not yet numerically/performance admitted. No production changes.
+
+08:36 checkpoint: S16 all14 independent CPU cases and S11 fingerprints/errors
+match. Weak full-forward nsys142.960[141.536,143.808]us versus S11
+147.617[146.752,148.480]us is a disjoint win; FI noCP112.800us remains faster.
+Strong-gate and FlashQLA paired confirmations are running sequentially.
+S17 K-first native four-body compile/full extension link passed; no device
+result yet. Main production, numeric gates, and SM80 remain unchanged.
 
 08:25checkpoint: S14 14case fingerprints/CPU errors identical,8repeat and
 capturedoutputs PASS. Weak paired148.689us vs S11control147.2805us overlaps:
