@@ -27,9 +27,12 @@ __global__ void candidate(const float* x,float* y,int n) {
     else y[i]=gdn::sm90::auxiliary_exp2<true>(x[i]);
   }
 }
+template<bool OmitLast = false>
 __global__ void prefix_flags(const float* x,int* flags) {
   int lane=threadIdx.x,base=blockIdx.x*64;
-  flags[blockIdx.x*32+lane]=gdn::sm90::collect_aux_normal_span(x[base+lane],x[base+lane+32]);
+  float hi=x[base+lane+32];
+  if constexpr (OmitLast) if(lane==31) hi=0.f;
+  flags[blockIdx.x*32+lane]=gdn::sm90::collect_aux_normal_span(x[base+lane],hi);
 }
 
 int main() {
@@ -71,7 +74,7 @@ int main() {
   if(prefixes.size()!=cases*64) throw std::runtime_error("range denominator changed");
   int* df;check(cudaMalloc(&dx,prefixes.size()*4));check(cudaMalloc(&df,cases*32*4));
   check(cudaMemcpy(dx,prefixes.data(),prefixes.size()*4,cudaMemcpyHostToDevice));
-  prefix_flags<<<cases,32>>>(dx,df);check(cudaGetLastError());
+  prefix_flags<false><<<cases,32>>>(dx,df);check(cudaGetLastError());
   std::vector<int> flags(cases*32);
   check(cudaMemcpy(flags.data(),df,flags.size()*4,cudaMemcpyDeviceToHost));
   int fast=0,slow=0;
@@ -86,9 +89,16 @@ int main() {
       if(!(prefixes[c*64+i]-prefixes[c*64+j]>-126.f))
         throw std::runtime_error("unsafe direct EX2 admitted");
   }
-  // Omitting the last prefix would falsely admit this real -127 difference.
-  if(flags[(cases-1)*32] || !gdn::sm90::aux_normal_span(true,0.f))
-    throw std::runtime_error("omitted-prefix negative did not distinguish");
+  // Mutate the actual device producer, not a parallel host bound. The last
+  // fixture contains a real -127 difference that this omission falsely admits.
+  prefix_flags<true><<<cases,32>>>(dx,df);check(cudaGetLastError());
+  std::vector<int> omitted(cases*32);
+  check(cudaMemcpy(omitted.data(),df,omitted.size()*4,cudaMemcpyDeviceToHost));
+  int omitted_bad=0;
+  for(int i=0;i<cases*32;++i) omitted_bad+=omitted[i]!=flags[i];
+  for(int lane=0;lane<32;++lane)
+    if(flags[(cases-1)*32+lane] || !omitted[(cases-1)*32+lane])
+      throw std::runtime_error("omitted-prefix device negative did not distinguish");
   check(cudaFree(dx));check(cudaFree(df));
-  std::printf("EX2 seam RAW/PASS n=%zu; unguarded EXPECTED_RED bad=%zu; actual-prefix cases=%d fast=%d fallback=%d all32-lanes/PASS\n",x.size(),planted,cases,fast,slow);
+  std::printf("EX2 seam RAW/PASS n=%zu; unguarded EXPECTED_RED bad=%zu; actual-prefix cases=%d fast=%d fallback=%d all32-lanes/PASS; omitted-prefix EXPECTED_RED bad=%d\n",x.size(),planted,cases,fast,slow,omitted_bad);
 }
