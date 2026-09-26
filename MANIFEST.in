@@ -1,0 +1,4 @@
+# Target-specific build code and moved primitive headers are build dependencies.
+recursive-include csrc/backends *.py *.cuh *.md
+include include/gdn_qsa/backend_target.h
+include gdn_qsa_sm80/backends/targets.json

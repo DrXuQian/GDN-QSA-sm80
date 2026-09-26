@@ -1,8 +1,73 @@
 # One repository, independent algorithms and execution families
 
-Status: design only, 2026-09-26 UTC. No kernel, numerical threshold, build target
-or default routing is changed by this document. The published legacy PPU
-`residual-solve-static` experiment remains pending device admission.
+Status: boundary implementation, 2026-09-26 UTC. The target isolation and optional
+complete-forward entry described below are implemented. New SM90/PPU1.7 kernels
+are not implemented; the remaining algorithm integration is still a design.
+Numerical thresholds and default algorithms are unchanged. The published legacy
+PPU `residual-solve-static` experiment remains pending device admission.
+
+## Implemented boundary
+
+- `csrc/backends/cuda_sm80/primitives.cuh` and `ppu_aiu/primitives.cuh` now own
+  the previously interleaved primitive bodies. The old `gdn_target.cuh` is a
+  compatibility selector, not an SM90 pipeline interface. Existing algorithm
+  TUs, host reset selection and private workspaces are unchanged.
+- `csrc/backends/cuda_sm80/build.py` owns CUDA builds;
+  `cmake/backends/ppu_aiu.cmake` owns PPU1.0 builds. A shared
+  `gdn_qsa_sm80/backends/targets.json` drives target availability, dependency
+  root and build-entry selection. A target cannot borrow another target's leaf
+  builder or silently reuse an existing build directory of another target.
+- `gdn_forward` is an optional complete-algorithm front end. Existing APIs and
+  environment variables still work. The default remains `original`; WY and
+  residual are explicit. No automatic candidate promotion or decay heuristic
+  is added. Native loading is lazy and cached by selected module and path,
+  without filesystem checks on every invocation of an unchanged selection.
+- ACU source bundles include the moved primitives, build modules and JSON;
+  missing backend dependencies mark a bundle incomplete.
+
+```python
+from gdn_qsa_sm80 import backend_inventory, gdn_forward
+
+print(backend_inventory())  # source availability, not device admission
+o, ht = gdn_forward(q, k, v, g, beta)  # unchanged original selection
+
+# Explicit existing PPU algorithm, not the default. GDN_QSA_WY_EXTENSION must
+# identify the built extension. Dtypes/scale follow the existing residual API.
+o, ht = gdn_forward(q, k, v, g, beta, initial_state=h0,
+                   algorithm="residual", backend="ppu10",
+                   delivery="warps8-hvlayout")
+```
+
+Explicit `cuda_sm90`, `ppu17` and distinct `ppu15` builds/calls currently fail
+with reasons. PPU1.5 retains the actlize dependency policy, but the existing
+compiler gate had only admitted PPU1.0; this refactor does not invent a PPU1.5
+numerical admission. Do not set an `implemented` bit to bypass this: each target
+needs its own registered source graph and native/body/device checks.
+
+The original entry rejects a nonzero/explicit initial-state argument because its
+old interface cannot consume it; WY/residual retain theirs. The new wrapper does
+not normalize gates, change precision or drop unsupported arguments. Backend
+names describe the compiled route, not an automatically measured device identity.
+In particular, original returns BF16 final state and accepts BF16 gates; the
+WY/residual contracts return FP32 state and accept BF16 or FP32 gates. The catalog
+exposes those differences. There is no hidden cast or cross-contract automatic
+algorithm choice; that would require a separately agreed precision policy.
+
+Existing box build commands remain valid. Explicit build selection is:
+
+```sh
+GDN_QSA_TARGET=ppu10 bash scripts/build_ppu.sh
+GDN_QSA_TARGET=cuda_sm80 python setup.py build_ext --inplace
+```
+
+New algorithms may reuse cuLA's CUDA C++ SM90 structure, but PPU1.7-specific
+TMA `.pos_swzl`, descriptor swizzles, TF32 major modes and synchronization must
+remain target traits/policies. They are not evidence that legacy AIU code or
+every Hopper feature works unchanged on PPU1.7. BF16/FP16 are the initial scope.
+
+Boundary tests: `python tests/test_backend_boundaries.py`. Native preservation
+uses `dev/backends/check_native_preserved.py BEFORE.isa AFTER.isa --self-test`.
+The refactor report records actual compile checks; it is not a speed verdict.
 
 ## Decision
 

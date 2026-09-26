@@ -9,6 +9,7 @@ PPU_SDK_ROOT="${PPU_SDK:-${PPU_SDK_ROOT:-/usr/local/PPU_SDK}}"
 mkdir -p "$BUILD_DIR"
 cmake -S "$ROOT" -B "$BUILD_DIR" \
   -DGDN_QSA_ENABLE_PPU=ON \
+  -DGDN_QSA_TARGET="${GDN_QSA_TARGET:-ppu10}" \
   -DPPU_SDK_ROOT="$PPU_SDK_ROOT" \
   -DCMAKE_BUILD_TYPE=Release
 cmake --build "$BUILD_DIR" --target _gdn_chunk_ppu -j"$JOBS"

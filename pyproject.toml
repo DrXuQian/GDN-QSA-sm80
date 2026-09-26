@@ -20,5 +20,8 @@ benchmark = ["matplotlib", "pandas"]
 where = ["."]
 include = ["gdn_qsa_sm80*"]
 
+[tool.setuptools.package-data]
+"gdn_qsa_sm80.backends" = ["targets.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

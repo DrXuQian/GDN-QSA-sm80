@@ -23,6 +23,26 @@ spec.loader.exec_module(collect)
 
 
 class ACUContract(unittest.TestCase):
+    def test_capture_keeps_moved_backend_sources_and_catalog(self):
+        directory = self.directory()
+        status, _, bundle, _ = self.run_mock_capture(directory)
+        self.assertEqual(status['status'], 'PASS', status['errors'])
+        root = bundle / 'sources/ours'
+        collect.validate_backend_source_snapshot(root)
+        for name in ('csrc/backends/ppu_aiu/primitives.cuh',
+                     'csrc/backends/cuda_sm80/primitives.cuh',
+                     'gdn_qsa_sm80/backends/targets.json'):
+            self.assertEqual((root / name).read_bytes(), (ROOT / name).read_bytes())
+        # Actual omission of either a moved header or the JSON is red.
+        real_is_file = Path.is_file
+        for omitted in ('csrc/backends/ppu_aiu/primitives.cuh',
+                        'gdn_qsa_sm80/backends/targets.json'):
+            def missing(path):
+                return path != root / omitted and real_is_file(path)
+            with patch.object(Path, 'is_file', missing), self.assertRaisesRegex(
+                    RuntimeError, 'backend source snapshot incomplete'):
+                collect.validate_backend_source_snapshot(root)
+
     def test_residual_delivery_capture_requires_matching_control(self):
         for delivery in sorted(collect.RESIDUAL_DELIVERIES):
             with self.subTest(delivery=delivery):

@@ -7,24 +7,15 @@ and input normalization. Forward-only (no backward in this release).
 from __future__ import annotations
 
 import torch
-from functools import lru_cache
-from importlib import import_module, util
-import os
-from pathlib import Path
+from .backends.loading import load_original, clear_backend_cache
 
 
-@lru_cache(maxsize=1)
 def _backend():
     """Explicit PPU selection; never silently execute an NVIDIA fallback."""
-    path = os.environ.get("GDN_QSA_PPU_EXTENSION")
-    if path is None:
-        return import_module("._gdn_chunk", __package__)
-    if not path.strip() or not Path(path).is_file():
-        raise RuntimeError(f"GDN_QSA_PPU_EXTENSION is not a file: {path!r}")
-    spec = util.spec_from_file_location("_gdn_chunk_ppu", Path(path).resolve())
-    module = util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return load_original()
+
+
+_backend.cache_clear = clear_backend_cache
 
 __all__ = ["gdn_chunk", "gdn_chunk_twolevel", "gdn_chunk_reference", "GDN_D", "GDN_CHUNK"]
 

@@ -355,6 +355,22 @@ def find_acu():
     return DEFAULT_ACU
 
 
+def validate_backend_source_snapshot(root):
+    # These are now transitive compile/load dependencies, not just documentation.
+    # A reused binary still needs the actual moved source and target authority.
+    required = (
+        "csrc/backends/ppu_aiu/primitives.cuh",
+        "csrc/backends/cuda_sm80/primitives.cuh",
+        "csrc/backends/cuda_sm80/build.py",
+        "include/gdn_qsa/backend_target.h",
+        "cmake/GdnBackend.cmake", "cmake/backends/ppu_aiu.cmake",
+        "gdn_qsa_sm80/backends/targets.json", "gdn_qsa_sm80/backends/loading.py",
+    )
+    missing = [path for path in required if not (root / path).is_file()]
+    if missing:
+        raise RuntimeError(f"backend source snapshot incomplete: {missing}")
+
+
 def collect(args, bundle, env):
     implementation = "wy" if args.wy_run else "original"
     delivery = getattr(args, "wy_delivery", "scalar")
@@ -373,13 +389,14 @@ def collect(args, bundle, env):
             ("submodules", ["git", "submodule", "status", "--recursive"]),
         ):
             run(command, bundle / f"{name}.txt", env, console=False)
-        for directory in ("csrc/gdn_chunk", "include/gdn_qsa", "gdn_qsa_sm80", "cmake",
-                          "benchmarks", "tests", "tools", "scripts", "dev/ppu"):
+        for directory in ("csrc/gdn_chunk", "csrc/backends", "include/gdn_qsa", "gdn_qsa_sm80", "cmake",
+                          "benchmarks", "tests", "tools", "scripts", "dev/ppu", "dev/backends"):
             for path in (ROOT / directory).rglob("*"):
-                if path.is_file() and path.suffix in (".py", ".cu", ".cuh", ".hpp", ".cpp", ".h", ".sh", ".cmake"):
+                if path.is_file() and path.suffix in (".py", ".cu", ".cuh", ".hpp", ".cpp", ".h", ".sh", ".cmake", ".json"):
                     copy_file(path, bundle / "sources/ours" / path.relative_to(ROOT))
-        for name in ("CMakeLists.txt", ".gitmodules", "docs/PPU_BACKEND.md"):
+        for name in ("CMakeLists.txt", ".gitmodules", "setup.py", "pyproject.toml", "docs/PPU_BACKEND.md"):
             copy_file(ROOT / name, bundle / "sources/ours" / name)
+        validate_backend_source_snapshot(bundle / "sources/ours")
         copy_file(ROOT / "docs/PPU_GDN_ACU.md", bundle / "README.md")
         if env.get("FLA_ROOT") and not (Path(env["FLA_ROOT"]) / "fla/__init__.py").is_file():
             raise RuntimeError(f"FLA_ROOT is not an FLA checkout: {env['FLA_ROOT']}")
