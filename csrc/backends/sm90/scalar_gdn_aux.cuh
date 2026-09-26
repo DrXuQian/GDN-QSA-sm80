@@ -6,6 +6,7 @@
 #include "ordered_pair.cuh"
 #include "aux_chunk_loop.cuh"
 #include "relative_gate_layout.cuh"
+#include "aux_exp2_range.cuh"
 
 namespace gdn::sm90 {
 
@@ -27,6 +28,7 @@ struct ScalarGdnAux : Base {
         // [alpha stage][exp / scaled-exp][token], protected by alpha_pipeline.
         cute::array_aligned<float, 128 * Base::StagesAlpha::value> gate_factors;
         cute::array_aligned<float, 64 * Base::StagesAlpha::value> relative_gate;
+        cute::array_aligned<int, Base::StagesAlpha::value> aux_normal_exp2;
     };
     using QPipeline = typename Base::MainloopQPipeline;
     using KPipeline = typename Base::MainloopKPipeline;
@@ -93,6 +95,8 @@ struct ScalarGdnAux : Base {
             float rhi = lane+32 < valid ? exp2f(__fsub_rn(last_prefix,hi)) : 0.f;
             smem.relative_gate[relative_gate_index(stage,lane)] = rlo;
             smem.relative_gate[relative_gate_index(stage,lane+32)] = rhi;
+            bool normal_span = collect_aux_normal_span(lo, hi);
+            if (lane == 0) smem.aux_normal_exp2[stage] = normal_span;
         };
         CUTE_NO_UNROLL
         for (int block=0; block<ceil_div(work.seq_len,64); ++block) {
@@ -170,8 +174,9 @@ struct ScalarGdnAux : Base {
             bp.consumer_wait(br);
             auto out_qk = make_fragment_like<Element>(acc_qk);
             auto out_kk = make_fragment_like<Inverse>(acc_kk);
-            CUTE_UNROLL
-            for (int i = 0; i < size(coords); ++i) {
+            auto apply_epilogue = [&](auto normal_span) __attribute__((always_inline)) {
+              CUTE_UNROLL
+              for (int i = 0; i < size(coords); ++i) {
                 auto [row, col] = coords(i);
                 bool live = row >= col;
                 if constexpr (!cute::is_static<decltype(valid_tag)>::value)
@@ -184,12 +189,17 @@ struct ScalarGdnAux : Base {
                 float row_log = alpha(row,0,ar.index());
                 float col_log = alpha(col,0,ar.index());
                 float row_beta = beta(row,br.index());
-                float decay = exp2f(row_log-col_log);
+                float decay = auxiliary_exp2<(decltype(normal_span)::value != 0)>(row_log-col_log);
                 out_qk(i) = Element(live ? acc_qk(i) * decay * params.scale : 0.f);
                 // Inverse expects positive lower input, garbage diagonal and
                 // zero upper triangle, then applies beta along its columns.
                 out_kk(i) = Inverse(live ? acc_kk(i) * row_beta * decay : 0.f);
-            }
+              }
+            };
+            // Every auxiliary lane consumes the same protected stage flag.
+            // Keep the generic exp2f path for wide/nonfinite prefix ranges.
+            if (smem.aux_normal_exp2[ar.index()]) apply_epilogue(Int<1>{});
+            else apply_epilogue(Int<0>{});
             kkp.producer_acquire(kw);
             qkp.producer_acquire(qw);
             copy(store_qk, tq.retile_S(out_qk), tq.partition_D(qk(_,_,qw.index())));
