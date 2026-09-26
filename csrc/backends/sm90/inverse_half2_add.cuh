@@ -15,8 +15,8 @@ CUTE_HOST_DEVICE void inverse_add_half_pairs(Dst& dst, Src const& src) {
   using Pair = cutlass::Array<Element, 2>;
   auto dst_pairs = cute::recast<Pair>(dst);
   auto src_pairs = cute::recast<Pair>(src);
-  static_assert(cute::size(dst_pairs) * 2 == cute::size(dst));
-  static_assert(cute::size(src_pairs) == cute::size(dst_pairs));
+  static_assert(decltype(cute::size(dst_pairs))::value * 2 == decltype(cute::size(dst))::value);
+  static_assert(decltype(cute::size(src_pairs))::value == decltype(cute::size(dst_pairs))::value);
   cute::transform(dst_pairs, src_pairs, dst_pairs, cutlass::plus<Pair>{});
 }
 
