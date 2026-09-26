@@ -4,7 +4,7 @@
 #include <stdexcept>
 using namespace cute;
 using BF16=cutlass::bfloat16_t;
-using Types=gdn::sm90::ValueKernelTypes<BF16,false,128,168,true,2,160>;
+using Types=gdn::sm90::ValueKernelTypes<BF16,false,128,136,true,2,176>;
 using Collective=Types::Collective;
 using H=gdn::sm90::SharedStateLayout<Collective>;
 using Atom=Copy_Atom<SM90_U32x4_STSM_N,BF16>;
@@ -73,13 +73,13 @@ void map(int plant=0) {
     reader(typename H::O1Mma{});reader(typename H::SKMma{});
 }
 template<class Gate,bool Initial> void actual_type() {
-    using T=gdn::sm90::ValueKernelTypes<Gate,Initial,128,168,true,2,160>;
+    using T=gdn::sm90::ValueKernelTypes<Gate,Initial,128,136,true,2,176>;
     using K=typename T::Kernel;
     static_assert(T::Collective::NumStateMmaWarpGroups==2 && K::MaxThreadsPerBlock==512);
-    static_assert(K::LdStRegisterRequirement==24 && K::StateMmaRegisterRequirement==160 && K::AuxMmaRegisterRequirement==168);
+    static_assert(K::LdStRegisterRequirement==24 && K::StateMmaRegisterRequirement==176 && K::AuxMmaRegisterRequirement==136);
     static_assert(K::SharedStorageSize<=232448);
     static_assert(K::QKInputConsumers==384 && K::AlphaConsumers==416 && K::BetaConsumers==384);
-    std::cout<<"S43 gate_fp32="<<std::is_same_v<Gate,float><<" initial="<<Initial
+    std::cout<<"S44 gate_fp32="<<std::is_same_v<Gate,float><<" initial="<<Initial
              <<" threads="<<K::MaxThreadsPerBlock<<" shared="<<K::SharedStorageSize<<"\n";
 }
 int main() {

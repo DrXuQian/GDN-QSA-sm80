@@ -24,7 +24,8 @@ struct ValueKernelTypes {
         std::conditional_t<ValueTile == 128,OriginalOptions,SplitOptions>>;
     static_assert(!SharedH || (ValueTile == 128 &&
         ((StateWGs == 1 && AuxRegs == 232 && StateRegs == 248) ||
-         (StateWGs == 2 && AuxRegs == 168 && StateRegs == 160))));
+         (StateWGs == 2 && AuxRegs == 168 && StateRegs == 160) ||
+         (StateWGs == 2 && AuxRegs == 136 && StateRegs == 176))));
     using Stride = cute::tuple<int64_t,cute::_1,int32_t>;
     using Builder = kda::sm90::kernel::FlatBuilderKdaFwd<BF16,float,float,
         cute::Shape<cute::_64,cute::_64,cute::_128>,Stride,Stride,Stride,Stride,

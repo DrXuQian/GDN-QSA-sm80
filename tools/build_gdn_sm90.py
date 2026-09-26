@@ -76,13 +76,14 @@ def main():
     p.add_argument("--value-loader32",action="store_true",help="S41: loader32 with V64/aux232 only")
     p.add_argument("--shared-state",action="store_true",help="S42: V128/one state WG, SS shared BF16 H")
     p.add_argument("--shared-state-cooperative",action="store_true",help="S43: V128/two state WGs, state160/aux168")
+    p.add_argument("--shared-state-balanced",action="store_true",help="S44: V128/two state WGs, state176/aux136")
     p.add_argument("--reuse-device",action="store_true",help="reuse only an exactly hash-bound device object; recheck target/codegen/link/import")
     args=p.parse_args()
     if args.value_loader32 and args.value_split != 232:
         p.error("--value-loader32 requires --value-split 232")
-    if args.shared_state and args.shared_state_cooperative:
+    if sum((args.shared_state,args.shared_state_cooperative,args.shared_state_balanced)) > 1:
         p.error("choose one shared-state experiment")
-    if (args.shared_state or args.shared_state_cooperative) and (args.value_split is not None or args.value_loader32):
+    if (args.shared_state or args.shared_state_cooperative or args.shared_state_balanced) and (args.value_split is not None or args.value_loader32):
         p.error("--shared-state is independent of value-split/loader32")
     out=args.out.resolve(); out.mkdir(parents=True,exist_ok=True)
     scratch=out/"scratch"; scratch.mkdir(exist_ok=True)
@@ -108,6 +109,8 @@ def main():
         options += ["-DGDN_SM90_SHARED_STATE=1"]
     if args.shared_state_cooperative:
         options += ["-DGDN_SM90_SHARED_STATE=2"]
+    if args.shared_state_balanced:
+        options += ["-DGDN_SM90_SHARED_STATE=3"]
     identity=dict(target=args.target,mode=args.mode,compiler=str(compiler),compiler_sha256=sha(compiler),
                   dependency=str(dep),flags=options,include=include,device_admission="NOT_RUN")
     identity["dependency_version_sha256"]=sha(dep/"include/cutlass/version.h")
