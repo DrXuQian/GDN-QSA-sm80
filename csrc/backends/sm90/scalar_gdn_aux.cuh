@@ -3,6 +3,7 @@
 #pragma once
 
 #include "kda/sm90/collective/mainloop_kda_fwd.hpp"
+#include "ordered_pair.cuh"
 
 namespace gdn::sm90 {
 
@@ -14,6 +15,8 @@ namespace gdn::sm90 {
 // BF16 QK / FP16 KK storage. This is NOT bit-equivalent to gated TF32 operands.
 template<class Base, bool AuxInverse = false>
 struct ScalarGdnAux : Base {
+    static_assert(Base::NumStateMmaWarpGroups == 2);
+    using OrderedMathBarriers = OrderedPair<Base::OrderedBarrierId0, Base::OrderedBarrierId1>;
     using Element = typename Base::Element;
     using Inverse = typename Base::InverseType;
     using Params = typename Base::Params;

@@ -29,7 +29,7 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
         typename Base::MainloopAlphaPipeline& ap, typename Base::AlphaPipelineState& ar,
         typename Base::MainloopBetaPipeline& bp, typename Base::BetaPipelineState& br,
         typename Base::MainloopAlphaLastPipeline& alp, typename Base::AlphaLastPipelineState& alr,
-        typename Base::OrderedMathBarriers& order, SharedStorage& smem) {
+        typename Parent::OrderedMathBarriers& order, SharedStorage& smem) {
         using namespace cute;
         using kda::sm90::collective::gemm_zero_acc;
         using Barriers = kda::sm90::collective::KdaNamedBarriers;
