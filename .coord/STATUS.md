@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 04:48:33 UTC
-working-on: original cuLA build/import PASS; idle H800 nsys weak-gate capture starting after numerical admission
-blocked-on: none for nsys capture; native PPU1.7 SDK/model unavailable
-last-commit: faa7bf5 (parent; production kernels/defaults unchanged)
+updated-at: 2026-09-26 04:55:01 UTC
+working-on: nsys comparison complete, publishing reports and reproducible harness; production kernels/defaults unchanged
+blocked-on: none for H800 comparison; native PPU1.7 SDK/model unavailable
+last-commit: 7aa9a01 (preregistered nsys comparison/accounting)
 
 ## cuLA / nsys comparison checkpoint
 
@@ -21,6 +21,19 @@ environment rerun is 3/3 PASS. Accounting9/9 and binary-identity four negative
 plants PASS. Original cuLA builds with pinned CUTLASS4.4.1 and original flags;
 all four specializations also emit C7512,128regs,248/336Bstack. GPU job23229
 finished; no GPU PID and0%util observed before launching fail-closed harness.
+
+04:55UTC: weak and strong captures complete.72 forwards/120 GPU kernels are
+assigned exactly once. cuLA original sums447.249/447.376us, ours-CUDA
+354.801/354.864us, PPU-fork CUDA source-check332.704/333.312us. All ranges
+disjoint; same output/final-state fingerprints across all three roles,8/8
+repeat checks and every captured output checked. Largest CPU oracle error
+0.6329%, unchanged2% criterion.115/52 monitor samples, no foreign PID observed.
+cuLA's actual three kernels are gate-prefix, state fill and fused C++; include
+all three, report gaps separately. Original unedited build also has4/4C7512
+warnings despite original register-usage-level10. Full report/JSON:
+docs/SM90_CULA_NSYS_20260926.md;dev/backends/sm90_cula_nsys_20260926.json.
+Raw nsys reports and SQLite under/workspace/gdn-sm90-cula-nsys-artifacts-20260926.
+This is not general KDA, FLA or physical PPU1.7 performance. GPU idle at finish.
 
 ## SM90 algorithm integration
 
