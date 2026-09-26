@@ -295,7 +295,8 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
         AlphaPipelineParams alpha_pipeline_params;
         if constexpr (NeedsAlpha) {
             alpha_pipeline_params.producer_arv_count = cutlass::NumThreadsPerWarp;
-            alpha_pipeline_params.consumer_arv_count = NumStateMathThreads + NumAuxMathThreads + cutlass::NumThreadsPerWarp;
+            alpha_pipeline_params.consumer_arv_count = NumStateMathThreads + NumAuxMathThreads +
+                (CollectiveMainloop::ScalarAuxOwnsMetadata ? 0 : cutlass::NumThreadsPerWarp);
         }
 
         OPipelineParams o_pipeline_params;
@@ -319,7 +320,8 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
         BetaPipelineParams beta_pipeline_params;
         if constexpr (NeedsBeta) {
             beta_pipeline_params.producer_arv_count = cutlass::NumThreadsPerWarp;
-            beta_pipeline_params.consumer_arv_count = NumAuxMathThreads + NumStateMathThreads;
+            beta_pipeline_params.consumer_arv_count = NumAuxMathThreads +
+                (CollectiveMainloop::ScalarAuxOwnsMetadata ? 0 : NumStateMathThreads);
         }
 
         OrderedMathBarriers math_barriers;
@@ -342,7 +344,8 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
                 beta_pipeline_params.role = MainloopBetaPipeline::ThreadCategory::Producer;
             }
         }
-        if (warp_group_role == WarpGroupRole::LdSt && ldst_warp_role == LdStWarpRole::LoadAlpha) {
+        if (!CollectiveMainloop::ScalarAuxOwnsMetadata &&
+            warp_group_role == WarpGroupRole::LdSt && ldst_warp_role == LdStWarpRole::LoadAlpha) {
             // LoadAlpha warp consumes alpha_pipeline (reads last row) and produces alpha_last_pipeline
             if constexpr (NeedsAlpha) {
                 alpha_pipeline_params.role = MainloopAlphaPipeline::ThreadCategory::Consumer;
@@ -361,9 +364,10 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
 
             if constexpr (NeedsAlpha) {
                 alpha_pipeline_params.role = MainloopAlphaPipeline::ThreadCategory::Consumer;
-                alpha_last_pipeline_params.role = MainloopAlphaLastPipeline::ThreadCategory::Consumer;
+                if constexpr (!CollectiveMainloop::ScalarAuxOwnsMetadata)
+                    alpha_last_pipeline_params.role = MainloopAlphaLastPipeline::ThreadCategory::Consumer;
             }
-            if constexpr (NeedsBeta) {
+            if constexpr (NeedsBeta && !CollectiveMainloop::ScalarAuxOwnsMetadata) {
                 beta_pipeline_params.role = MainloopBetaPipeline::ThreadCategory::Consumer;
             }
 
@@ -505,7 +509,7 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
                 }
             } else if (ldst_warp_role == LdStWarpRole::LoadAlpha) {
                 // produce the last row of Alpha
-                if constexpr (NeedsAlpha) {
+                if constexpr (NeedsAlpha && !CollectiveMainloop::ScalarAuxOwnsMetadata) {
                     auto work_desc = scheduler.get_next_work(params.scheduler, params.problem_size);
                     CUTE_NO_UNROLL
                     for (; work_desc.is_valid(params.scheduler);

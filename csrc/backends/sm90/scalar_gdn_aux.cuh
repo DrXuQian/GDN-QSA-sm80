@@ -15,6 +15,7 @@ namespace gdn::sm90 {
 // BF16 QK / FP16 KK storage. This is NOT bit-equivalent to gated TF32 operands.
 template<class Base, bool AuxInverse = false>
 struct ScalarGdnAux : Base {
+    static constexpr bool ScalarAuxOwnsMetadata = AuxInverse;
     static_assert(Base::NumStateMmaWarpGroups == 2);
     using OrderedMathBarriers = OrderedPair<Base::OrderedBarrierId0, Base::OrderedBarrierId1>;
     using Element = typename Base::Element;

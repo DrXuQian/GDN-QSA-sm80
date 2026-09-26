@@ -95,6 +95,7 @@ struct FlatMainloopTmaWarpSpecializedKdaFwd {
     static constexpr bool kInitStateFromInput = find_option_t<Tag::kInitStateFromInput, false_type, Options>::value;
 
     static constexpr int NumLoadWarpGroups = 1;
+    static constexpr bool ScalarAuxOwnsMetadata = false;
     static constexpr int NumStateMmaWarpGroups = 2;
     static constexpr int NumAuxMmaWarpGroups = 1;
 

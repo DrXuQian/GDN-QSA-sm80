@@ -152,8 +152,8 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
                 }
             }
             kkp.consumer_wait(kkr);
-            bp.consumer_wait(br);
             if constexpr (!AuxInverse) {
+                bp.consumer_wait(br);
                 if (wg==0) inverse();
                 cutlass::arch::NamedBarrier::arrive_and_wait(256,Barriers::StateMath);
                 cutlass::arch::fence_view_async_shared();
@@ -172,7 +172,7 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             }
             vp.consumer_release(vr); ++vr;
             kkp.consumer_release(kkr); ++kkr;
-            bp.consumer_release(br); ++br;
+            if constexpr (!AuxInverse) { bp.consumer_release(br); ++br; }
 
             auto operand_delta = kda::sm90::collective::make_acc_into_op<Element>(acc_delta,typename Base::TiledMmaKV::LayoutA_TV{});
             qkp.consumer_wait(qkr);
@@ -194,9 +194,9 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
                 op.producer_commit(ow); ++ow;
             }
 
-            // Consume the inherited alpha-last pipeline even though the scalar
-            // prefix supplies the same value; do not change barrier counts.
-            alp.consumer_wait(alr);
+            // Aux-owned scalar GDN uses the prefix directly: there is no
+            // alpha-last producer/consumer. The control keeps its old protocol.
+            if constexpr (!AuxInverse) alp.consumer_wait(alr);
             float last_log = alpha(valid-1,0,ar.index());
             float decay_h = exp2f(last_log);
             CUTE_UNROLL
@@ -216,7 +216,7 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             warpgroup_wait<0>(); warpgroup_fence_operand(h);
             kp.consumer_release(kr); ++kr;
             ap.consumer_release(ar); ++ar;
-            alp.consumer_release(alr); ++alr;
+            if constexpr (!AuxInverse) { alp.consumer_release(alr); ++alr; }
         };
 
         int chunks = ceil_div(work.seq_len,64);
