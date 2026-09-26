@@ -1,11 +1,47 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 06:20:08 UTC
-working-on: isolated SM90 scalar-GDN optimization; must beat BOTH FlashInfer and FlashQLA fastest admitted paths
-blocked-on: native PPU1.7 SDK/model unavailable; H800 candidate compilation ongoing
-last-commit: 6bebe1d (main remains unchanged except this checkpoint; candidate b609e03 in dedicated worktree)
+updated-at: 2026-09-26 07:29:11 UTC
+working-on: S11 wins FlashQLA but loses FlashInfer; paired S12 composition closure and raw evidence archive
+blocked-on: native PPU1.7 SDK/model unavailable; H800 currently idle for guarded serial measurements
+last-commit: 8c2cd50 (main production unchanged; admitted candidate S3 is 1f22ac0)
 
 ## Active SM90 campaign
+
+07:29checkpoint: S11(457267e)14/14 independent+parentraw PASS,8repeats
+and every captured forward pass. Same-window nsys145.536/145.424us versus
+FlashQLAauto165.072/163.200us:1.134x/1.122x WIN. Separate pairedFIwindows
+148.736/148.480us versus FI noCP113.440/113.248us: LOSE. Full target NOT MET.
+Exact nativeauxLDS99->21, no local operations in that interval; work fixed
+16WGMMA+14HMMA. S12retests cache-on-cheaper-aux,14numericcases PASS, parent
+raw/timing pending. No production routing or SM80 change. Source/report and
+18 hash-bound captures are being committed; prior runtime failures excluded.
+
+Current best confirmed both regimes S6(58712cc)181.2805/181.5045us;
+pairedFI112.928/112.736us => target NOT MET. S7 caches reducedMUFU but LOST;
+S9 actualNewVcasts and S10 separate-gatewarp both UNRESOLVED. S8 was the
+wrong conversion seam, rejected natively (no device timing). S11(457267e)
+corrects aux repeated metadata reads:99->21LDS, zero local operations in
+that nativeauxinterval, same16WGMMA/14HMMA. Device14case admission running.
+Experimental branches preserved separately; main kernel/SM80 remain unchanged.
+
+S5 (222dc90)14/14 matches S3 raw bits; weak nsys kernel sums190.177us
+versus S3control190.945us, overlapping envelopes => UNRESOLVED, not a win.
+S3strong191.9865us vs FI112.737us. Both gate regimes still miss the target.
+SASS for localS3 and the actually measured shared object is instruction-exact
+across all4bodies (31,432 staticinstructions; this is NOT an execution count).
+Full-chunk intervals: state1050 vs FI642 with28WGMMA each; aux1426 vs920
+with16WGMMA+14HMMA each. S5 removes the indexed local barrier array, not all
+spills. S6removes debug checks, S7caches repeated gate coefficients,
+S8pairs residual casts; independent raw-bit admission precedes each timing.
+
+S2 14/14device admission:196.399/195.519us; S3 same14/14 plus raw equality
+toS2, weak191.2635us vs FI112.767us. Still LOSES the user's target. Strong
+S3 capture blocked before timing by observed foreignPID75882; reject it.
+Actual loadedFI cubin extracted intact (94,096B),0stack/0spill. Our S3 SASS
+shows ordered barrier runtime array LDL feeding each wait/notify; exact PCs
+and source mapping retained under/workspace/gdn-sm90-win-20260926/*-native.
+Do not equate whole-image static opcode counts with executed instruction work.
+S4 casts compile-only; S5 is a separate single-axis, bit-preserving experiment.
 
 Source /workspace/gdn-sm90-win-20260926/state-source; plan/resume/records in
 the parent task directory. R1 register-only24/104/192/192 passes14cases with
