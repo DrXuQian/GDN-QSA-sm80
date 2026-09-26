@@ -15,6 +15,7 @@ namespace gdn::sm90 {
 // BF16 QK / FP16 KK storage. This is NOT bit-equivalent to gated TF32 operands.
 template<class Base, bool AuxInverse = false>
 struct ScalarGdnAux : Base {
+    static constexpr bool SeparateScalarGateProducer = true;
     static_assert(Base::NumStateMmaWarpGroups == 2);
     using OrderedMathBarriers = OrderedPair<Base::OrderedBarrierId0, Base::OrderedBarrierId1>;
     using Element = typename Base::Element;
@@ -44,7 +45,7 @@ struct ScalarGdnAux : Base {
         Params const& params, Problem const& problem, Tile const& tile,
         Work const& work, QPipeline& qp, QState& qw, KPipeline& kp, KState& kw,
         typename Base::MainloopVPipeline& vp, typename Base::VPipelineState& vw,
-        AlphaPipeline& ap, AlphaState& aw, SharedStorage& smem) {
+        AlphaPipeline&, AlphaState&, SharedStorage& smem) {
         using namespace cute;
         auto qload = typename Base::LoadQ(params.tma_load_q, qp, smem.smem_q);
         auto kload = typename Base::LoadK(params.tma_load_k, kp, smem.smem_k);
@@ -53,6 +54,26 @@ struct ScalarGdnAux : Base {
         auto ksd = kload.partition_SD(problem,tile,work);
         auto vsd = vload.partition_SD(problem,tile,work);
         uint32_t leader = elect_one_sync();
+        CUTE_NO_UNROLL
+        for (int block=0; block<ceil_div(work.seq_len,64); ++block) {
+            qload.step(qsd,block,qw,leader);
+            kload.step(ksd,block,kw,leader);
+            vload.step(vsd,block,vw,leader);
+        }
+    }
+
+    template<class Problem, class Tile, class Work>
+    CUTE_DEVICE void load_alpha_and_last(
+        Params const& params, Problem const& problem, Tile const&, Work const& work,
+        AlphaPipeline& ap, AlphaState& aw, AlphaState& ar,
+        AlphaLastPipeline& lp, AlphaLastState& lw, SharedStorage& smem) {
+        using namespace cute;
+        auto alpha = make_tensor(make_smem_ptr(smem.smem_alpha.data()),
+                                 typename Base::QKQSmemLayoutAlpha{});
+        auto last = make_tensor(make_smem_ptr(smem.smem_alpha_last.data()),
+                                typename Base::SmemLayoutAlphaLast{});
+        int lane = int(threadIdx.x) & 31;
+        // Same S12 values/rounding/stage storage; only producer ownership moves.
         auto factors = [&](int lane, float lo, float hi, int stage) __attribute__((always_inline)) {
             float elo = exp2f(lo), ehi = exp2f(hi);
             smem.gate_factors[stage*128+lane] = elo;
@@ -63,11 +84,17 @@ struct ScalarGdnAux : Base {
         CUTE_NO_UNROLL
         for (int block=0; block<ceil_div(work.seq_len,64); ++block) {
             load_scalar_gate<64,128>(params.gate_ptr, problem.num_v_heads, work,
-                block,ap,aw,make_tensor(make_smem_ptr(smem.smem_alpha.data()),
-                                       typename Base::QKQSmemLayoutAlpha{}),factors);
-            qload.step(qsd,block,qw,leader);
-            kload.step(ksd,block,kw,leader);
-            vload.step(vsd,block,vw,leader);
+                                    block,ap,aw,alpha,factors);
+            // Preserve the existing32-thread alpha consumer and alpha-last
+            // producer: no changed barrier count, no new stage ownership.
+            ap.consumer_wait(ar);
+            lp.producer_acquire(lw);
+            int valid = min(int(work.seq_len-block*64),64);
+            CUTE_UNROLL
+            for (int k=lane; k<128; k+=32) last(k,lw.index())=alpha(valid-1,k,ar.index());
+            cutlass::arch::fence_view_async_shared();
+            lp.producer_commit(lw); ++lw;
+            ap.consumer_release(ar); ++ar;
         }
     }
 
