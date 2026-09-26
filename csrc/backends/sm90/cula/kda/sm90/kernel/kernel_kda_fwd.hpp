@@ -42,7 +42,12 @@ get_register_requirements(
     uint32_t reg_alloc_granularity = 8;
 
 #if !defined(FLAT_DEBUG_PRINT) || !FLAT_DEBUG_PRINT
+#ifdef GDN_SM90_VALUE_LOADER_REGS
+    uint32_t load_registers = GDN_SM90_VALUE_LOADER_REGS;
+    static_assert(GDN_SM90_VALUE_LOADER_REGS == 32);
+#else
     uint32_t load_registers = 40 - 2 * reg_alloc_granularity;
+#endif
 #else
     uint32_t load_registers = 40;
 #endif
@@ -206,6 +211,10 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
         find_option_t<Tag::kAuxRegisters, Int<DefaultAuxMmaRegisterRequirement>, Options>::value;
     static_assert((LdStRegisterRequirement + AuxMmaRegisterRequirement +
                    NumStateMmaWarpGroups*StateMmaRegisterRequirement)*128 <= 65536);
+#ifdef GDN_SM90_VALUE_LOADER_REGS
+    static_assert(NumStateMmaWarpGroups == 1 && AuxMmaRegisterRequirement == 232 &&
+                  StateMmaRegisterRequirement == 192 && LdStRegisterRequirement == 32);
+#endif
 
     // Actual constructor counts, shared with the compiled host proof. A V64
     // CTA must not retain phantom arrivals from the removed second state WG.
