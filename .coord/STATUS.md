@@ -1,9 +1,28 @@
 # PPU original-structure port
 
-updated-at: 2026-09-25 15:25:34 UTC
-working-on: static solve A/B published; awaiting user box numerical admission and complete ACU capture
-blocked-on: device verdict not measured locally; retained HV/default routing unchanged
-last-commit: ec6e5d4 (published static solve, tested8434d88/577ef7d identical tree)
+updated-at: 2026-09-26 01:21:03 UTC
+working-on: SM80/legacy PPU and SM90/PPU1.7 architecture design; complete algorithms share semantics, not a forced stage DAG
+blocked-on: no design blocker; new PPU1.7 native build/device admission not attempted; legacy solve-static box verdict still pending
+last-commit: 2182e7c (local published-tree merge; kernel implementation ec6e5d4 remains unchanged)
+
+## Current design checkpoint
+
+Inspected PPU CUTLASS3.6.0 commit023e82d: explicit ACOMPUTE10700 ->90a;
+standard BF16/FP16 TMA/GMMA separate from FP8/FP4 extensions. Legacy GDN's
+GDN_QSA_PPU branch is AIU-specific, so replacing include paths is not a port.
+User policy: PPU1.0/1.5 retain actlize; PPU1.7 uses the supplied CUTLASS fork.
+
+Proposed docs/BACKEND_ARCHITECTURE.md separates algorithm/numerical contract,
+execution family and target/toolchain. Share API/oracle/registry; private DAG,
+workspace and pipeline per implementation. No full Cartesian-product promise,
+no cross-algorithm RAW-BIT claim, no loss of existing scan/reset winners.
+cuLA C++ fused KDA is not automatically scalar-gate GDN; latest FlashInfer GDN
+is DSL, so it is an algorithm reference, not a new shipping DSL dependency.
+This checkpoint changes documentation only. No kernel/build/default-route edit,
+native compile, simulator job or box launch. Source/worktree:
+/workspace/gdn-backend-design-20260926. Design remains a proposal, not a new API.
+
+## Previous static-solve handoff
 
 User authorized next step. Worktree /workspace/gdn-wy-solve-static-20260925;
 plan/evidence /workspace/gdn-wy-solve-static-evidence-20260925. Only diagonal
