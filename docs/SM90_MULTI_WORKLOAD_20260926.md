@@ -65,6 +65,14 @@ of algorithm. No averaging across rows may hide either counterexample.
 
 ## Evidence repair, not a timing-rule change
 
+A later, independent failure remains visible: on B1/T2048/Hq32/Hv32,
+g=-0.1, FlashQLA auto has output/state relative errors
+0.021621605/0.009716575. It fails the registered2% gate before timing. Our
+same-input S24/S38 pass. This is a reference admission failure, not evidence
+of a regression in our kernel and not permission to loosen the criterion.
+The paired strong-gate capture passed. Isolated auto/no-CP diagnosis is
+pending; unrelated workloads continue in fresh processes.
+
 At the34th original capture, first-JIT FlashQLA passed all five arms' numerics
 but failed before timing: the old identity collector required a mapped
 `executable.so`. Fresh TVM executables can instead run live LLVM/CUDA modules.

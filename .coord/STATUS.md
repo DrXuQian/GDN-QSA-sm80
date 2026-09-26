@@ -1,11 +1,22 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 16:47:08 UTC
-working-on: resumed frozen 56-capture matrix after actual fresh/cached JIT identity proof
-blocked-on: native PPU1.7 SDK/model unavailable; expanded performance goal not yet met
-last-commit: f959713 checkpoint; matrixb2101d2, stash81dac54, loaderc5c0584 published
+updated-at: 2026-09-26 16:56:10 UTC
+working-on: finish independent workload cells; preserve FlashQLA weak GVA1 numeric failure for isolated diagnosis
+blocked-on: native PPU1.7 SDK/model unavailable; one reference arm fails original2% gate, no tolerance change
+last-commit: 9c1c165 multi-workload report; matrixafe28fa, stash81dac54, loaderc5c0584 published
 
 ## Current checkpoint
+
+16:56 checkpoint:43PASS/1FAIL/12pending at last completed tranche. Reference
+FlashQLA auto on B1/T2048/Hq32/Hv32,g=-.1 has errors[.021621605,.009716575],
+fails original2% gate before timing. Our same-input S24/S38 are admitted.
+Stronggate correspondingcells pass. Failingreferencepaused, notgreen/SKIP;
+separate exact-input no-timing auto/noCP diagnostic prepared, notyetexecuted.
+Independent heads16/varyFP32/initialvary tranche runs sequential session93316.
+FollowupGPUadmission stillNOT_RUN; numericalfailure neverclears goalgate.
+Main report docs/SM90_MULTI_WORKLOAD_20260926.md records completedcounterexamples.
+Local Python3.12 re-extraction matches2508forwards exactly; Python3.10
+descriptivefloat-sum last-bit mismatch was not hidden with a tolerance.
 
 16:46 checkpoint: 37/56 captures PASS, 1 running, 18 pending. Re-extracted
 36 completed captures/2376 full forwards exactly from SQLite. All four
