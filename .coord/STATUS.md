@@ -1,11 +1,19 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 17:23:36 UTC
-working-on: 56-attempt matrix archived locally; S41 six-cell nsys confirmation; S42 shared-H experiment registered before edits
+updated-at: 2026-09-26 17:34:47 UTC
+working-on: S41 six nsys captures closed; S42 native-rejected; S43 two-state-WG shared-H compile/map checks
 blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: 4b33948 full matrix report; matrix5180295, stash81dac54, loaderc5c0584
+last-commit: 06757fb matrix checkpoint; matrix5180295, S42bbddadd, S43 isolated worktree in progress
 
 ## Current checkpoint
+
+17:34 UTC: S41 six captures/408 full forwards exactSQLite local re-extraction.
+One narrow parent win at T8192weak, five UNRESOLVED; neither long cell beats
+fastest FI, both Hv16 cells lose QLA. No default promotion. S39/S40 all8 graph
+cells lose. S42 actual16384-cell STSM/SSmap and3negativesPASS, but all4native
+bodies C7512,920/1016Bstack => rejected before GPU. S43 two-WG shared-H,
+state160/aux168, registeredbeforeedit, CPUcompile session64963/map44617.
+H800 currently idle/ON, expanded target unmet; no shutdown attempted.
 
 17:23 UTC: all12 paired graph screens complete. S39/S40 lose all4 cells each;
 S41 ~0.5us T2048 graph gain, T8192 UNRESOLVED. No speed promotion from graph.
