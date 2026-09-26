@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 04:55:01 UTC
-working-on: nsys comparison complete, publishing reports and reproducible harness; production kernels/defaults unchanged
+updated-at: 2026-09-26 04:56:29 UTC
+working-on: nsys comparison complete; source tree unchanged, evidence archived, publishing handoff
 blocked-on: none for H800 comparison; native PPU1.7 SDK/model unavailable
-last-commit: 7aa9a01 (preregistered nsys comparison/accounting)
+last-commit: a54e3f1 (complete measured cuLA/nsys verdict and machine-readable evidence)
 
 ## cuLA / nsys comparison checkpoint
 
