@@ -1,11 +1,21 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 14:52:10 UTC
-working-on: S36 all32 builds/native gates passed;28/32 numerical+event screens complete,4 pending; then preregistered nsys finalists
+updated-at: 2026-09-26 15:09:09 UTC
+working-on: S36 closed32/32+4nsys no winner; S37/S38 V64 disjoint-CTA maps/local native pass, remote builds in progress
 blocked-on: native PPU1.7 SDK/model unavailable; fastest FlashInfer target not yet met
-last-commit: 8d3bdbe main checkpoint; S36 source8f513e2; incumbent S24 bc3c154/head06b7471 unchanged
+last-commit: 2a035c3 main checkpoint; S36 source8f513e2; S37/S38c490c8d; incumbent S24 unchanged
 
 ## Current checkpoint
+
+15:09 UTC: S36 COMPLETE32/32 compiled/native/numeric/screened;0pending.
+4finalistcaptures/288fullforwards re-extracted EXACT; O2/beta5 candidates
+lose or unresolved againstS24 and all lose fastestFI. No promotion.
+Rawarchive local/remote SHA d15838fc845eb5a9dd7be9a1eab891ce86f20862404761247f70d65e98fb5c7d.
+Report docs/SM90_STAGE_SWEEP_20260926.md. S37/S38 separately registered14:56:55:
+V128->2V64CTAs,one stateWG;aux104 then232, state192. Actual384threads,
+152576Bshared;16384state/8192output ownersexactonce,96shapeABI maps,4negative
+controls PASS. Local4-body native buildPASS,noC7512;spill16B/8B. Device numeric
+and timing still NOT_RUN; remoteisolatedbuilds started. Goalunmet,H800ON.
 
 14:52 UTC: S36 compiled32/32, actual shared168960..224256 <=232448B;
 native gates32/32 PASS. Screen28/32 complete,4 pending, no numerical failure.
