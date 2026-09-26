@@ -1,11 +1,22 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 16:05:08 UTC
-working-on: frozen S24/S38 multi-workload admission; 14 workloads x2 gates x2 libraries, sequential nsys captures
-blocked-on: native PPU1.7 SDK/model unavailable; expanded speed coverage pending (not blocked on user)
-last-commit: c9be6ce multi-workload counterexample; matrix71534d6, stash81dac54, loaderc5c0584 published
+updated-at: 2026-09-26 16:31:00 UTC
+working-on: repair fresh/cached FlashQLA JIT identity, preserve attempts, then resume frozen 56-capture matrix
+blocked-on: native PPU1.7 SDK/model unavailable; metadata admission defect under repair, no user input needed
+last-commit: 26d1a18 checkpoint; matrix d8d56e3, stash81dac54, loaderc5c0584 published
 
 ## Current checkpoint
+
+16:31 UTC: matrix 33 PASS / 1 identity FAIL / 22 PENDING. All five arms of
+the failed heads64-gva4 QLA cell passed numerics/replay before timing stopped.
+First JIT uses an in-memory TVM CUDA module, not necessarily mapped .so.
+Three prior QLA captures had incomplete binary identity after partial fresh
+JIT; preserve and supersede explicitly, never silently mark complete. New
+live-module collector plus metadata-only AST-bound resume migration underway.
+Actual cached module exposed empty GetWriteFormats despite WriteToFile cubin
+support; read pinned C++ implementation, use its exact stored data_ with ELF
+validation. S39/S40/S41 source-check builds PASS, native PPU remains SKIP;
+device tests NOT_RUN. Expanded performance target NOT MET, H800 stays ON.
 
 16:03 checkpoint: frozenmatrix27/56PASS atlastreanalysis,0numericFAIL;
 1788fullforwards exactSQLite. T8192S38~359/361vsFIauto353/353us LOSESbothgates;
