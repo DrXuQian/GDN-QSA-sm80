@@ -120,10 +120,16 @@ def main():
     p.add_argument("--source-archive", type=Path, required=True)
     p.add_argument("--cuda-extension", type=Path, required=True)
     p.add_argument("--ppu-source-extension", type=Path, required=True)
+    p.add_argument("--candidate-extension", type=Path,
+                   help="isolated CUDA SM90 candidate; preserve both incumbent binaries")
+    p.add_argument("--candidate-raw-bit", action="store_true",
+                   help="delivery-only admission: candidate must match the CUDA incumbent bits")
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--gate", type=float, choices=(-.1, -1.), required=True)
     p.add_argument("--preflight-only", action="store_true")
     args = p.parse_args()
+    if args.candidate_raw_bit and not args.candidate_extension:
+        p.error("--candidate-raw-bit requires --candidate-extension")
     args.out.mkdir(parents=True, exist_ok=True)
     if (args.out / "receipt.json").exists():
         raise RuntimeError("refuse to overwrite a measurement receipt")
@@ -136,11 +142,15 @@ def main():
         "ours-cuda": build_receipt(args.cuda_extension, "cuda_sm90", "native"),
         "ours-ppu-source-check": build_receipt(args.ppu_source_extension, "ppu17", "source-check"),
     }
+    if args.candidate_extension:
+        builds["ours-candidate"] = build_receipt(args.candidate_extension, "cuda_sm90", "native")
+    comparison_family = args.family + ("-candidate" if args.candidate_extension else "")
     watch = DeviceWatch(0)
     result = dict(status="INCOMPLETE", scope="H800_CONTROL_NOT_NATIVE_PPU17",
                   protocol="NSYS_KERNEL_SUM_PER_SYNCHRONIZED_NVTX_FORWARD",
-                  comparison_family=args.family, samples=12, calls=[], shape=[*SHAPE, 128],
+                  comparison_family=comparison_family, samples=12, calls=[], shape=[*SHAPE, 128],
                   gate=args.gate, source=source, versions=versions(), incumbent_builds=builds,
+                  candidate_requires_raw_bit=args.candidate_raw_bit,
                   harness_sha256=sha(__file__), utc=datetime.now(timezone.utc).isoformat())
     try:
         for _ in range(3):
@@ -202,7 +212,9 @@ def main():
             calls.update({"flashinfer-auto": lambda: infer("auto"),
                           "flashinfer-no-cp": lambda: infer(False),
                           "flashinfer-auto-log-adapter": lambda: infer("auto", True)})
-        if tuple(calls) != LIBRARY_ROLES[args.family]:
+        if args.candidate_extension:
+            calls["ours-candidate"] = lambda: ours(args.candidate_extension, "cuda_sm90", False)
+        if tuple(calls) != LIBRARY_ROLES[comparison_family]:
             raise AssertionError("role denominator changed")
 
         def checked(role, pair):
@@ -238,6 +250,9 @@ def main():
                 if again != fingerprint:
                     raise AssertionError(f"{role}: repeated result unstable")
             admission[role] = dict(errors=errors, fingerprint=fingerprint, repeat="8/8 RAW-BIT")
+            if role == "ours-candidate" and args.candidate_raw_bit:
+                if fingerprint != admission["ours-cuda"]["fingerprint"]:
+                    raise AssertionError("delivery-only candidate differs from incumbent raw bits")
             print(f"[SM90 library admission] role={role} {admission[role]}", flush=True)
         result["admission"] = admission
         result["reference_binaries"] = reference_binaries(args.family, args.out)

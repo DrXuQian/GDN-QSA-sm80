@@ -27,13 +27,20 @@ export FLASHINFER_WORKSPACE_BASE="$WORK/cache"
 export CUTE_DSL_CACHE_DIR="$WORK/cache/cute-dsl"
 export CUTE_DSL_DUMP_DIR="$WORK/cache/cute-dsl-codegen"
 export CUTE_DSL_KEEP=ptx,cubin
+CANDIDATE_ARGS=()
+if [[ -n ${CANDIDATE_EXTENSION:-} ]]; then
+  CANDIDATE_ARGS+=(--candidate-extension "$CANDIDATE_EXTENSION")
+fi
+if [[ ${CANDIDATE_RAW_BIT:-0} == 1 ]]; then
+  CANDIDATE_ARGS+=(--candidate-raw-bit)
+fi
 "$NSYS" profile --trace=cuda,nvtx --sample=none --cpuctxsw=none \
   --capture-range=cudaProfilerApi --capture-range-end=stop -o "$OUT/forward" \
   "$PYTHON" -u "$ROOT/benchmarks/profile_sm90_libraries.py" \
     --family "$FAMILY" --reference-root "$REF" \
     --source-archive "$WORK/$FAMILY-source.tar.gz" \
     --cuda-extension "$CUDA_EXTENSION" --ppu-source-extension "$PPU_SOURCE_EXTENSION" \
-    --gate "$GATE" --out "$OUT" 2>&1 | tee "$OUT/run.log"
+    --gate "$GATE" --out "$OUT" "${CANDIDATE_ARGS[@]}" 2>&1 | tee "$OUT/run.log"
 "$NSYS" export --type sqlite --output "$OUT/forward.sqlite" "$OUT/forward.nsys-rep"
 "$PYTHON" "$ROOT/tools/analyze_sm90_nsys.py" --sqlite "$OUT/forward.sqlite" \
   --receipt "$OUT/receipt.json" --out "$OUT/result.json" | tee "$OUT/summary.log"

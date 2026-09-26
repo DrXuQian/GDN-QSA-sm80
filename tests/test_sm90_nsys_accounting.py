@@ -137,6 +137,28 @@ class LibraryAccounting(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"foreign"):
             module.extract(self.db,self.receipt)
 
+    def test_candidate_does_not_replace_incumbent_or_reduce_denominator(self):
+        self.receipt["comparison_family"] = "flashqla-candidate"
+        with self.assertRaisesRegex(ValueError, "denominator"):
+            module.extract(self.db, self.receipt)
+        for sample in range(12):
+            start = (48 + sample) * 100000
+            label = f"GDN_FORWARD|ours-candidate|{sample:03d}"
+            self.receipt["calls"].append(label)
+            self.db.execute("INSERT INTO NVTX_EVENTS VALUES(?,?,?,NULL)", (start,start+90000,label))
+            self.db.execute("INSERT INTO CUPTI_ACTIVITY_KIND_KERNEL VALUES(?,?,1)", (start+1000,start+40000))
+        result = module.extract(self.db, self.receipt)
+        self.assertEqual(len(result["forwards"]), 60)
+        self.assertEqual(result["summary"]["ours-candidate"]["calls"], 12)
+        self.assertEqual(result["summary"]["ours-cuda"]["calls"], 12)
+        # Removing the SAME candidate call from both artifacts still fails.
+        label = self.receipt["calls"].pop()
+        row = self.db.execute("SELECT start,end FROM NVTX_EVENTS WHERE text=?", (label,)).fetchone()
+        self.db.execute("DELETE FROM NVTX_EVENTS WHERE text=?", (label,))
+        self.db.execute("DELETE FROM CUPTI_ACTIVITY_KIND_KERNEL WHERE start>=? AND end<=?", row)
+        with self.assertRaisesRegex(ValueError, "denominator"):
+            module.extract(self.db, self.receipt)
+
 
 if __name__ == "__main__":
     unittest.main()

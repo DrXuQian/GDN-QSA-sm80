@@ -13,6 +13,8 @@ LIBRARY_ROLES = {
     "flashinfer": ("ours-cuda", "ours-ppu-source-check", "flashinfer-auto",
                    "flashinfer-no-cp", "flashinfer-auto-log-adapter"),
 }
+for _family in ("flashqla", "flashinfer"):
+    LIBRARY_ROLES[_family + "-candidate"] = LIBRARY_ROLES[_family] + ("ours-candidate",)
 
 
 def union_ns(intervals):
