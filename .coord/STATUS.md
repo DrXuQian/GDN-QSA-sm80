@@ -1,11 +1,24 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 11:54:50 UTC
-working-on: S25 LOSE; S26/S27 UNRESOLVED; final evidence validation and archive; retain S24
+updated-at: 2026-09-26 12:01:47 UTC
+working-on: bounded S25-S27 inventory closed; S24 retained; final report push
 blocked-on: native PPU1.7 SDK/model unavailable; fastest FlashInfer target not yet met
-last-commit: 9235fe5; S25 ab11c9b/S26 360bd17/S27 80b6d6f kernels
+last-commit: 4aabba3 (exact nsys evidence); S25/S26/S27 test branches pushed
 
 ## Current checkpoint
+
+FINAL: three captures/216 full forwards exactly re-extracted;12/12 archive
+trace hashes and3/3 binary hashes checked, CSV3/3 matches. No new winner.
+Report docs/SM90_EX2_GUARD_20260926.md; raw archive23,084,687bytes local+remote
+SHAea8b88aee11c3d8483ff0ce05f2d9695ad01967923a074a20df6c33c2185adf0.
+S25 testhead7685af4, S26 0c94a8f, S27 a82ddc1 pushed, clean.14cases each,
+2direct-byte stress pairs each,40/38/40host tests all PASS; device negative
+omittedprefix catches160laneflags. Skillreference scopedlesson updated and
+validated. Current H800 idle; only own SSH master awaits archive handoff.
+S24 still beats historical fastest QLA, still loses current fastest FI;
+beat-both target NOT MET. NativePPU17 SKIP; default/SM80unchanged.
+
+### Validation checkpoint (superseded)
 
 All three weak screenings completed exclusively. S25 153.776 versus120.048us
 is a disjoint loss. S26 122.288 versus120.655 and S27 122.3995 versus120.560us
