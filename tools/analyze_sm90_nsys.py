@@ -177,7 +177,10 @@ def main():
     print(json.dumps(result["comparisons"], indent=2))
     if result["candidate_vs_references"]:
         print("[candidate vs references] " + json.dumps(result["candidate_vs_references"], sort_keys=True))
-        print("[SM90 goal] beats-all-reference-paths=" + str(result["candidate_beats_all_reference_paths"]))
+        print("[SM90 goal] scope=current-reference-family references=" +
+              ",".join(sorted(result["candidate_vs_references"])) +
+              " beats-all-reference-paths=" + str(result["candidate_beats_all_reference_paths"]) +
+              " both-library-target=REQUIRES-CROSS-FAMILY-VERDICT")
 
 
 if __name__ == "__main__":
