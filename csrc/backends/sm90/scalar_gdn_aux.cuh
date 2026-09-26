@@ -170,6 +170,20 @@ struct ScalarGdnAux : Base {
             bp.consumer_wait(br);
             auto out_qk = make_fragment_like<Element>(acc_qk);
             auto out_kk = make_fragment_like<Inverse>(acc_kk);
+            // Same per-element FP32 order as the fused epilogue, but separate
+            // beta, decay and publication passes to expose independent work.
+            CUTE_UNROLL
+            for (int i = 0; i < size(coords); ++i) {
+                auto [row, col] = coords(i);
+                acc_kk(i) = acc_kk(i) * beta(row,br.index());
+            }
+            CUTE_UNROLL
+            for (int i = 0; i < size(coords); ++i) {
+                auto [row, col] = coords(i);
+                float decay = exp2f(alpha(row,0,ar.index())-alpha(col,0,ar.index()));
+                acc_qk(i) = acc_qk(i) * decay * params.scale;
+                acc_kk(i) = acc_kk(i) * decay;
+            }
             CUTE_UNROLL
             for (int i = 0; i < size(coords); ++i) {
                 auto [row, col] = coords(i);
@@ -181,14 +195,10 @@ struct ScalarGdnAux : Base {
                 // Inactive intermediates may overflow; the final live selects
                 // below must discard them before either product is published.
                 // Keep standard exp2f, not an approximate/FTZ substitute.
-                float row_log = alpha(row,0,ar.index());
-                float col_log = alpha(col,0,ar.index());
-                float row_beta = beta(row,br.index());
-                float decay = exp2f(row_log-col_log);
-                out_qk(i) = Element(live ? acc_qk(i) * decay * params.scale : 0.f);
+                out_qk(i) = Element(live ? acc_qk(i) : 0.f);
                 // Inverse expects positive lower input, garbage diagonal and
                 // zero upper triangle, then applies beta along its columns.
-                out_kk(i) = Inverse(live ? acc_kk(i) * row_beta * decay : 0.f);
+                out_kk(i) = Inverse(live ? acc_kk(i) : 0.f);
             }
             kkp.producer_acquire(kw);
             qkp.producer_acquire(qw);
