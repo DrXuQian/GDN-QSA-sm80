@@ -24,9 +24,13 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def flags(target, mode):
+def flags(target, mode, release=False):
     result = ["-std=c++17", "-O3", "--expt-relaxed-constexpr", "--extended-lambda",
               "-gencode=arch=compute_90a,code=sm_90a", "-lineinfo", "-Xcompiler=-fPIC"]
+    if release:
+        # Remove CUTLASS's device pipeline-role DEBUG checks, not our public
+        # ABI validation or independent numeric/measurement admission.
+        result += ["-DNDEBUG"]
     if target == "ppu17":
         result += ["-DGDN_SM90_PPU17=1", "-DACOMPUTE_VERSION=10700"]
         if mode == "source-check":
@@ -66,6 +70,7 @@ def main():
     p.add_argument("--compiler",type=Path)
     p.add_argument("--cutlass-root",default=os.getenv("PPU_CUTLASS_ROOT"))
     p.add_argument("--device-only",action="store_true")
+    p.add_argument("--release",action="store_true",help="explicit NDEBUG candidate; flags remain hash-bound")
     p.add_argument("--reuse-device",action="store_true",help="reuse only an exactly hash-bound device object; recheck target/codegen/link/import")
     args=p.parse_args()
     out=args.out.resolve(); out.mkdir(parents=True,exist_ok=True)
@@ -83,7 +88,7 @@ def main():
     if not compiler.is_file(): raise ValueError(f"compiler missing: {compiler}")
     # Keep wrapper path: SDK nvcc wrappers may locate their runtime relative to it.
     include=[f"-I{SOURCE}",f"-I{SOURCE/'cula'}",f"-I{dep/'include'}"]
-    options=flags(args.target,args.mode)
+    options=flags(args.target,args.mode,args.release)
     identity=dict(target=args.target,mode=args.mode,compiler=str(compiler),compiler_sha256=sha(compiler),
                   dependency=str(dep),flags=options,include=include,device_admission="NOT_RUN")
     identity["dependency_version_sha256"]=sha(dep/"include/cutlass/version.h")

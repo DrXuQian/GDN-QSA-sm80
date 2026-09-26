@@ -57,6 +57,10 @@ class Contracts(unittest.TestCase):
             self.assertIn("-gencode=arch=compute_90a,code=sm_90a",f)
             self.assertFalse(any("-D__CUDA_ARCH__" in x for x in f))
             self.assertEqual("-DGDN_SM90_SOURCE_CHECK=1" in f,mode=="source-check")
+        debug=module.flags("cuda_sm90","native")
+        release=module.flags("cuda_sm90","native",True)
+        self.assertNotIn("-DNDEBUG",debug)
+        self.assertEqual(release,debug+["-DNDEBUG"])
         # Explicit reuse cannot hide a stale object, changed source or target.
         directory=Path("/workspace")/f"gdn-sm90-reuse-{uuid4().hex}"
         directory.mkdir()
@@ -64,7 +68,8 @@ class Contracts(unittest.TestCase):
         identity=dict(target="cuda_sm90",source_sha256={"a":"a"})
         prior=identity|{"device_object_sha256":module.sha(obj)}
         module.admit_reuse(prior,identity,obj)
-        for plant in (identity|{"target":"ppu17"},identity|{"source_sha256":{"a":"b"}}):
+        for plant in (identity|{"target":"ppu17"},identity|{"source_sha256":{"a":"b"}},
+                      identity|{"flags":release}):
             with self.assertRaisesRegex(ValueError,"changed"): module.admit_reuse(prior,plant,obj)
         obj.write_bytes(b"modified")
         with self.assertRaisesRegex(ValueError,"hash mismatch"):module.admit_reuse(prior,identity,obj)
