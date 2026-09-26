@@ -35,6 +35,7 @@
 #include <cutlass/arch/barrier.h>
 
 #include "kerutils/common/cute_ext.hpp"
+#include "inverse_warp_coordinate.hpp"
 
 namespace kerutils {
 
@@ -1057,7 +1058,7 @@ private:
     using CopyOpO_R2S = UniversalCopy<Element, Element>;
 #endif
 
-    int warp_id_in_wg = cutlass::canonical_warp_idx() - cutlass::NumWarpsPerWarpGroup * cutlass::canonical_warp_group_idx();
+    int warp_id_in_wg = inverse_warp_in_group(unsigned(threadIdx.x));
     int x = warp_id_in_wg / 2;
     int y = warp_id_in_wg % 2;
 
