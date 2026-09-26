@@ -6,6 +6,7 @@
 #include "ordered_pair.cuh"
 #include "aux_chunk_loop.cuh"
 #include "relative_gate_layout.cuh"
+#include "value_tile.cuh"
 
 namespace gdn::sm90 {
 
@@ -18,8 +19,9 @@ namespace gdn::sm90 {
 template<class Base, bool AuxInverse = false>
 struct ScalarGdnAux : Base {
     static constexpr bool SeparateScalarGateProducer = true;
-    static_assert(Base::NumStateMmaWarpGroups == 2);
-    using OrderedMathBarriers = OrderedPair<Base::OrderedBarrierId0, Base::OrderedBarrierId1>;
+    static_assert(Base::NumStateMmaWarpGroups == 1 || Base::NumStateMmaWarpGroups == 2);
+    using OrderedMathBarriers = std::conditional_t<Base::NumStateMmaWarpGroups == 2,
+        OrderedPair<Base::OrderedBarrierId0, Base::OrderedBarrierId1>, SingleStateOrder>;
     using Element = typename Base::Element;
     using Inverse = typename Base::InverseType;
     using Params = typename Base::Params;

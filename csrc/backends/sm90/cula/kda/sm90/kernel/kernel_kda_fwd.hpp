@@ -199,8 +199,21 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
     static constexpr auto RegisterRequirements =
         get_register_requirements(MaxThreadsPerBlock, MinBlocksPerMultiprocessor, NumStateMmaWarpGroups);
     static constexpr uint32_t LdStRegisterRequirement = get<0>(RegisterRequirements);
-    static constexpr uint32_t StateMmaRegisterRequirement = get<1>(RegisterRequirements);
-    static constexpr uint32_t AuxMmaRegisterRequirement = get<2>(RegisterRequirements);
+    static constexpr uint32_t StateMmaRegisterRequirement =
+        NumStateMmaWarpGroups == 1 ? 192 : get<1>(RegisterRequirements);
+    static constexpr int DefaultAuxMmaRegisterRequirement = get<2>(RegisterRequirements);
+    static constexpr uint32_t AuxMmaRegisterRequirement =
+        find_option_t<Tag::kAuxRegisters, Int<DefaultAuxMmaRegisterRequirement>, Options>::value;
+    static_assert((LdStRegisterRequirement + AuxMmaRegisterRequirement +
+                   NumStateMmaWarpGroups*StateMmaRegisterRequirement)*128 <= 65536);
+
+    // Actual constructor counts, shared with the compiled host proof. A V64
+    // CTA must not retain phantom arrivals from the removed second state WG.
+    static constexpr int StateThreads = 128*NumStateMmaWarpGroups;
+    static constexpr int AuxThreads = 128*NumAuxMmaWarpGroups;
+    static constexpr int QKInputConsumers = StateThreads+AuxThreads;
+    static constexpr int AlphaConsumers = StateThreads+AuxThreads+32;
+    static constexpr int BetaConsumers = StateThreads+AuxThreads;
 
     static size_t
     get_workspace_size(Arguments const& args) {
@@ -241,8 +254,8 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
         enum class WarpGroupRole {
             LdSt = 0,
             Math0 = 1,
-            Math1 = 2,
-            MathA = 3,  // auxiliary math WG
+            Math1 = NumStateMmaWarpGroups == 2 ? 2 : -1,
+            MathA = NumStateMmaWarpGroups+1,  // after the actual state WGs
         };
 
         // NOTE: CollectiveInverse will have more utilization on warp 0&1
@@ -274,18 +287,18 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
             CollectiveMainloop::prefetch_tma_descriptors(params.mainloop);
         }
 
-        constexpr int NumStateMathThreads = NumStateMmaWarpGroups * cutlass::NumThreadsPerWarpGroup;
-        constexpr int NumAuxMathThreads = NumAuxMmaWarpGroups * cutlass::NumThreadsPerWarpGroup;
+        constexpr int NumStateMathThreads = StateThreads;
+        constexpr int NumAuxMathThreads = AuxThreads;
 
         QPipelineParams q_pipeline_params;
         q_pipeline_params.transaction_bytes = CollectiveMainloop::LoadQBytes;
         q_pipeline_params.is_leader = lane_predicate && (ldst_warp_role == LdStWarpRole::LoadQKV);
-        q_pipeline_params.num_consumers = NumStateMathThreads + NumAuxMathThreads;
+        q_pipeline_params.num_consumers = QKInputConsumers;
 
         KPipelineParams k_pipeline_params;
         k_pipeline_params.transaction_bytes = CollectiveMainloop::LoadKBytes;
         k_pipeline_params.is_leader = lane_predicate && (ldst_warp_role == LdStWarpRole::LoadQKV);
-        k_pipeline_params.num_consumers = NumStateMathThreads + NumAuxMathThreads;
+        k_pipeline_params.num_consumers = QKInputConsumers;
 
         VPipelineParams v_pipeline_params;
         v_pipeline_params.transaction_bytes = CollectiveMainloop::LoadVBytes;
@@ -295,7 +308,7 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
         AlphaPipelineParams alpha_pipeline_params;
         if constexpr (NeedsAlpha) {
             alpha_pipeline_params.producer_arv_count = cutlass::NumThreadsPerWarp;
-            alpha_pipeline_params.consumer_arv_count = NumStateMathThreads + NumAuxMathThreads + cutlass::NumThreadsPerWarp;
+            alpha_pipeline_params.consumer_arv_count = AlphaConsumers;
         }
 
         OPipelineParams o_pipeline_params;
@@ -319,7 +332,7 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
         BetaPipelineParams beta_pipeline_params;
         if constexpr (NeedsBeta) {
             beta_pipeline_params.producer_arv_count = cutlass::NumThreadsPerWarp;
-            beta_pipeline_params.consumer_arv_count = NumAuxMathThreads + NumStateMathThreads;
+            beta_pipeline_params.consumer_arv_count = BetaConsumers;
         }
 
         OrderedMathBarriers math_barriers;
@@ -603,7 +616,10 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
         } else if (warp_group_role == WarpGroupRole::MathA) {
             DPRINTF0_WG(
                 "Compute[aux]: warp_group_idx:%d, RegisterRequirement:%d\n", warp_group_idx, AuxMmaRegisterRequirement);
-            cutlass::arch::warpgroup_reg_dealloc<AuxMmaRegisterRequirement>();
+            if constexpr (AuxMmaRegisterRequirement > 128)
+                cutlass::arch::warpgroup_reg_alloc<AuxMmaRegisterRequirement>();
+            else
+                cutlass::arch::warpgroup_reg_dealloc<AuxMmaRegisterRequirement>();
             auto work_desc = scheduler.get_next_work(params.scheduler, params.problem_size);
             CUTE_NO_UNROLL
             for (; work_desc.is_valid(params.scheduler);

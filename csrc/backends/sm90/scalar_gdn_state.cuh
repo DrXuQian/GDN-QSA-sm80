@@ -16,6 +16,7 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
     using Inverse = typename Base::InverseType;
     using Params = typename Base::Params;
     using SharedStorage = typename Parent::SharedStorage;
+    using Value = cute::Int<Base::ValueTile>;
 
     template<class Problem, class Work>
     CUTE_DEVICE void compute(
@@ -60,14 +61,14 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
         auto sk_thread = sk_mma.get_thread_slice(tid);
         auto newv_thread = newv_mma.get_thread_slice(tid);
         auto inv_thread = inv_mma.get_thread_slice(local_tid);
-        auto h = partition_fragment_C(kv_thread, Shape<_128,_128>{});
+        auto h = partition_fragment_C(kv_thread, Shape<Value,_128>{});
         auto q_desc = o1_thread.make_fragment_B(o1_thread.partition_B(q));
         auto k_desc = sk_thread.make_fragment_B(sk_thread.partition_B(k));
         auto kt_desc = kv_thread.make_fragment_B(kv_thread.partition_B(kt));
         auto qk_desc = o2_thread.make_fragment_B(o2_thread.partition_B(qk));
         auto inv_desc = newv_thread.make_fragment_B(newv_thread.partition_B(kk_operand));
-        auto c_output = o1_thread.partition_C(make_identity_tensor(Shape<_128,_64>{}));
-        auto c_value = kv_thread.partition_A(make_identity_tensor(Shape<_128,_64>{}));
+        auto c_output = o1_thread.partition_C(make_identity_tensor(Shape<Value,_64>{}));
+        auto c_value = kv_thread.partition_A(make_identity_tensor(Shape<Value,_64>{}));
         auto c_inverse = inv_thread.partition_C(make_identity_tensor(Shape<_64,_64>{}));
 
         auto load_v = make_tiled_copy_C(Copy_Atom<SM75_U16x8_LDSM_T,Element>{}, sk_mma);
@@ -80,7 +81,13 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             auto global_h = make_tensor(make_gmem_ptr(params.ptr_input_state),
                 state_layout<128,128>(problem.num_v_heads,problem.num_seqs))(
                     _,_,work.o_head_idx(),work.seq_idx);
-            copy(copy_h, ch.partition_S(kda::sm90::collective::select_tensor<1,0>(global_h)), h);
+            if constexpr (Base::ValueTile == 128) {
+                copy(copy_h, ch.partition_S(kda::sm90::collective::select_tensor<1,0>(global_h)), h);
+            } else {
+                auto half = local_tile(domain_offset(make_coord(_0{},work.value_offset),global_h),
+                                       Shape<_128,Value>{},make_coord(_0{},_0{}));
+                copy(copy_h,ch.partition_S(kda::sm90::collective::select_tensor<1,0>(half)),h);
+            }
         } else {
             clear(h);
         }
@@ -111,7 +118,7 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             int valid = last ? int(work.seq_len-chunk*64) : 64;
             ap.consumer_wait(ar);
             qp.consumer_wait(qr);
-            auto acc_o = partition_fragment_C(o1_thread,Shape<_128,_64>{});
+            auto acc_o = partition_fragment_C(o1_thread,Shape<Value,_64>{});
             if constexpr (!first) {
                 auto operand_h = kda::sm90::collective::make_acc_into_op<Element>(h,typename Base::TiledMmaO1::LayoutA_TV{});
                 warpgroup_fence_operand(operand_h);
@@ -130,7 +137,7 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             qp.consumer_release(qr); ++qr;
 
             kp.consumer_wait(kr);
-            auto acc_sk = partition_fragment_C(sk_thread,Shape<_128,_64>{});
+            auto acc_sk = partition_fragment_C(sk_thread,Shape<Value,_64>{});
             if constexpr (!first) {
                 auto operand_h = kda::sm90::collective::make_acc_into_op<Element>(h,typename Base::TiledMmaSK::LayoutA_TV{});
                 warpgroup_fence_operand(operand_h);
@@ -159,7 +166,7 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
                 cutlass::arch::fence_view_async_shared();
             }
 
-            auto acc_delta = partition_fragment_C(newv_thread,Shape<_128,_64>{});
+            auto acc_delta = partition_fragment_C(newv_thread,Shape<Value,_64>{});
             {
                 auto operand_r = kda::sm90::collective::make_acc_into_op<Element>(residual,typename Base::TiledMmaNewV::LayoutA_TV{});
                 warpgroup_fence_operand(operand_r);
@@ -228,7 +235,13 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             auto global_h = make_tensor(make_gmem_ptr(params.ptr_output_state),
                 state_layout<128,128>(problem.num_v_heads,problem.num_seqs))(
                     _,_,work.o_head_idx(),work.seq_idx);
-            copy(copy_h,h,ch.partition_D(kda::sm90::collective::select_tensor<1,0>(global_h)));
+            if constexpr (Base::ValueTile == 128) {
+                copy(copy_h,h,ch.partition_D(kda::sm90::collective::select_tensor<1,0>(global_h)));
+            } else {
+                auto half = local_tile(domain_offset(make_coord(_0{},work.value_offset),global_h),
+                                       Shape<_128,Value>{},make_coord(_0{},_0{}));
+                copy(copy_h,h,ch.partition_D(kda::sm90::collective::select_tensor<1,0>(half)));
+            }
         }
     }
 };

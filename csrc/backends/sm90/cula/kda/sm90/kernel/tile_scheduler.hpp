@@ -34,6 +34,7 @@ struct WorkDesc {
 
     // update by mainloop
     int32_t tile_idx = 0;  // current tile index (mutated by the mainloop)
+    int32_t value_offset = 0; // optional disjoint V-column slice, never a K/sequence split
 
     template <typename Params>
     CUTE_DEVICE bool

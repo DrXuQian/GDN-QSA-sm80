@@ -71,6 +71,8 @@ def main():
     p.add_argument("--cutlass-root",default=os.getenv("PPU_CUTLASS_ROOT"))
     p.add_argument("--device-only",action="store_true")
     p.add_argument("--release",action="store_true",help="explicit NDEBUG candidate; flags remain hash-bound")
+    p.add_argument("--value-split",type=int,choices=(104,232),
+                   help="two disjoint V64 CTAs, fixed state192, explicit auxiliary register budget")
     p.add_argument("--reuse-device",action="store_true",help="reuse only an exactly hash-bound device object; recheck target/codegen/link/import")
     args=p.parse_args()
     out=args.out.resolve(); out.mkdir(parents=True,exist_ok=True)
@@ -89,6 +91,8 @@ def main():
     # Keep wrapper path: SDK nvcc wrappers may locate their runtime relative to it.
     include=[f"-I{SOURCE}",f"-I{SOURCE/'cula'}",f"-I{dep/'include'}"]
     options=flags(args.target,args.mode,args.release)
+    if args.value_split is not None:
+        options += [f"-DGDN_SM90_VALUE_SPLIT_AUX_REGS={args.value_split}"]
     identity=dict(target=args.target,mode=args.mode,compiler=str(compiler),compiler_sha256=sha(compiler),
                   dependency=str(dep),flags=options,include=include,device_admission="NOT_RUN")
     identity["dependency_version_sha256"]=sha(dep/"include/cutlass/version.h")

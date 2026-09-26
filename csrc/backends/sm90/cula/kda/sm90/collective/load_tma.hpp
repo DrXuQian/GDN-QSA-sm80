@@ -140,11 +140,16 @@ struct CollectiveLoadTma {
                     problem_size.total_seqlen,
                     num_kv_heads));                               // global view to the packed varlen sequence
                 Tensor m_varlen = m_varlen_head(_, _, head_idx);  // slice into current head_idx
+                constexpr int ValueRows = size<0>(SmemLayout{});
+                auto value_offset = [&] {
+                    if constexpr (!kIsK && ValueRows != HeadSize) return work_desc.value_offset;
+                    else return _0{};
+                }();
                 Tensor m_offset = domain_offset(
-                    make_coord(_0{}, work_desc.tok_offset),
+                    make_coord(value_offset, work_desc.tok_offset),
                     m_varlen);  // offset to start of the current sequence
                 Tensor g_full =
-                    local_tile(m_offset, make_tile(HeadSize, BlkSeqKV), make_coord(_0{}, _));  // (d, blk, iter_blk)
+                    local_tile(m_offset, make_tile(kIsK ? HeadSize : ValueRows, BlkSeqKV), make_coord(_0{}, _));
                 return g_full;
             }
         }();

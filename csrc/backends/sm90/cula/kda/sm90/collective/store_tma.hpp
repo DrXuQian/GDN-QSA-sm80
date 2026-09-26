@@ -37,6 +37,7 @@
 #include <cutlass/epilogue/collective/collective_builder.hpp>
 
 #include "kerutils/gdn_sm90.cuh"
+#include "value_tile.cuh"
 
 #include "kda/sm90/utils/debug.hpp"
 
@@ -202,11 +203,15 @@ struct CollectiveStoreTma {
                 problem_size.total_seqlen,
                 problem_size.num_v_heads));                                 // O lives in the V/O head space under GVA
             Tensor m_varlen = m_varlen_head(_, _, work_desc.o_head_idx());  // slice into current head_idx
+            auto value_offset = [&] {
+                if constexpr (SizeM{} != HeadSize) return work_desc.value_offset;
+                else return _0{};
+            }();
             Tensor m_offset = domain_offset(
-                make_coord(_0{}, work_desc.tok_offset),
+                make_coord(value_offset, work_desc.tok_offset),
                 m_varlen);  // offset to start of the current sequence
             Tensor g_full =
-                local_tile(m_offset, make_tile(HeadSize, BlkSeqQ), make_coord(_0{}, _));  // (d, blk, iter_blk)
+                local_tile(m_offset, make_tile(SizeM{}, BlkSeqQ), make_coord(_0{}, _));
             return g_full;
         }();
         Tensor s = make_tensor(make_smem_ptr(storage_.data()), SmemLayoutO{});
@@ -262,9 +267,14 @@ struct CollectiveStoreTma {
             for (int i = lane; i < rows * int(SizeM{}); i += 32) {
                 int row = i / int(SizeM{}), col = i % int(SizeM{});
                 int64_t token = work_desc.tok_offset + dst_iter * int(SizeN{}) + row;
-                static_cast<ElementO*>(output_base_)[
-                    (token * problem_size.num_v_heads + work_desc.o_head_idx()) * int(SizeM{}) + col]
-                    = shared(col, row, src_pipe.index());
+                int64_t address;
+                if constexpr (SizeM{} == 128) {
+                    address = (token*problem_size.num_v_heads + work_desc.o_head_idx())*int(SizeM{})+col;
+                } else {
+                    address = gdn::sm90::value_output_index(token,problem_size.num_v_heads,
+                        work_desc.o_head_idx(),work_desc.value_offset,col);
+                }
+                static_cast<ElementO*>(output_base_)[address] = shared(col,row,src_pipe.index());
             }
         }
 

@@ -3,7 +3,7 @@
 #include <cute/tensor.hpp>
 #include "kda/sm90/device/device_universal.hpp"
 #include "kda/sm90/kernel/builder_kda_fwd.hpp"
-#include "scalar_gdn_state.cuh"
+#include "value_types.cuh"
 #include <climits>
 #include <stdexcept>
 
@@ -14,15 +14,12 @@ using BF16 = cutlass::bfloat16_t;
 
 template <class Gate, bool Initial>
 void run(Arguments const& a, cudaStream_t stream) {
-    using Options = std::tuple<Option<Tag::kElementGateGmem, Gate>,
-        Option<Tag::kElementBetaGmem, BF16>,
-        Option<Tag::kInitStateFromInput, cute::bool_constant<Initial>>>;
-    using Stride = cute::tuple<int64_t, _1, int32_t>;
-    using Builder = FlatBuilderKdaFwd<BF16, float, float, Shape<_64,_64,_128>,
-        Stride, Stride, Stride, Stride,
-        cutlass::gemm::KernelTmaWarpSpecializedCooperative, Options>;
-    using Kernel = FlatKernelTmaWarpSpecializedKdaFwd<
-        ScalarGdnState<typename Builder::CollectiveMainloop,true>, typename Builder::TileScheduler, Options>;
+#ifdef GDN_SM90_VALUE_SPLIT_AUX_REGS
+    using Types = ValueKernelTypes<Gate,Initial,64,GDN_SM90_VALUE_SPLIT_AUX_REGS>;
+#else
+    using Types = ValueKernelTypes<Gate,Initial>;
+#endif
+    using Kernel = typename Types::Kernel;
     using Operation = cutlass::device::Universal<Kernel>;
     typename Operation::Arguments args{};
     args.problem_size.total_seqlen = int64_t(a.batch) * a.length;

@@ -96,8 +96,13 @@ struct FlatMainloopTmaWarpSpecializedKdaFwd {
 
     static constexpr int NumLoadWarpGroups = 1;
     static constexpr bool SeparateScalarGateProducer = false;
-    static constexpr int NumStateMmaWarpGroups = 2;
+    static constexpr int ValueTile = find_option_t<Tag::kValueTile, Int<128>, Options>::value;
+    static_assert(ValueTile == 64 || ValueTile == 128);
+    static constexpr int NumStateMmaWarpGroups = ValueTile / 64;
     static constexpr int NumAuxMmaWarpGroups = 1;
+    using StateSchedule = std::conditional_t<ValueTile == 128,
+        cutlass::gemm::KernelTmaWarpSpecializedCooperative,
+        cutlass::gemm::KernelTmaWarpSpecialized>;
 
     static constexpr int StageCountQ = find_option_t<Tag::kStagesQ, Int<2>, Options>::value;
     static constexpr int StageCountK = find_option_t<Tag::kStagesK, Int<2>, Options>::value;
@@ -140,7 +145,7 @@ struct FlatMainloopTmaWarpSpecializedKdaFwd {
     static constexpr auto BlkSeqKV = get<1>(TileShape{});  // Blk_K/V
     static constexpr auto HeadSize = get<2>(TileShape{});  // D (Dq, Dk, Dv all equal)
     static constexpr auto HeadSizeQK = HeadSize;
-    static constexpr auto HeadSizeV = HeadSize;
+    static constexpr auto HeadSizeV = Int<ValueTile>{};
     using HeadSizeHalf = _64;
     using HeadSizeQuar = _32;
 
@@ -204,7 +209,7 @@ struct FlatMainloopTmaWarpSpecializedKdaFwd {
         TileShapeKV,
         ClusterShape,
         DummyStages,
-        cutlass::gemm::KernelTmaWarpSpecializedCooperative>::CollectiveOp;
+        StateSchedule>::CollectiveOp;
 
     // GDN gate is scalar along K. Keep the consumers' logical (token,K,stage)
     // shape, but broadcast one prefix value: no 128-wide gate artifact, neither
@@ -240,7 +245,7 @@ struct FlatMainloopTmaWarpSpecializedKdaFwd {
         TileShapeKV,
         ClusterShape,
         DummyStages,
-        cutlass::gemm::KernelTmaWarpSpecializedCooperative>::CollectiveOp;
+        StateSchedule>::CollectiveOp;
 
     using RefLayoutKV = decltype(make_layout(select<0, 1>(TileShapeKV{}), LayoutRight{}));  // (dv, dk)
     using CollectiveMmaO1 = typename cutlass::gemm::collective::CollectiveBuilder<
@@ -256,7 +261,7 @@ struct FlatMainloopTmaWarpSpecializedKdaFwd {
         TileShapeO1,
         ClusterShape,
         DummyStages,
-        cutlass::gemm::KernelTmaWarpSpecializedCooperative>::CollectiveOp;
+        StateSchedule>::CollectiveOp;
 
     // (blk_q,blk_k) to align with O2 mma, LayoutRight to align with QK mma output
     using DesiredLayoutQK = decltype(make_layout(select<0, 1>(TileShapeQK{}), LayoutRight{}));
@@ -273,7 +278,7 @@ struct FlatMainloopTmaWarpSpecializedKdaFwd {
         TileShapeO2,
         ClusterShape,
         DummyStages,
-        cutlass::gemm::KernelTmaWarpSpecializedCooperative>::CollectiveOp;
+        StateSchedule>::CollectiveOp;
 
     using TiledMmaQK = typename CollectiveMmaQK::TiledMma;  // Q@K^t
     using TiledMmaKV = decltype(convert_to_gmma_rs(typename CollectiveMmaKV::TiledMma{}));
@@ -339,7 +344,7 @@ struct FlatMainloopTmaWarpSpecializedKdaFwd {
         TileShapeSK,
         ClusterShape,
         DummyStages,
-        cutlass::gemm::KernelTmaWarpSpecializedCooperative>::CollectiveOp;
+        StateSchedule>::CollectiveOp;
 
     using ElementAccumulatorNewV = float;
     using TileShapeNewV = decltype(make_shape(HeadSizeV, BlkSeqKV, BlkSeqKV));
@@ -358,7 +363,7 @@ struct FlatMainloopTmaWarpSpecializedKdaFwd {
         TileShapeNewV,
         ClusterShape,
         DummyStages,
-        cutlass::gemm::KernelTmaWarpSpecializedCooperative>::CollectiveOp;
+        StateSchedule>::CollectiveOp;
 
     // FIXME: K@K^t are not exactly the same as Q@K^t, but similar enough (what does this mean??)
     using TiledMmaKK = typename CollectiveMmaQK::TiledMma;  // T = inv(I + strict_lower_triangular(K@K^t))
