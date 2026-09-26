@@ -6,6 +6,7 @@
 #include "ordered_pair.cuh"
 #include "aux_chunk_loop.cuh"
 #include "relative_gate_layout.cuh"
+#include "inverse_unit_input.cuh"
 
 namespace gdn::sm90 {
 
@@ -186,9 +187,17 @@ struct ScalarGdnAux : Base {
                 float row_beta = beta(row,br.index());
                 float decay = exp2f(row_log-col_log);
                 out_qk(i) = Element(live ? acc_qk(i) * decay * params.scale : 0.f);
-                // Inverse expects positive lower input, garbage diagonal and
-                // zero upper triangle, then applies beta along its columns.
-                out_kk(i) = Inverse(live ? acc_kk(i) * row_beta * decay : 0.f);
+                // Positive lower input and zero upper; the auxiliary-owned
+                // inverse also receives a unit diagonal. Beta-column scaling
+                // remains a separate post-inverse step below.
+                float kk_value = live ? acc_kk(i) * row_beta * decay : 0.f;
+                if constexpr (AuxInverse) {
+                    // Normalize while publishing the same KK plane. This is
+                    // exactly the old solver's diagonal/upper input selection,
+                    // including padded diagonal entries outside `valid`.
+                    kk_value = inverse_unit_input(row, col, kk_value);
+                }
+                out_kk(i) = Inverse(kk_value);
             }
             kkp.producer_acquire(kw);
             qkp.producer_acquire(qw);
@@ -199,7 +208,7 @@ struct ScalarGdnAux : Base {
                 // its beta-column conversion finish. State must not repeat it.
                 using Barriers = kda::sm90::collective::KdaNamedBarriers;
                 cutlass::arch::NamedBarrier::arrive_and_wait(128,Barriers::AuxMath);
-                typename Base::CollectiveInverse solve(Barriers::AuxMath);
+                kerutils::CollectiveInverse<Inverse, false, false> solve(Barriers::AuxMath);
                 solve.compute(kk(_,_,kw.index()));
                 cutlass::arch::NamedBarrier::arrive_and_wait(128,Barriers::AuxMath);
                 auto ld = make_tiled_copy_C(Copy_Atom<SM75_U32x4_LDSM_N,Inverse>{},mma);
