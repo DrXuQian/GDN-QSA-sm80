@@ -602,8 +602,8 @@ struct FlatMainloopTmaWarpSpecializedKdaFwd {
                 params.gate_ptr, problem_size.num_v_heads, work_desc,
                 blk, alpha_pipeline, alpha_smem_pipe_write,
                 make_tensor(make_smem_ptr(storage.smem_alpha.data()), QKQSmemLayoutAlpha{}));
-            q_collective_load.step(q_src_dst, blk, q_smem_pipe_write, lane_predicate);
             k_collective_load.step(k_src_dst, blk, k_smem_pipe_write, lane_predicate);
+            q_collective_load.step(q_src_dst, blk, q_smem_pipe_write, lane_predicate);
             v_collective_load.step(v_src_dst, blk, v_smem_pipe_write, lane_predicate);
         }
     }
