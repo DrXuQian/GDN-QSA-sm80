@@ -4,6 +4,7 @@
 
 #include "kda/sm90/collective/mainloop_kda_fwd.hpp"
 #include "ordered_pair.cuh"
+#include "aux_chunk_loop.cuh"
 
 namespace gdn::sm90 {
 
@@ -131,10 +132,8 @@ struct ScalarGdnAux : Base {
         auto tq = store_qk.get_thread_slice(tid);
         auto tk = store_kk.get_thread_slice(tid);
 
-        int chunks = ceil_div(work.seq_len, 64);
-        CUTE_NO_UNROLL
-        for (int chunk = 0; chunk < chunks; ++chunk) {
-            int valid = min(int(work.seq_len - chunk * 64), 64);
+        for_each_aux_chunk(int(work.seq_len), [&](int, auto valid_tag) __attribute__((always_inline)) {
+            int valid = int(valid_tag);
             auto acc_qk = partition_fragment_C(mma, Shape<_64,_64>{});
             auto acc_kk = partition_fragment_C(mma, Shape<_64,_64>{});
 
@@ -162,7 +161,9 @@ struct ScalarGdnAux : Base {
             CUTE_UNROLL
             for (int i = 0; i < size(coords); ++i) {
                 auto [row, col] = coords(i);
-                bool live = row >= col && row < valid && col < valid;
+                bool live = row >= col;
+                if constexpr (!cute::is_static<decltype(valid_tag)>::value)
+                    live = live && row < valid && col < valid;
                 // Metadata rows are initialized for all64 positions, including
                 // tails. Load independently of the causal predicate to expose
                 // common row values; never exponentiate an invalid difference.
@@ -206,7 +207,7 @@ struct ScalarGdnAux : Base {
             kkp.producer_commit(kw); ++kw;
             ap.consumer_release(ar); ++ar;
             bp.consumer_release(br); ++br;
-        }
+        });
     }
 };
 
