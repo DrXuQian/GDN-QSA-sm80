@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 02:03:13 UTC
-working-on: backend boundary implementation fully verified locally; committing and publishing unchanged legacy kernel bodies
-blocked-on: none for boundary refactor; independent SM90/PPU1.7 algorithms remain next work, legacy solve-static box verdict pending
-last-commit: e2c4e7a (parent; boundary refactor in isolated worktree)
+updated-at: 2026-09-26 02:04:46 UTC
+working-on: backend boundaries completed and published; SM90/PPU1.7 algorithm implementation remains separate next work
+blocked-on: none for delivered boundary refactor; legacy solve-static device verdict still pending
+last-commit: 1cd9be3 (published boundary implementation; tested local9871a93 has identical tree)
 
 ## Boundary implementation in progress
 
@@ -39,6 +39,12 @@ encoding/control bits identical. Actual CUDA6TU before/after link and PPU2DSO+
 False implemented flag cannot borrow legacy builder or produce empty success;
 initial-state omission, mismatched target, stale loader selection and missing
 source-bundle dependency negatives red. Report BACKEND_BOUNDARIES_20260926.md.
+
+Published1cd9be30fa4bcf821f1c8b388b9164add9d045bc on ppu-backend; remote tree
+58b2aa6321d5fba3274f91e4fb0202b47059b7bc exactly matches tested local source.
+Default algorithms and existing device bodies unchanged. No box was used.
+No claim that new Hopper/PPU1.7 algorithms or distinct PPU1.5 targets are ready;
+their explicit rejection and separate dependency policy are the delivered boundary.
 
 ## Current design checkpoint
 
