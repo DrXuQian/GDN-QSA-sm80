@@ -9,9 +9,9 @@ namespace gdn::sm90 {
 // commute with QH/KH and with K^T delta. This is not a vector-KDA operation.
 // The inherited state/inverse storage precision and producer/consumer counts
 // remain fixed; old KDA mainloop is retained independently.
-template<class Base>
-struct ScalarGdnState : ScalarGdnAux<Base> {
-    using Parent = ScalarGdnAux<Base>;
+template<class Base, bool AuxInverse = false>
+struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
+    using Parent = ScalarGdnAux<Base,AuxInverse>;
     using Element = typename Base::Element;
     using Inverse = typename Base::InverseType;
     using Params = typename Base::Params;
@@ -153,9 +153,11 @@ struct ScalarGdnState : ScalarGdnAux<Base> {
             }
             kkp.consumer_wait(kkr);
             bp.consumer_wait(br);
-            if (wg==0) inverse();
-            cutlass::arch::NamedBarrier::arrive_and_wait(256,Barriers::StateMath);
-            cutlass::arch::fence_view_async_shared();
+            if constexpr (!AuxInverse) {
+                if (wg==0) inverse();
+                cutlass::arch::NamedBarrier::arrive_and_wait(256,Barriers::StateMath);
+                cutlass::arch::fence_view_async_shared();
+            }
 
             auto acc_delta = partition_fragment_C(newv_thread,Shape<_128,_64>{});
             {

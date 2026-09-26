@@ -12,7 +12,7 @@ namespace gdn::sm90 {
 //
 // Floating point schedule: BF16 Q/K -> FP32 dot -> scalar decay -> existing
 // BF16 QK / FP16 KK storage. This is NOT bit-equivalent to gated TF32 operands.
-template<class Base>
+template<class Base, bool AuxInverse = false>
 struct ScalarGdnAux : Base {
     using Element = typename Base::Element;
     using Inverse = typename Base::InverseType;
@@ -110,6 +110,28 @@ struct ScalarGdnAux : Base {
             qkp.producer_acquire(qw);
             copy(store_qk, tq.retile_S(out_qk), tq.partition_D(qk(_,_,qw.index())));
             copy(store_kk, tk.retile_S(out_kk), tk.partition_D(kk(_,_,kw.index())));
+            if constexpr (AuxInverse) {
+                // KK remains private to the producer until BOTH inversion and
+                // its beta-column conversion finish. State must not repeat it.
+                using Barriers = kda::sm90::collective::KdaNamedBarriers;
+                cutlass::arch::NamedBarrier::arrive_and_wait(128,Barriers::AuxMath);
+                typename Base::CollectiveInverse solve(Barriers::AuxMath);
+                solve.compute(kk(_,_,kw.index()));
+                cutlass::arch::NamedBarrier::arrive_and_wait(128,Barriers::AuxMath);
+                auto ld = make_tiled_copy_C(Copy_Atom<SM75_U32x4_LDSM_N,Inverse>{},mma);
+                auto l = ld.get_thread_slice(tid);
+                auto inv = make_fragment_like<Inverse>(acc_kk);
+                auto operand = make_fragment_like<Element>(acc_kk);
+                copy(ld,l.partition_S(kk(_,_,kw.index())),l.retile_D(inv));
+                CUTE_UNROLL
+                for (int i=0; i<size(inv); ++i) {
+                    auto [row,col] = coords(i);
+                    operand(i) = Element(float(inv(i))*beta(col,br.index()));
+                }
+                auto kk_bf16 = make_tensor(make_smem_ptr(reinterpret_cast<Element*>(smem.smem_kk.data())),
+                                          typename Base::SmemLayoutKK{});
+                copy(store_qk,tq.retile_S(operand),tq.partition_D(kk_bf16(_,_,kw.index())));
+            }
             cutlass::arch::fence_view_async_shared();
             qkp.producer_commit(qw); ++qw;
             kkp.producer_commit(kw); ++kw;

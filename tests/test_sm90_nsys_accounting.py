@@ -151,6 +151,17 @@ class LibraryAccounting(unittest.TestCase):
         self.assertEqual(len(result["forwards"]), 60)
         self.assertEqual(result["summary"]["ours-candidate"]["calls"], 12)
         self.assertEqual(result["summary"]["ours-cuda"]["calls"], 12)
+        self.assertTrue(result["candidate_beats_all_reference_paths"])
+        # Winning against a slow incumbent does NOT meet the library target.
+        for label in self.receipt["calls"]:
+            if "flashqla" in label:
+                start = self.db.execute("SELECT start FROM NVTX_EVENTS WHERE text=?",(label,)).fetchone()[0]
+                self.db.execute("UPDATE CUPTI_ACTIVITY_KIND_KERNEL SET end=? WHERE start=?",
+                                (start+38000,start+10000))
+        result = module.extract(self.db, self.receipt)
+        self.assertEqual(result["comparisons"]["ours-candidate"]["verdict"], "CANDIDATE-WINS")
+        self.assertFalse(result["candidate_beats_all_reference_paths"])
+        self.assertEqual(result["candidate_vs_references"]["flashqla-auto"]["verdict"], "REFERENCE-WINS")
         # Removing the SAME candidate call from both artifacts still fails.
         label = self.receipt["calls"].pop()
         row = self.db.execute("SELECT start,end FROM NVTX_EVENTS WHERE text=?", (label,)).fetchone()

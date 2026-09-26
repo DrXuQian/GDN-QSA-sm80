@@ -22,7 +22,7 @@ void run(Arguments const& a, cudaStream_t stream) {
         Stride, Stride, Stride, Stride,
         cutlass::gemm::KernelTmaWarpSpecializedCooperative, Options>;
     using Kernel = FlatKernelTmaWarpSpecializedKdaFwd<
-        ScalarGdnState<typename Builder::CollectiveMainloop>, typename Builder::TileScheduler, Options>;
+        ScalarGdnState<typename Builder::CollectiveMainloop,true>, typename Builder::TileScheduler, Options>;
     using Operation = cutlass::device::Universal<Kernel>;
     typename Operation::Arguments args{};
     args.problem_size.total_seqlen = int64_t(a.batch) * a.length;

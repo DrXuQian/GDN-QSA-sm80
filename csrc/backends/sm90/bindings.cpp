@@ -63,6 +63,6 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME,m) {
     m.def("forward",&forward);
     m.attr("target")=GDN_SM90_TARGET_NAME;
     m.attr("math_contract")="cula-scalar-gdn-fused-bf16-v1";
-    m.attr("numeric_schedule")="scalar-GDN-BF16-WGMMA-aux-and-state; scalar gates after FP32 dot; decay-V; not KDA raw bits";
+    m.attr("numeric_schedule")="scalar-GDN-BF16-WGMMA; unchanged FP16 inverse precomputed by auxiliary warpgroup";
     m.attr("device_admission")="UNVERIFIED";
 }

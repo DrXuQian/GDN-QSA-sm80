@@ -136,8 +136,24 @@ def extract(connection, receipt):
                                 verdict=verdict, criterion="disjoint-observed-kernel-sum-ranges")
         if family is None:
             comparisons[role]["cula_over_ours"] = ref["median"]/ours["median"]
+    candidate_comparisons = {}
+    if family and "ours-candidate" in summary:
+        subject = summary["ours-candidate"]["kernel_sum_us"]
+        for role in required_roles:
+            if role.startswith("ours-"):
+                continue
+            reference = summary[role]["kernel_sum_us"]
+            verdict = ("CANDIDATE-WINS" if subject["range"][1] < reference["range"][0] else
+                       "REFERENCE-WINS" if reference["range"][1] < subject["range"][0] else "UNRESOLVED")
+            candidate_comparisons[role] = dict(candidate="ours-candidate", reference=role,
+                reference_over_candidate=reference["median"]/subject["median"], verdict=verdict,
+                criterion="disjoint-observed-kernel-sum-ranges")
     return dict(scope=receipt["scope"], gate=receipt["gate"], shape=receipt["shape"],
                 input_sha256=receipt["input_sha256"], summary=summary,
+                candidate_vs_references=candidate_comparisons,
+                candidate_beats_all_reference_paths=(
+                    all(row["verdict"] == "CANDIDATE-WINS" for row in candidate_comparisons.values())
+                    if candidate_comparisons else None),
                 comparisons=comparisons, forwards=list(ranges.values()),
                 accounting="ALL_CAPTURED_KERNELS_AND_MEMORY_ASSIGNED_EXACTLY_ONCE")
 
@@ -159,6 +175,9 @@ def main():
               f"fused_us={row.get('fused_kernel_us', {}).get('median', 'NA')} "
               f"memory_us={row['memory_sum_us']['median']:.3f} gaps_us={row['gpu_gaps_us']['median']:.3f}")
     print(json.dumps(result["comparisons"], indent=2))
+    if result["candidate_vs_references"]:
+        print("[candidate vs references] " + json.dumps(result["candidate_vs_references"], sort_keys=True))
+        print("[SM90 goal] beats-all-reference-paths=" + str(result["candidate_beats_all_reference_paths"]))
 
 
 if __name__ == "__main__":
