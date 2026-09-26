@@ -97,6 +97,7 @@ struct FlatMainloopTmaWarpSpecializedKdaFwd {
     static constexpr int NumLoadWarpGroups = 1;
     static constexpr bool SeparateScalarGateProducer = false;
     static constexpr bool UsesAlphaLastPipeline = true;
+    static constexpr bool StateUsesBeta = true;
     static constexpr int NumStateMmaWarpGroups = 2;
     static constexpr int NumAuxMmaWarpGroups = 1;
 
@@ -126,14 +127,14 @@ struct FlatMainloopTmaWarpSpecializedKdaFwd {
     using StagesK = cutlass::gemm::collective::StageCount<StageCountK>;
     using StagesV = cutlass::gemm::collective::StageCount<StageCountV>;
     using StagesQ_K_Scaled = cutlass::gemm::collective::StageCount<2>;
-    using StagesO = cutlass::gemm::collective::StageCount<1>;
+    using StagesO = cutlass::gemm::collective::StageCount<find_option_t<Tag::kStagesO, Int<1>, Options>::value>;
     using ClusterShape = Shape<_1, _1, _1>;
 
     using StagesQK = cutlass::gemm::collective::StageCount<2>;
     using StagesKK = cutlass::gemm::collective::StageCount<2>;
 
-    using StagesAlpha = cutlass::gemm::collective::StageCount<2>;
-    using StagesBeta = cutlass::gemm::collective::StageCount<2>;
+    using StagesAlpha = cutlass::gemm::collective::StageCount<find_option_t<Tag::kStagesAlpha, Int<2>, Options>::value>;
+    using StagesBeta = cutlass::gemm::collective::StageCount<find_option_t<Tag::kStagesBeta, Int<2>, Options>::value>;
 
     static constexpr int Alignment = 16 / sizeof(Element);
 

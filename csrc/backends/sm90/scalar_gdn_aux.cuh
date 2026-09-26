@@ -62,8 +62,8 @@ struct ScalarGdnAux : Base {
         uint32_t leader = elect_one_sync();
         CUTE_NO_UNROLL
         for (int block=0; block<ceil_div(work.seq_len,64); ++block) {
-            qload.step(qsd,block,qw,leader);
             kload.step(ksd,block,kw,leader);
+            qload.step(qsd,block,qw,leader);
             vload.step(vsd,block,vw,leader);
         }
     }
@@ -184,8 +184,6 @@ struct ScalarGdnAux : Base {
                 out_kk(i) = Inverse(live ? acc_kk(i) * row_beta * decay : 0.f);
             }
             kkp.producer_acquire(kw);
-            qkp.producer_acquire(qw);
-            copy(store_qk, tq.retile_S(out_qk), tq.partition_D(qk(_,_,qw.index())));
             copy(store_kk, tk.retile_S(out_kk), tk.partition_D(kk(_,_,kw.index())));
             if constexpr (AuxInverse) {
                 // KK remains private to the producer until BOTH inversion and
@@ -210,8 +208,13 @@ struct ScalarGdnAux : Base {
                 copy(store_qk,tq.retile_S(operand),tq.partition_D(kk_bf16(_,_,kw.index())));
             }
             cutlass::arch::fence_view_async_shared();
-            qkp.producer_commit(qw); ++qw;
             kkp.producer_commit(kw); ++kw;
+            // Publish the completed inverse before waiting for QK storage.
+            // This order is coupled to the reference profile's deeper rings.
+            qkp.producer_acquire(qw);
+            copy(store_qk, tq.retile_S(out_qk), tq.partition_D(qk(_,_,qw.index())));
+            cutlass::arch::fence_view_async_shared();
+            qkp.producer_commit(qw); ++qw;
             ap.consumer_release(ar); ++ar;
             bp.consumer_release(br); ++br;
         });

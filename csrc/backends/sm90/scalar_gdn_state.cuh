@@ -11,6 +11,7 @@ namespace gdn::sm90 {
 // remain fixed; old KDA mainloop is retained independently.
 template<class Base, bool AuxInverse = false>
 struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
+    static constexpr bool StateUsesBeta = !AuxInverse;
     using Parent = ScalarGdnAux<Base,AuxInverse>;
     using Element = typename Base::Element;
     using Inverse = typename Base::InverseType;
@@ -152,7 +153,7 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
                 }
             }
             kkp.consumer_wait(kkr);
-            bp.consumer_wait(br);
+            if constexpr (StateUsesBeta) bp.consumer_wait(br);
             if constexpr (!AuxInverse) {
                 if (wg==0) inverse();
                 cutlass::arch::NamedBarrier::arrive_and_wait(256,Barriers::StateMath);
@@ -172,7 +173,7 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             }
             vp.consumer_release(vr); ++vr;
             kkp.consumer_release(kkr); ++kkr;
-            bp.consumer_release(br); ++br;
+            if constexpr (StateUsesBeta) { bp.consumer_release(br); ++br; }
 
             auto operand_delta = kda::sm90::collective::make_acc_into_op<Element>(acc_delta,typename Base::TiledMmaKV::LayoutA_TV{});
             qkp.consumer_wait(qkr);

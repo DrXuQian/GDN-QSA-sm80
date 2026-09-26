@@ -76,6 +76,9 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
     static constexpr int AlphaConsumerThreads =
         (NumStateMmaWarpGroups + NumAuxMmaWarpGroups) * cutlass::NumThreadsPerWarpGroup
         + (UsesAlphaLastPipeline ? cutlass::NumThreadsPerWarp : 0);
+    static constexpr int BetaConsumerThreads =
+        (NumAuxMmaWarpGroups + (CollectiveMainloop::StateUsesBeta ? NumStateMmaWarpGroups : 0))
+        * cutlass::NumThreadsPerWarpGroup;
 
     using TileShape = typename CollectiveMainloop::TileShape;
     using ClusterShape = typename CollectiveMainloop::ClusterShape;
@@ -323,7 +326,7 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
         BetaPipelineParams beta_pipeline_params;
         if constexpr (NeedsBeta) {
             beta_pipeline_params.producer_arv_count = cutlass::NumThreadsPerWarp;
-            beta_pipeline_params.consumer_arv_count = NumAuxMathThreads + NumStateMathThreads;
+            beta_pipeline_params.consumer_arv_count = BetaConsumerThreads;
         }
 
         OrderedMathBarriers math_barriers;
@@ -376,7 +379,7 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
                 if constexpr (UsesAlphaLastPipeline)
                     alpha_last_pipeline_params.role = MainloopAlphaLastPipeline::ThreadCategory::Consumer;
             }
-            if constexpr (NeedsBeta) {
+            if constexpr (NeedsBeta && CollectiveMainloop::StateUsesBeta) {
                 beta_pipeline_params.role = MainloopBetaPipeline::ThreadCategory::Consumer;
             }
 

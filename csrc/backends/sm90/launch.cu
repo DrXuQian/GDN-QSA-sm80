@@ -4,6 +4,7 @@
 #include "kda/sm90/device/device_universal.hpp"
 #include "kda/sm90/kernel/builder_kda_fwd.hpp"
 #include "scalar_gdn_state.cuh"
+#include "pipeline_profile.cuh"
 #include <climits>
 #include <stdexcept>
 
@@ -14,9 +15,7 @@ using BF16 = cutlass::bfloat16_t;
 
 template <class Gate, bool Initial>
 void run(Arguments const& a, cudaStream_t stream) {
-    using Options = std::tuple<Option<Tag::kElementGateGmem, Gate>,
-        Option<Tag::kElementBetaGmem, BF16>,
-        Option<Tag::kInitStateFromInput, cute::bool_constant<Initial>>>;
+    using Options = typename FlashInferPipelineProfile::template Options<Gate, Initial>;
     using Stride = cute::tuple<int64_t, _1, int32_t>;
     using Builder = FlatBuilderKdaFwd<BF16, float, float, Shape<_64,_64,_128>,
         Stride, Stride, Stride, Stride,
