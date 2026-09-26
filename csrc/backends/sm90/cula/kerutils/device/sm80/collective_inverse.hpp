@@ -787,6 +787,18 @@ struct CollectiveInverse {
 
 private:
 
+  // Preserve the old predicated FP32 RNE update, but express its in-place
+  // destination explicitly. A C++ conditional assignment around a shuffle
+  // result otherwise keeps two row-value copies live in the Hopper image.
+  // This does not predicate the shuffle itself: its source lane must execute.
+  CUTE_DEVICE static float eliminate_if(float value, float scale, float source, bool enabled) {
+    asm("{ .reg .pred update;\n"
+        "  setp.ne.u32 update, %3, 0;\n"
+        "  @update fma.rn.f32 %0, %1, %2, %0;\n}"
+        : "+f"(value) : "f"(scale), "f"(source), "r"(int(enabled)));
+    return value;
+  }
+
   template <int N, typename TensorT>
   CUTE_DEVICE void
   compute_diagonal_inverse_NxN(TensorT&& mat, int tid_in_group) {  // group_size = N
@@ -832,7 +844,7 @@ private:
       CUTE_UNROLL
       for (int i = 0; i < src_row; ++i) {
         auto src_row_value = LOAD(src_row, i);
-        row(i)             = tid_in_group > src_row ? row_scale * src_row_value + row(i) : row(i);
+        row(i)             = eliminate_if(row(i), row_scale, src_row_value, tid_in_group > src_row);
       }
       row(src_row) = tid_in_group > src_row ? row_scale : row(src_row);
     }
