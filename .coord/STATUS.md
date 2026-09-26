@@ -1,9 +1,64 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 02:04:46 UTC
-working-on: backend boundaries completed and published; SM90/PPU1.7 algorithm implementation remains separate next work
-blocked-on: none for delivered boundary refactor; legacy solve-static device verdict still pending
-last-commit: 1cd9be3 (published boundary implementation; tested local9871a93 has identical tree)
+updated-at: 2026-09-26 03:57:37 UTC
+working-on: integration and H800 validation complete; publishing tested harnesses/raw evidence and handoff
+blocked-on: none for source/H800 numerical handoff; NCU permissions and native PPU1.7 SDK/model remain unavailable
+last-commit: ccd6703 (published integration; tested local 33b6b9c has identical tree)
+
+## SM90 algorithm integration
+
+Worktree /workspace/gdn-sm90-algorithm-20260926. Reference cuLA
+79be249e61453808e18e5cef7702b363239e7d8d C++ SM90 KDA, not DSL.
+Scalar natural-log gate needs chunk-local prefix, state ABI is V-contiguous,
+fixed-batch tail must not overwrite the next sequence. Preserve WGMMA/TMA roles,
+resident state and inverse algorithm; defaults unchanged. No speed claim.
+Host algebra/negative checks and real SM90 body compile are complete locally.
+
+D128/72 FP64 algebra combinations/four seam negatives PASS. Both actual CuTe A/B
+gate consumers, state/output ownership, all64 tails pass with ASan under CUDA
+and PPU3.6 dependencies. Wrong gate row red on both.104 Python contracts,
+26 boundary tests and7 dialect tests PASS. All4 CUDA and4 PPU-fork source-check
+bodies assemble with WGMMA/TF32/TMA/O/state;7 native-code negatives per image
+red. Both real host bindings link/import; missing launch TU fails with the
+specific undefined symbol, not SKIP. SM80 target negative red.
+Dynamic shared232448->167936B. CUDA128regs/264-296Bstack; PPU-fork CUDA source
+check128regs/224-312Bstack: spills remain, NOT performance-admitted. Real
+SDK2.1.1 cannot supply SM90a/10700, so PPU1.7 native compile SKIP. No GPU or
+simulator execution; no speed or device-accuracy claim. Full commands and
+evidence:docs/SM90_FUSED_GDN.md and SM90_FUSED_GDN_LOCAL_20260926.md.
+Fresh cuda-admitted and ppu-source-admitted builds bind final source bytes;
+both CMake target configurations pass without pulling in legacy AIU.
+Published ccd6703165b8e2cc81ea0b486ef6a8f3e10cc3b2, tree132a00ae matches
+the tested local commit. User supplied H800 for additional verification; GPU
+idle at connection. Remote Torch2.8/CUDA12.8 requires its own host binding.
+Performance only in an idle-device window, with concurrent-process monitoring.
+No credential is stored in the source or evidence bundle.
+Remote source bundle tree132a00ae, PPU dependency1436fd; remote114-SM H800
+Torch2.8/CUDA12.8. CUDA12.8 emits register-pressure/WGMMA-serialization warnings;
+these are retained alongside spill counts. No GPU numerical/performance result
+at that checkpoint. Concurrent-PID and nonzero-idle-utilization measurement negatives PASS.
+
+03:39UTC: CUDA and PPU-fork source-check each pass 13/13 physical H800 cases,
+including three of four specialization paths, initial state, GVA, varied per-token/head
+gates, tails and T2048. CPU-reference tolerance remains 2%; maximum observed
+0.6897%. PPU-fork tail/initial memcheck: zero errors. First three graph timing
+windows had no foreign PID observed, 8/8 bit-stable repeats, but fourth and retry
+were blocked by the idle gate; independent single-launch tasks were observed.
+Do not stop those tasks or certify an uncontended full comparison. No default
+promotion; no PPU-native numerical/performance claim.
+03:42UTC audit: the 13-case matrix omitted FP32 gate without initial state.
+Expanded to14 cases, added omission/duplicate-denominator negatives. That cell
+still needs both hardware runs; not included in the preceding26 passes.
+03:55UTC: both full14-case reruns passed,14/14 cross-dependency fingerprints
+match. Four fresh timing arms completed with42 monitor samples each, no foreign
+PID observed: CUDA352.850/350.253us, PPU-fork CUDA325.987/325.680us (g=-.1/-1).
+H800 only; no FLA baseline, no1.5x or PPU-native performance claim. NCU launch
+profiling failed ERR_NVGPUCTRPERM; no permission/settings change. Report and raw
+JSON: docs/SM90_FUSED_GDN_H800_20260926.md, dev/backends/sm90_h800_20260926.json.
+Final local replay:13 SM90 tests (72 algebra cases included),26 boundary tests
+PASS; no production kernel source changed since published integration. Final
+performance evidence is hash-bound to the committed benchmark script; earlier
+blocked/partial runs remain in the first archive, not used in the final table.
 
 ## Boundary implementation in progress
 
