@@ -3,13 +3,17 @@
 #include <cutlass/arch/barrier.h>
 
 namespace gdn::sm90 {
+struct NoGateFactors {
+    CUTE_DEVICE void operator()(int, float, float, int) const {}
+};
 // Natural-log increments, NOT multipliers or cumulative gates. Prefix resets
 // at each C64 tile; the resident state carries all earlier chunk decay.
 template <int Rows, int Dim, class Gate, class Work, class Pipeline,
-          class PipeState, class SharedTensor>
+          class PipeState, class SharedTensor, class PublishFactors = NoGateFactors>
 CUTE_DEVICE void load_scalar_gate(Gate const* gate, int heads, Work const& work,
                                  int block, Pipeline& pipeline,
-                                 PipeState& stage, SharedTensor shared) {
+                                 PipeState& stage, SharedTensor shared,
+                                 PublishFactors publish_factors = {}) {
     static_assert(Rows == 64 && Dim == 128);
     int lane = int(threadIdx.x) & 31;
     int row = block * Rows + lane;
@@ -28,6 +32,7 @@ CUTE_DEVICE void load_scalar_gate(Gate const* gate, int heads, Work const& work,
     pipeline.producer_acquire(stage);
     shared(lane, 0, stage.index()) = lo;
     shared(lane + 32, 0, stage.index()) = hi;
+    publish_factors(lane, lo, hi, stage.index());
     // PipelineAsync counts every producer lane (32), not TMA bytes.
     cutlass::arch::fence_view_async_shared();
     pipeline.producer_commit(stage);

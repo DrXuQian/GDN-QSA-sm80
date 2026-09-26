@@ -20,7 +20,10 @@ struct ScalarGdnAux : Base {
     using Element = typename Base::Element;
     using Inverse = typename Base::InverseType;
     using Params = typename Base::Params;
-    using SharedStorage = typename Base::SharedStorage;
+    struct SharedStorage : Base::SharedStorage {
+        // [alpha stage][exp / scaled-exp][token], protected by alpha_pipeline.
+        cute::array_aligned<float, 128 * Base::StagesAlpha::value> gate_factors;
+    };
     using QPipeline = typename Base::MainloopQPipeline;
     using KPipeline = typename Base::MainloopKPipeline;
     using QKPipeline = typename Base::MainloopQKPipeline;
@@ -35,6 +38,38 @@ struct ScalarGdnAux : Base {
     using AlphaState = typename Base::AlphaPipelineState;
     using BetaState = typename Base::BetaPipelineState;
     using AlphaLastState = typename Base::AlphaLastPipelineState;
+
+    template<class Problem, class Tile, class Work>
+    CUTE_DEVICE void load_qkv(
+        Params const& params, Problem const& problem, Tile const& tile,
+        Work const& work, QPipeline& qp, QState& qw, KPipeline& kp, KState& kw,
+        typename Base::MainloopVPipeline& vp, typename Base::VPipelineState& vw,
+        AlphaPipeline& ap, AlphaState& aw, SharedStorage& smem) {
+        using namespace cute;
+        auto qload = typename Base::LoadQ(params.tma_load_q, qp, smem.smem_q);
+        auto kload = typename Base::LoadK(params.tma_load_k, kp, smem.smem_k);
+        auto vload = typename Base::LoadV(params.tma_load_v, vp, smem.smem_v);
+        auto qsd = qload.partition_SD(problem,tile,work);
+        auto ksd = kload.partition_SD(problem,tile,work);
+        auto vsd = vload.partition_SD(problem,tile,work);
+        uint32_t leader = elect_one_sync();
+        auto factors = [&](int lane, float lo, float hi, int stage) __attribute__((always_inline)) {
+            float elo = exp2f(lo), ehi = exp2f(hi);
+            smem.gate_factors[stage*128+lane] = elo;
+            smem.gate_factors[stage*128+lane+32] = ehi;
+            smem.gate_factors[stage*128+64+lane] = elo * params.scale;
+            smem.gate_factors[stage*128+64+lane+32] = ehi * params.scale;
+        };
+        CUTE_NO_UNROLL
+        for (int block=0; block<ceil_div(work.seq_len,64); ++block) {
+            load_scalar_gate<64,128>(params.gate_ptr, problem.num_v_heads, work,
+                block,ap,aw,make_tensor(make_smem_ptr(smem.smem_alpha.data()),
+                                       typename Base::QKQSmemLayoutAlpha{}),factors);
+            qload.step(qsd,block,qw,leader);
+            kload.step(ksd,block,kw,leader);
+            vload.step(vsd,block,vw,leader);
+        }
+    }
 
     template<class Problem, class Work>
     CUTE_DEVICE void compute_aux_safe(
