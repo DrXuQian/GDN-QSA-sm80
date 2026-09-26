@@ -1,0 +1,252 @@
+{
+  "scope": "H800_SM90_NOT_NATIVE_PPU17",
+  "protocol": "nsys_all_kernels_per_forward_12_interleaved_calls_per_role",
+  "target": "NOT_MET",
+  "rejected_capture": "independent-fi-weak: idle guard observed PID143838 before capture; not counted",
+  "runs": [
+    {
+      "capture": "factor-owner-fi-strong",
+      "gate": -1,
+      "candidate_source": "e799c55e2ab505f78ecf306ac8322b57678d98ce",
+      "candidate_binary_sha256": "a88a07e8c48c53a860e5cc94a936737be508e487314acbc0d197cbbf34970b08",
+      "candidate_us": {
+        "median": 142.88049999999998,
+        "range": [
+          140.672,
+          143.873
+        ]
+      },
+      "control_us": {
+        "median": 147.28,
+        "range": [
+          147.008,
+          148.545
+        ]
+      },
+      "references_us": {
+        "flashinfer-auto": 130.48000000000002,
+        "flashinfer-no-cp": 112.88,
+        "flashinfer-auto-log-adapter": 138.81599999999997
+      },
+      "verdict_vs_control": "CANDIDATE-WINS",
+      "complete_forwards": 72,
+      "admission": {
+        "errors": [
+          0.0063291084952652454,
+          0.0035608401522040367
+        ],
+        "fingerprint": "0b06a8b88db6ef14",
+        "repeat": "8/8 RAW-BIT"
+      },
+      "record_sha256": {
+        "receipt.json": "f9f8ce554de6cd9a9e138d0b4b88d8ffab2f5704debe89cd1cc3101786942c53",
+        "result.json": "35b82b720c9847b80d702384580f08b473323b6370203808b43f47ab65758ffb",
+        "forward.sqlite": "e17cd6b1300b13d7e5c1ff4e4a93be2e288cbfc994100550ec35db2990e80224",
+        "forward.nsys-rep": "94381fde8ce6b42740d69af814c5d091ad79f169e97d37c852c4f0c4f670b5ee"
+      }
+    },
+    {
+      "capture": "factor-owner-fi-weak",
+      "gate": -0.1,
+      "candidate_source": "e799c55e2ab505f78ecf306ac8322b57678d98ce",
+      "candidate_binary_sha256": "a88a07e8c48c53a860e5cc94a936737be508e487314acbc0d197cbbf34970b08",
+      "candidate_us": {
+        "median": 142.96,
+        "range": [
+          141.536,
+          143.808
+        ]
+      },
+      "control_us": {
+        "median": 147.6165,
+        "range": [
+          146.752,
+          148.48
+        ]
+      },
+      "references_us": {
+        "flashinfer-auto": 130.832,
+        "flashinfer-no-cp": 112.8005,
+        "flashinfer-auto-log-adapter": 139.50400000000002
+      },
+      "verdict_vs_control": "CANDIDATE-WINS",
+      "complete_forwards": 72,
+      "admission": {
+        "errors": [
+          0.0048543657176196575,
+          0.003361937589943409
+        ],
+        "fingerprint": "462cc9ef1e8a85d4",
+        "repeat": "8/8 RAW-BIT"
+      },
+      "record_sha256": {
+        "receipt.json": "f3f917ac11ed17a6f422156e4e9dc640775c4cefe48fca3ef4f87423d7d446a4",
+        "result.json": "e48095b2d577edeb2c095c3e1a8e2b930f481056dc43ca9855817fadd14b4fea",
+        "forward.sqlite": "908db7a2dd65b0ea90171f51aa75d04df858e084cad642eaacaf0b7ae48e0995",
+        "forward.nsys-rep": "46ef469037635a50c9873eaacffd16531a87ef30b8ebf3804c93638ac05c564b"
+      }
+    },
+    {
+      "capture": "factor-owner-qla-strong",
+      "gate": -1,
+      "candidate_source": "e799c55e2ab505f78ecf306ac8322b57678d98ce",
+      "candidate_binary_sha256": "a88a07e8c48c53a860e5cc94a936737be508e487314acbc0d197cbbf34970b08",
+      "candidate_us": {
+        "median": 140.2405,
+        "range": [
+          139.553,
+          141.984
+        ]
+      },
+      "control_us": {
+        "median": 146.432,
+        "range": [
+          145.633,
+          147.392
+        ]
+      },
+      "references_us": {
+        "flashqla-auto": 163.6005,
+        "flashqla-no-cp": 175.0245
+      },
+      "verdict_vs_control": "CANDIDATE-WINS",
+      "complete_forwards": 60,
+      "admission": {
+        "errors": [
+          0.0063291084952652454,
+          0.0035608401522040367
+        ],
+        "fingerprint": "0b06a8b88db6ef14",
+        "repeat": "8/8 RAW-BIT"
+      },
+      "record_sha256": {
+        "receipt.json": "7c596901b620d190fbd34f5a0e15195d64bf0a85b8b58e6734757e222087b408",
+        "result.json": "f0998fe727502e5cb261c4af5d948b190e7f8064ecd44bb91058a25f8414e6b0",
+        "forward.sqlite": "2e7b3b5527a3c582b9ac8593c14cf53e68b1a1b29c8082bb17c0385c31afc020",
+        "forward.nsys-rep": "a5d342d539dd26393d94498819f36997ae3684131ddd542e61a258a115a76f43"
+      }
+    },
+    {
+      "capture": "factor-owner-qla-weak",
+      "gate": -0.1,
+      "candidate_source": "e799c55e2ab505f78ecf306ac8322b57678d98ce",
+      "candidate_binary_sha256": "a88a07e8c48c53a860e5cc94a936737be508e487314acbc0d197cbbf34970b08",
+      "candidate_us": {
+        "median": 140.60899999999998,
+        "range": [
+          139.616,
+          141.728
+        ]
+      },
+      "control_us": {
+        "median": 146.353,
+        "range": [
+          145.761,
+          148.672
+        ]
+      },
+      "references_us": {
+        "flashqla-auto": 165.361,
+        "flashqla-no-cp": 174.72
+      },
+      "verdict_vs_control": "CANDIDATE-WINS",
+      "complete_forwards": 60,
+      "admission": {
+        "errors": [
+          0.0048543657176196575,
+          0.003361937589943409
+        ],
+        "fingerprint": "462cc9ef1e8a85d4",
+        "repeat": "8/8 RAW-BIT"
+      },
+      "record_sha256": {
+        "receipt.json": "142e20a9fad00b3251d835bd1dccbf421c36e4776124f554c2ecd85fae22ec07",
+        "result.json": "55f1df82db9db0ebaebdb68e3d5143874d1f229fc55a437e599b4d8469146dbd",
+        "forward.sqlite": "2651a3a171ed22ea34d32fa37c9e6d0a1962f3f0638cedf8efac4b237faad835",
+        "forward.nsys-rep": "1dcc8c98a37ba4261ebdddbedd152543dadd87869d9a33218b249998dc493be1"
+      }
+    },
+    {
+      "capture": "immediate-fi-weak",
+      "gate": -0.1,
+      "candidate_source": "107c0de49ebd0851cc9626af8d089bba58454378",
+      "candidate_binary_sha256": "e610020857b13abff6c82ee6e1a700257230b2f7af854e6e41465d128f34e358",
+      "candidate_us": {
+        "median": 148.68900000000002,
+        "range": [
+          146.913,
+          149.504
+        ]
+      },
+      "control_us": {
+        "median": 147.2805,
+        "range": [
+          146.849,
+          147.649
+        ]
+      },
+      "references_us": {
+        "flashinfer-auto": 130.945,
+        "flashinfer-no-cp": 112.9925,
+        "flashinfer-auto-log-adapter": 138.753
+      },
+      "verdict_vs_control": "UNRESOLVED",
+      "complete_forwards": 72,
+      "admission": {
+        "errors": [
+          0.0048543657176196575,
+          0.003361937589943409
+        ],
+        "fingerprint": "462cc9ef1e8a85d4",
+        "repeat": "8/8 RAW-BIT"
+      },
+      "record_sha256": {
+        "receipt.json": "05637a60faa1a8a643ccedf7b6f56bbf64e4435034a3598bc26cdf1d5ab080d9",
+        "result.json": "36a28a7cacbff874f1aac17751a8da13f16e791e8514b6e4f13e0e0011b42c27",
+        "forward.sqlite": "a30b1d600f0e90c0f45cef80d4b05a6795290d6ab22e6ac89826897f61ad2cbe",
+        "forward.nsys-rep": "3fb49d10fd032cd64846b9a20c09a4708434ae15ea29f584f17f054e834241ad"
+      }
+    },
+    {
+      "capture": "kfirst-fi-weak",
+      "gate": -0.1,
+      "candidate_source": "daabe62984bee5c8d417f898a219f5430ee03bf9",
+      "candidate_binary_sha256": "8bebc8a6cda681b43b10e33ee1b6854a553fad17f77453e25ddd613cedf614a6",
+      "candidate_us": {
+        "median": 147.98450000000003,
+        "range": [
+          147.041,
+          148.961
+        ]
+      },
+      "control_us": {
+        "median": 146.865,
+        "range": [
+          145.792,
+          148.384
+        ]
+      },
+      "references_us": {
+        "flashinfer-auto": 130.224,
+        "flashinfer-no-cp": 112.816,
+        "flashinfer-auto-log-adapter": 139.361
+      },
+      "verdict_vs_control": "UNRESOLVED",
+      "complete_forwards": 72,
+      "admission": {
+        "errors": [
+          0.0048543657176196575,
+          0.003361937589943409
+        ],
+        "fingerprint": "462cc9ef1e8a85d4",
+        "repeat": "8/8 RAW-BIT"
+      },
+      "record_sha256": {
+        "receipt.json": "904451a9113ecb27d60de8a3d1317ecb088d60704912bb68c11c0824b11c5950",
+        "result.json": "6ea3e88778e37562c65ca550e43a22ce7adca8bcb0bbd1d3f2cf10dd96a3569b",
+        "forward.sqlite": "4b824f8c78fb31468c4220c631a9b18ce51ad83e2354b56bda4c0a1607073bc3",
+        "forward.nsys-rep": "36cfcf7be6a3844879fac1aa4a7a11e85f5a5d26a5a9745ff164d2c00dad4f32"
+      }
+    }
+  ]
+}

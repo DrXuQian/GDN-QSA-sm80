@@ -1,11 +1,19 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 08:46:41 UTC
-working-on: S16 confirmed both regimes; S17 UNRESOLVED; S18 independent state issue passed host/native gates, device cases running
+updated-at: 2026-09-26 08:58:31 UTC
+working-on: retain S16; S18 correct but UNRESOLVED; final S19 full/tail auxiliary specialization compiling
 blocked-on: native PPU1.7 SDK/model unavailable; H800 reconnected, idle guard required
-last-commit: f104ae6 (main checkpoint); S16 e799c55 / S17 daabe62; defaults unchanged
+last-commit: 0427387 (main checkpoint); S16 e799c55 / S17 daabe62 / S18 f529083; defaults unchanged
 
 ## Active SM90 campaign
+
+S18 timing retry142.016[140.257,143.009] versus S16
+142.321[140.993,143.616]us overlaps: UNRESOLVED. First attempt remains
+INVALID for foreign PID143838. No synchronization-removal speed claim.
+S16 PPU CUTLASS3.6 CUDA source-check4body PASS, native PPU1.7 SKIP.
+Final S19 isolated auxiliary full/final specialization registered before
+edit, CPU actual visitor lengths1..4096 and4096 fragment owners PASS;
+device/native admission pending. Source/default production remains unchanged.
 
 Latest: S16 both-FI windows142.960/142.8805us versus S11
 147.6165/147.280us; QLA windows140.609/140.2405us versus

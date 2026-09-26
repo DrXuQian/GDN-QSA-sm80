@@ -4,6 +4,9 @@ Checkpoint: 2026-09-26. Physical H800, B1/T2048/Hqk16/Hv32/D128/C64,
 BF16 Q/K/V/beta and scalar natural-log gates, FP32 final state. Forward only.
 This is **not** a native PPU1.7 result. SM80/PPU1.0 is unchanged.
 
+The closed inventory below is historical. The authorized continuation and
+new S16 incumbent are in [SM90_SASS_FOLLOWUP_20260926.md](SM90_SASS_FOLLOWUP_20260926.md).
+
 ## Exact subjects
 
 FlashInfer is pinned at `5d9f8c8d97fa53e22952ce8672f475d235f07478`, its
