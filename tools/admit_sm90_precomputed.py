@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """S47 fixed numerical/resource admission; no timing follows a failed cell."""
 import importlib.util
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -13,20 +14,26 @@ sys.path[:0]=[str(ROOT),str(ROOT/'benchmarks'),str(ROOT/'tests'),str(ROOT/'tools
 
 
 def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--candidate',choices=('s47','s48'),default='s47')
+    choice=parser.parse_args().candidate
     import torch
     from bench_sm90_hopper import DeviceWatch
     from profile_sm90_libraries import build_receipt
     from sm90_process_family import admission_watch
     from sm90_workloads import WORKLOADS, validate_inventory
     from sm90_execution_contract import from_build, PREPARED
-    root=Path('/workspace/gdn-sm90-precomputed-aux-20260926')
+    root=Path('/workspace/gdn-sm90-precomputed-aux-20260926' if choice=='s47' else
+              '/workspace/gdn-sm90-precomputed-v128-20260926')
     parent=Path('/workspace/gdn-sm90-win-20260926')
-    build=root/'s47-build'
+    build=root/(choice+'-build')
     binary=next(build.glob('_gdn_fused_sm90*.so'))
     identity=build_receipt(binary,'cuda_sm90','native')
     if from_build(identity)!=PREPARED:raise ValueError('candidate not the prepared build')
-    out=root/'s47-admission';out.mkdir()
-    row=dict(id='s47',root=str(root),build=str(build),status='RUNNING',
+    if choice=='s48' and '-DGDN_SM90_PRECOMPUTED_VALUE_TILE=128' not in identity['flags']:
+        raise ValueError('S48 must bind the explicit V128 build flag')
+    out=root/(choice+'-admission');out.mkdir()
+    row=dict(id=choice,root=str(root),build=str(build),status='RUNNING',
              binary_sha256=identity['extension_sha256'])
     result=dict(denominator=1,rows=[row],performance='NOT_RUN',routing='UNCHANGED')
     watch=admission_watch(DeviceWatch)(0)
@@ -42,6 +49,10 @@ def main():
         run('native',[sys.executable,root/'source/dev/backends/check_sm90_precomputed_binary.py',
             build/'launch.o','--cuobjdump','/usr/local/cuda-12.8/bin/cuobjdump','--out',out/'native'])
         run('progress',[sys.executable,root/'source/dev/backends/check_sm90_precomputed_protocol.py'])
+        if choice=='s48':
+            run('prepare-unchanged',[sys.executable,root/'source/dev/backends/check_sm90_preparer_identity.py',
+                build/'codegen/image.sass',
+                '/workspace/gdn-sm90-precomputed-aux-20260926/s47-build/codegen/image.sass'])
         include=root/'source/csrc/backends/sm90'
         run('map-build',['/usr/local/cuda-12.8/bin/nvcc','-std=c++17','-O2','--expt-relaxed-constexpr',
             '--extended-lambda','-gencode=arch=compute_90a,code=sm_90a',f'-I{include}',f'-I{include}/cula',
@@ -55,14 +66,15 @@ def main():
         row['map_workloads']=len(WORKLOADS)
         spec=importlib.util.spec_from_file_location('_gdn_fused_sm90',binary)
         module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
-        if module.execution_structure!='chunk-parallel-aux+V64-state;2-kernels;private-physical-operands':
+        value_tile=64 if choice=='s47' else 128
+        if module.execution_structure!=f'chunk-parallel-aux+V{value_tile}-state;2-kernels;private-physical-operands':
             raise ValueError('loaded execution structure differs')
         resources={}
         for fp32 in (False,True):
             for initial in (False,True):
                 key=f'fp32={fp32},initial={initial}'
                 resources[key]=dict(module.resources(fp32,initial))
-                if resources[key]['state']['blocks_per_sm']<2:
+                if resources[key]['state']['blocks_per_sm']<(2 if choice=='s47' else 1):
                     raise ValueError(f'registered state occupancy failed: {resources[key]}')
         row['resources']=resources
         run('cases',[sys.executable,ROOT/'tests/run_sm90_hopper_cases.py','--extension',binary,
@@ -95,7 +107,7 @@ def main():
             harness_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest())
         (out/'admission.json').write_text(json.dumps(result,indent=2)+'\n')
     if row['status']!='PASS':raise RuntimeError(row)
-    print('[S47 admission] PASS; performance NOT_RUN',flush=True)
+    print(f'[{choice.upper()} admission] PASS; performance NOT_RUN',flush=True)
 
 
 if __name__=='__main__':main()

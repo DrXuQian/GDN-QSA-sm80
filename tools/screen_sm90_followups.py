@@ -29,7 +29,7 @@ def main():
     a = p.parse_args()
     admission = json.loads(a.admission.read_text())
     inventory = [r["id"] for r in admission["rows"]]
-    if (inventory not in (["s39", "s40", "s41"], ["s45"], ["s47"])
+    if (inventory not in (["s39", "s40", "s41"], ["s45"], ["s47"], ["s48"])
             or admission["denominator"] != len(inventory)
             or any(row["status"] != "PASS" for row in admission["rows"])):
         raise ValueError("every candidate in the registered inventory must first pass numerical admission")
@@ -69,6 +69,9 @@ def main():
                        else Path("/workspace/gdn-sm90-win-20260926/relative-build"))
             paths = {"parent": next(control.glob("_gdn_fused_sm90*.so")),
                      "candidate": next(Path(candidate["build"]).glob("_gdn_fused_sm90*.so"))}
+            if candidate['id']=='s48':
+                paths['prepared-v64']=next(Path('/workspace/gdn-sm90-precomputed-aux-20260926/s47-build').glob('_gdn_fused_sm90*.so'))
+                paths['incumbent-v64']=next(Path('/workspace/gdn-sm90-value-split-20260926/s38-build').glob('_gdn_fused_sm90*.so'))
             identities = {role: build_receipt(path, "cuda_sm90", "native") for role, path in paths.items()}
             if identities["candidate"]["extension_sha256"] != candidate["binary_sha256"]:
                 raise ValueError("candidate changed after numeric admission")
@@ -95,7 +98,7 @@ def main():
                                 raise ValueError("unstable direct launch")
                             first = fingerprint
                         fingerprints[role] = first
-                    if fingerprints["parent"] != fingerprints["candidate"]:
+                    if len(set(fingerprints.values())) != 1:
                         raise ValueError("delivery candidate differs from parent raw bits")
                     for role in paths:
                         graphs[role] = torch.cuda.CUDAGraph()
@@ -106,7 +109,8 @@ def main():
                     torch.cuda.synchronize()
                     samples = {role: [] for role in paths}
                     for sample in range(9):
-                        for role in (("parent", "candidate") if sample % 2 == 0 else ("candidate", "parent")):
+                        order=tuple(paths)
+                        for role in (order if sample%2==0 else tuple(reversed(order))):
                             start = torch.cuda.Event(enable_timing=True)
                             end = torch.cuda.Event(enable_timing=True)
                             start.record(); graphs[role].replay(); end.record(); end.synchronize()
@@ -125,8 +129,13 @@ def main():
                                "PARENT-WINS" if max(samples["parent"]) < min(samples["candidate"]) else "UNRESOLVED")
                     row = dict(candidate=candidate["id"], workload=workload.receipt(), gate=gate,
                                binaries=identities, input_sha256=digest(cpu), errors=errors,
-                               fingerprint=fingerprints["candidate"], replay="8_DIRECT+32_GRAPH_RESULTS",
+                               fingerprint=fingerprints["candidate"], replay=f"8_DIRECT+{len(paths)*16}_GRAPH_RESULTS",
                                summary_us=summary, verdict=verdict, admission="NOT_A_SPEED_VERDICT")
+                    if candidate['id']=='s48':
+                        row['candidate_vs_controls']={role:(
+                            'CANDIDATE-WINS' if max(samples['candidate'])<min(times) else
+                            'CONTROL-WINS' if max(times)<min(samples['candidate']) else 'UNRESOLVED')
+                            for role,times in samples.items() if role!='candidate'}
                     rows.append(row)
                     watch.sample()
                     if watch.errors:
@@ -134,6 +143,10 @@ def main():
                     (a.out / "screen.json").write_text(json.dumps(result, indent=2) + "\n")
                     print(f"[screen] {candidate['id']} {name} g={gate} parent={summary['parent']['median']:.3f} "
                           f"candidate={summary['candidate']['median']:.3f} {verdict} NSYS_REQUIRED", flush=True)
+                    if candidate['id']=='s48':
+                        print('[screen extra controls] '+json.dumps(dict(
+                            medians={k:v['median'] for k,v in summary.items()},
+                            verdicts=row['candidate_vs_controls']),sort_keys=True),flush=True)
         if len(rows) != denominator:
             raise ValueError("screen denominator changed")
         result["status"] = "PASS_SCREEN_COMPLETED_NOT_SPEED_ADMISSION"
