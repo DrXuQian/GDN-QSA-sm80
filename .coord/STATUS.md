@@ -1,11 +1,20 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 12:59:04 UTC
-working-on: S31 registered inverse-input normalization moved into existing KK writer; local proofs before device
+updated-at: 2026-09-26 13:18:00 UTC
+working-on: S31 measured loss; S32 registered packed-half inverse reduction on immutable S24
 blocked-on: native PPU1.7 SDK/model unavailable; fastest FlashInfer target not yet met
-last-commit: f7cac7f; immutable incumbentS24 bc3c154/head06b7471
+last-commit: 9083af3; S31 branch576d94f pushed; immutable incumbentS24 bc3c154/head06b7471
 
 ## Current checkpoint
+
+S31 all14CPU/parent fingerprints,2overflow raw stresses,8replay/everycall
+PASS. Native diagonal selectors17/18->7 but wholebody+80sites and spills
+20/28->24/32B. Paired nsys124.3525[121.985,125.120]vsS24
+120.448[119.520,121.664]us: CONTROL-WINS. FI112.656us still faster.
+No promotion. PPU3.6 CUDA source-check PASS; nativePPU17 unavailableSKIP.
+S32 independent packed-half add at final inverse reduction, actualfragment
+layout, scalar/packed seam and native negatives before fullforward timing.
+13:30checkpoint/14:10handoff unchanged; at most3candidates this inventory.
 
 New bounded authorized turn: matched native inverse phases358vsFI286sites;
 8x8stage165vs127, same21SHFL/21FFMA and sameblocked matrix algorithm.
