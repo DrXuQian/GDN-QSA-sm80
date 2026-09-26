@@ -18,6 +18,9 @@ namespace gdn::sm90 {
 template<class Base, bool AuxInverse = false>
 struct ScalarGdnAux : Base {
     static constexpr bool SeparateScalarGateProducer = true;
+    // Scalar state reads the last-prefix coefficient from gate_factors under
+    // the alpha stage's lifetime; the vector-KDA duplicate channel is unused.
+    static constexpr bool UsesAlphaLastPipeline = false;
     static_assert(Base::NumStateMmaWarpGroups == 2);
     using OrderedMathBarriers = OrderedPair<Base::OrderedBarrierId0, Base::OrderedBarrierId1>;
     using Element = typename Base::Element;
@@ -66,16 +69,13 @@ struct ScalarGdnAux : Base {
     }
 
     template<class Problem, class Tile, class Work>
-    CUTE_DEVICE void load_alpha_and_last(
+    CUTE_DEVICE void load_scalar_alpha(
         Params const& params, Problem const& problem, Tile const&, Work const& work,
-        AlphaPipeline& ap, AlphaState& aw, AlphaState& ar,
-        AlphaLastPipeline& lp, AlphaLastState& lw, SharedStorage& smem) {
+        AlphaPipeline& ap, AlphaState& aw, AlphaState&,
+        AlphaLastPipeline&, AlphaLastState&, SharedStorage& smem) {
         using namespace cute;
         auto alpha = make_tensor(make_smem_ptr(smem.smem_alpha.data()),
                                  typename Base::QKQSmemLayoutAlpha{});
-        auto last = make_tensor(make_smem_ptr(smem.smem_alpha_last.data()),
-                                typename Base::SmemLayoutAlphaLast{});
-        int lane = int(threadIdx.x) & 31;
         int valid;
         // Same prefix/O1 factors, plus the state-update coefficient. All
         // channels are initialized before the existing alpha publication.
@@ -99,15 +99,8 @@ struct ScalarGdnAux : Base {
             valid = min(int(work.seq_len-block*64),64);
             load_scalar_gate<64,128>(params.gate_ptr, problem.num_v_heads, work,
                                     block,ap,aw,alpha,factors);
-            // Preserve the existing32-thread alpha consumer and alpha-last
-            // producer: no changed barrier count, no new stage ownership.
-            ap.consumer_wait(ar);
-            lp.producer_acquire(lw);
-            CUTE_UNROLL
-            for (int k=lane; k<128; k+=32) last(k,lw.index())=alpha(valid-1,k,ar.index());
-            cutlass::arch::fence_view_async_shared();
-            lp.producer_commit(lw); ++lw;
-            ap.consumer_release(ar); ++ar;
+            // All coefficients were published by load_scalar_gate. Only the
+            // auxiliary and two state warpgroups consume this alpha stage.
         }
     }
 

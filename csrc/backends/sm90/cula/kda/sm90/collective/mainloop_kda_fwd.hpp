@@ -96,6 +96,7 @@ struct FlatMainloopTmaWarpSpecializedKdaFwd {
 
     static constexpr int NumLoadWarpGroups = 1;
     static constexpr bool SeparateScalarGateProducer = false;
+    static constexpr bool UsesAlphaLastPipeline = true;
     static constexpr int NumStateMmaWarpGroups = 2;
     static constexpr int NumAuxMmaWarpGroups = 1;
 

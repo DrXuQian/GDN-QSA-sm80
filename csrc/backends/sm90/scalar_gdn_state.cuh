@@ -28,7 +28,7 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
         typename Base::MainloopKKPipeline& kkp, typename Base::KKPipelineState& kkr,
         typename Base::MainloopAlphaPipeline& ap, typename Base::AlphaPipelineState& ar,
         typename Base::MainloopBetaPipeline& bp, typename Base::BetaPipelineState& br,
-        typename Base::MainloopAlphaLastPipeline& alp, typename Base::AlphaLastPipelineState& alr,
+        typename Base::MainloopAlphaLastPipeline&, typename Base::AlphaLastPipelineState&,
         typename Parent::OrderedMathBarriers& order, SharedStorage& smem) {
         using namespace cute;
         using kda::sm90::collective::gemm_zero_acc;
@@ -194,9 +194,8 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
                 op.producer_commit(ow); ++ow;
             }
 
-            // Consume the inherited alpha-last pipeline even though the scalar
-            // prefix supplies the same value; do not change barrier counts.
-            alp.consumer_wait(alr);
+            // Alpha is still held until the update WGMMA completes below.
+            // No second pipeline is needed for the cached scalar coefficient.
             float decay_h = smem.gate_factors[ar.index()*128+valid-1];
             CUTE_UNROLL
             for (int i=0; i<size(h); ++i) h(i) *= decay_h;
@@ -215,7 +214,6 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             warpgroup_wait<0>(); warpgroup_fence_operand(h);
             kp.consumer_release(kr); ++kr;
             ap.consumer_release(ar); ++ar;
-            alp.consumer_release(alr); ++alr;
         };
 
         int chunks = ceil_div(work.seq_len,64);

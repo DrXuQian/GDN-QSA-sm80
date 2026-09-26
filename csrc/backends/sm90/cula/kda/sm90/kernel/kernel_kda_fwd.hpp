@@ -72,6 +72,10 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
     static constexpr int NeedsAlpha = CollectiveMainloop::NeedsAlpha;
     static constexpr int NeedsBeta = CollectiveMainloop::NeedsBeta;
     static constexpr int SafeGate = CollectiveMainloop::SafeGate;
+    static constexpr bool UsesAlphaLastPipeline = CollectiveMainloop::UsesAlphaLastPipeline;
+    static constexpr int AlphaConsumerThreads =
+        (NumStateMmaWarpGroups + NumAuxMmaWarpGroups) * cutlass::NumThreadsPerWarpGroup
+        + (UsesAlphaLastPipeline ? cutlass::NumThreadsPerWarp : 0);
 
     using TileShape = typename CollectiveMainloop::TileShape;
     using ClusterShape = typename CollectiveMainloop::ClusterShape;
@@ -295,7 +299,7 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
         AlphaPipelineParams alpha_pipeline_params;
         if constexpr (NeedsAlpha) {
             alpha_pipeline_params.producer_arv_count = cutlass::NumThreadsPerWarp;
-            alpha_pipeline_params.consumer_arv_count = NumStateMathThreads + NumAuxMathThreads + cutlass::NumThreadsPerWarp;
+            alpha_pipeline_params.consumer_arv_count = AlphaConsumerThreads;
         }
 
         OPipelineParams o_pipeline_params;
@@ -343,14 +347,19 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
             }
         }
         if (warp_group_role == WarpGroupRole::LdSt && ldst_warp_role == LdStWarpRole::LoadAlpha) {
-            // LoadAlpha warp consumes alpha_pipeline (reads last row) and produces alpha_last_pipeline
+            // Vector KDA extracts a separate last row; scalar GDN publishes
+            // every required coefficient directly into the alpha stage.
             if constexpr (NeedsAlpha) {
-                if constexpr (CollectiveMainloop::SeparateScalarGateProducer)
-                    alpha_pipeline_params.role = MainloopAlphaPipeline::ThreadCategory::ProducerConsumer;
-                else
+                if constexpr (CollectiveMainloop::SeparateScalarGateProducer) {
+                    alpha_pipeline_params.role = UsesAlphaLastPipeline
+                        ? MainloopAlphaPipeline::ThreadCategory::ProducerConsumer
+                        : MainloopAlphaPipeline::ThreadCategory::Producer;
+                } else {
                     alpha_pipeline_params.role = MainloopAlphaPipeline::ThreadCategory::Consumer;
+                }
             }
-            alpha_last_pipeline_params.role = MainloopAlphaLastPipeline::ThreadCategory::Producer;
+            if constexpr (UsesAlphaLastPipeline)
+                alpha_last_pipeline_params.role = MainloopAlphaLastPipeline::ThreadCategory::Producer;
         }
         if (warp_group_role == WarpGroupRole::Math0 || warp_group_role == WarpGroupRole::Math1) {
             DPRINTF0_WG("warp_group_role: MathX\n");
@@ -364,7 +373,8 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
 
             if constexpr (NeedsAlpha) {
                 alpha_pipeline_params.role = MainloopAlphaPipeline::ThreadCategory::Consumer;
-                alpha_last_pipeline_params.role = MainloopAlphaLastPipeline::ThreadCategory::Consumer;
+                if constexpr (UsesAlphaLastPipeline)
+                    alpha_last_pipeline_params.role = MainloopAlphaLastPipeline::ThreadCategory::Consumer;
             }
             if constexpr (NeedsBeta) {
                 beta_pipeline_params.role = MainloopBetaPipeline::ThreadCategory::Consumer;
@@ -520,7 +530,7 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
                             work_desc.seq_len);
                         auto tile_shape = typename CollectiveMainloop::TileShape{};
                         if constexpr (CollectiveMainloop::SeparateScalarGateProducer) {
-                            collective_mainloop.load_alpha_and_last(
+                            collective_mainloop.load_scalar_alpha(
                                 params.mainloop, params.problem_size, tile_shape, work_desc,
                                 alpha_pipeline, alpha_smem_pipe_write, alpha_smem_pipe_read,
                                 alpha_last_pipeline, alpha_last_smem_pipe_write,
