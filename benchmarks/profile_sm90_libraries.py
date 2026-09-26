@@ -67,13 +67,9 @@ def reference_binaries(family, out):
     """Hash the actual loaded JIT code, without changing compiler options."""
     result = []
     if family == "flashqla":
-        cache = Path(os.environ["TILELANG_CACHE_DIR"]).resolve()
-        mapped = {line.split()[-1] for line in Path("/proc/self/maps").read_text().splitlines()
-                  if line.rstrip().endswith("/executable.so")}
-        for name in sorted(mapped):
-            path = Path(name).resolve()
-            if path.is_relative_to(cache):
-                result.append(dict(path=str(path), sha256=sha(path), bytes=path.stat().st_size))
+        from tilelang.cache import _dispatch_map
+        from sm90_jit_identity import tilelang_images
+        result = tilelang_images(_dispatch_map["tvm_ffi"]._memory_cache, out)
     else:
         from flashinfer.gdn_kernels.delta_rule_dsl.custom_compile_cache import _in_mem_compile_cache
         from cutlass.base_dsl.jit_executor import walk_module_and_get_cubin_data
