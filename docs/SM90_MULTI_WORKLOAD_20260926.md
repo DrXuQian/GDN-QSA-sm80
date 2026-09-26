@@ -1,6 +1,6 @@
 # SM90 GDN: multi-workload admission
 
-Status: **in progress; the expanded performance target is not met**. The H800
+Status: **56 attempts complete; the expanded performance target is not met**. The H800
 remains on. A primary-shape win is not permission to declare all shapes faster.
 No production routing, legacy SM80 code, clock or power settings were changed.
 Native PPU1.7 remains **SKIP: SDK/model unavailable**; these are H800 controls.
@@ -38,6 +38,34 @@ observed timing envelopes are unchanged. Overlap remains UNRESOLVED.
 
 ## Counterexamples already established
 
+Final frozen inventory: **55 valid captures / 1 reference numerical failure /
+0 pending**. All3,636 complete forwards were re-extracted exactly from SQLite;
+local and remote Python3.12 results are byte-identical. Against each library's
+fastest path, S38 has **16 wins / 10 losses / 2 unresolved** versus FlashInfer,
+and **25 wins / 2 losses / 1 invalid numerical reference** versus FlashQLA.
+No aggregate speedup is used to hide losses.
+
+All values below are paired medians in microseconds. Each entry is
+S38/reference; W/L/U means win/loss/overlapping ranges. Weak/strong correspond
+to the registered -.1/-1 gate parameters, including the varying-gate fixtures.
+
+| Workload | S38 / FI, weak | S38 / FI, strong | S38 / QLA, weak | S38 / QLA, strong |
+|---|---:|---:|---:|---:|
+| seq2048 | 101.50 / 112.77 W | 101.39 / 112.61 W | 99.54 / 165.01 W | 100.15 / 164.56 W |
+| batch2 | 194.39 / 114.29 L | 196.72 / 116.43 L | 194.69 / 218.67 W | 196.88 / 221.09 W |
+| seq512 | 30.29 / 31.81 W | 30.27 / 31.87 W | 30.29 / 54.74 W | 30.42 / 54.86 W |
+| seq1024 | 53.92 / 58.70 W | 53.55 / 58.50 W | 53.30 / 96.61 W | 53.52 / 96.98 W |
+| seq4096 | 187.02 / 209.44 W | 186.99 / 207.81 W | 185.81 / 241.18 W | 186.54 / 238.85 W |
+| seq8192 | 358.75 / 353.43 L | 361.09 / 353.11 L | 362.37 / 383.38 W | 366.24 / 377.48 W |
+| tail2051 | 101.55 / 113.06 W | 101.65 / 112.83 W | 101.62 / 181.04 W | 101.38 / 174.47 W |
+| batch4 | 288.79 / 227.33 L | 289.43 / 228.29 L | 289.04 / 325.52 W | 290.71 / 327.97 W |
+| heads64-gva4 | 195.03 / 114.69 L | 197.22 / 116.14 L | 196.55 / 227.04 W | 196.06 / 225.71 W |
+| heads64-gva2 | 196.80 / 115.23 L | 194.93 / 114.96 L | 197.71 / 228.70 W | 196.42 / 228.32 W |
+| heads32-gva1 | 102.82 / 114.26 W | 102.40 / 113.65 W | NUMERIC FAIL | 99.86 / 172.69 W |
+| heads16 | 93.97 / 94.46 U | 93.79 / 94.02 U | 94.11 / 91.82 L | 94.31 / 92.32 L |
+| vary-fp32 | 102.02 / 113.01 W | 102.58 / 113.86 W | 99.19 / 168.98 W | 99.25 / 164.59 W |
+| initial-vary | 105.25 / 114.37 W | 105.20 / 114.80 W | 101.04 / 169.86 W | 101.25 / 165.25 W |
+
 The tested candidate is S38 (V128 split into two independent V64 CTAs,
 aux232/state192). Control is the immutable unsplit S24. Representative
 same-capture weak-gate medians in microseconds:
@@ -70,8 +98,13 @@ g=-0.1, FlashQLA auto has output/state relative errors
 0.021621605/0.009716575. It fails the registered2% gate before timing. Our
 same-input S24/S38 pass. This is a reference admission failure, not evidence
 of a regression in our kernel and not permission to loosen the criterion.
-The paired strong-gate capture passed. Isolated auto/no-CP diagnosis is
-pending; unrelated workloads continue in fresh processes.
+The paired strong-gate capture passed. Isolated auto/no-CP diagnosis has now
+reproduced identical maximum errors and worst output location in both
+reference paths, with8 stable repeats each. The no-CP result also fails:
+CP is not necessary for this maximum-error violation. Our two arms are
+raw-identical and have errors0.005405401/0.003333338 on those exact inputs.
+No performance is claimed for the failing reference, no tolerance is changed,
+and this reference-only failure does not stop independent candidate checks.
 
 At the34th original capture, first-JIT FlashQLA passed all five arms' numerics
 but failed before timing: the old identity collector required a mapped
@@ -101,6 +134,10 @@ forward sums and verdicts are unaffected; no tolerance was added to disguise
 that reanalysis mismatch. Python3.12 local re-extraction is exact.
 
 Artifacts: `/workspace/gdn-sm90-multishape-20260926/{captures,jit-fresh-cached-proof-r2}`.
-Final full-inventory results and the verified archive will be added after
-all56 captures close. S39/S40/S41 are separately registered followups, not
-changes to the running S24/S38 comparison, and not admitted performance wins.
+Full-inventory machine-readable result: final-matrix.json in that task root.
+All279 recorded reference image entries (53 unique images) were hash-checked
+and copied to reference-images/, including the older mapped-cache images.
+The full archive is being sealed. S39/S40/S41 are separately registered
+followups, not changes to the frozen S24/S38 comparison. They now pass14 CPU
+cases with parent fingerprints and two raw stress pairs each; paired graph
+screening is underway, and is not nsys performance admission.

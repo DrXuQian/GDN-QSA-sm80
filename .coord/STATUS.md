@@ -1,11 +1,24 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 16:56:10 UTC
-working-on: finish independent workload cells; preserve FlashQLA weak GVA1 numeric failure for isolated diagnosis
-blocked-on: native PPU1.7 SDK/model unavailable; one reference arm fails original2% gate, no tolerance change
-last-commit: 9c1c165 multi-workload report; matrixafe28fa, stash81dac54, loaderc5c0584 published
+updated-at: 2026-09-26 17:12:07 UTC
+working-on: 56-case frozen inventory closed; three admitted followups in paired graph screening, nsys required for winners
+blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
+last-commit: 24c3bd8 reference-failure checkpoint; matrixd690350, stash81dac54, loaderc5c0584 published
 
 ## Current checkpoint
+
+17:11 checkpoint: frozen matrix55valid captures/1reference numeric failure,
+0pending. All3636 validfullforwards exactSQLite re-extracted, localPython3.12
+result byte-identical to remote. FI:16wins/10losses/2unresolved;QLA25wins/
+2losses/1numeric-invalid. No unconditional promotion or shutdown.
+Reference failure reproduced with SAMEinputs: auto andnoCP both2.16216%
+output/0.97166%state, sameworstoutput;ourS24/S38 .54054%/.33333%,rawsame.
+Allfourarms8repeatstable. Invalidreference remainsFAIL,no timing.
+All279 recordedreference images53unique hash-verified andcopied forarchive.
+S39/S40/S41 nowall14CPU+exactparentfingerprints+2rawstresspairsPASS,native
+gatesPASS. OldfailedCLI attemptpreserved; correctedrunner usesactualoptions.
+Paired12-cell graphscreen session69193 active, firstS39weak126.85vs115.69us
+loses. Graphscreen is NOTnsys speedadmission. Routing/SM80unchanged,H800ON.
 
 16:56 checkpoint:43PASS/1FAIL/12pending at last completed tranche. Reference
 FlashQLA auto on B1/T2048/Hq32/Hv32,g=-.1 has errors[.021621605,.009716575],
