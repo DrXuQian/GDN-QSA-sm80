@@ -26,6 +26,8 @@ counts do not prove their elapsed cost.
 | Scalar alpha consumers | aux128+state256+own producer32=416 | aux128+state256=384 | Reference `kernel:2149`; S33 removal alone unresolved |
 | Beta consumers | aux128+state256=384, although scalar state no longer reads beta | aux128 only | Reference `kernel:2154`; part of old S13, not a new hypothesis |
 | State matrix schedule | O1→SK→NewV→O2→KV, ordered WGs, commit/wait0 each | Same | `compute_loop_body:862–1008`; do not call FlashInfer wait-free |
+| First-chunk specialization | Separate single-chunk and multi-chunk first bodies;4state clones | One first body with B=min(T,64);3state clones | `run_state_math_role:1257–1378`; whole no-initial kernel112vs100HGMMA sites includes an unexecuted clone, not12extra dynamic MMAs |
+| NewV FP32→BF16 operand | Scalar conversion during retile | Vector conversion before operand use | `helpers.py:400`; actual no-initial body128 scalar F2F sites vs0. Old S9 removed the sites but was unresolved on~180us S7; not proof it cannot matter after S24 |
 | Output retirement | TMA commit then wait0 before slot release | Same | Both `collective_store_tma`; an O2-stage ring still allows producer lookahead, not unsafe reuse |
 | Gate input/math | Natural-log g, standard exp2f; cached relative factor | alpha multiplier, log2(alpha+1e-10), fastmath exp2; relative factor in state | Deliberately retained numerical contract; direct port is not raw-bit equivalent. Adapter excluded and separately measured as already registered |
 | Shared storage not consumed | Original vector-KDA scaled-Q/K and alpha-last allocations retained | No such duplicate scalar allocation | Capacity cost, not repeated traffic; do not claim byte traffic without accesses |
@@ -58,3 +60,16 @@ After this comparison, a bounded configuration sweep should enumerate only
 implemented stage axes, report the entire legal/rejected denominator and price
 shared/register occupancy together. Chunk size and state-WG count require new
 layout/math admission first; they are not currently legal sweep axes.
+
+13:49 result: S34 is raw-admitted but **loses**128.8165[127.425,129.601]us
+versus S24120.704[120.129,121.761]; fastestFI113.089us. Deeper rings and
+reference publication/order together are not a speed admission. No defaults
+change. Whole no-initial footprint6656->6560, but spill bytes20->48; do not
+ascribe the loss to any one part without an ablation. This complete profile
+is retained for the future config sweep, not called the optimum.
+
+The remaining state-loop clone and conversion differences above are native
+code-generation differences in **writing the same computation**, not a new
+GDN algorithm. The next bounded source-alignment arm S35 tests these together
+on S24, without adopting losing S34's delivery profile. It must preserve each
+chunk's valid rows (first min(T,64), final tail), RNE and exact parent output.
