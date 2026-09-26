@@ -22,6 +22,8 @@ def gdn_forward(q, k, v, g, beta, initial_state=None, output_final_state=True,
     implementation; this wrapper performs no hidden conversions.
     """
     legacy_ppu = "GDN_QSA_PPU_EXTENSION" in os.environ
+    if algorithm == "fused_sm90" and backend is None:
+        raise ValueError("fused_sm90 requires an explicit cuda_sm90 or ppu17 backend")
     if backend is None:
         backend = "ppu10" if algorithm != "original" or legacy_ppu else "cuda_sm80"
     implementation = require_implementation(algorithm, backend)
@@ -37,6 +39,11 @@ def gdn_forward(q, k, v, g, beta, initial_state=None, output_final_state=True,
                 "set/unset the extension explicitly, no fallback")
     module = import_module(f".{implementation['module']}", __package__)
     call = getattr(module, implementation["entry"])
+    if algorithm == "fused_sm90":
+        if delivery is not None:
+            raise ValueError("fused_sm90 owns its pipeline; legacy delivery selectors do not apply")
+        return call(q,k,v,g,beta,initial_state=initial_state,
+                    output_final_state=output_final_state,backend=backend)
     if algorithm == "original":
         return call(q, k, v, g, beta, output_final_state=output_final_state)
     return call(q, k, v, g, beta, initial_state=initial_state,

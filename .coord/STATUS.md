@@ -1,9 +1,33 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 02:04:46 UTC
-working-on: backend boundaries completed and published; SM90/PPU1.7 algorithm implementation remains separate next work
-blocked-on: none for delivered boundary refactor; legacy solve-static device verdict still pending
-last-commit: 1cd9be3 (published boundary implementation; tested local9871a93 has identical tree)
+updated-at: 2026-09-26 03:17:01 UTC
+working-on: final-byte CUDA and PPU-fork source-check builds complete; publishing opt-in fused_sm90
+blocked-on: installed HGGC lists vm_10/vm_15 only; PPU1.7 native compile/device admission unavailable here
+last-commit: b9a870b (integration parent; new algorithm not committed yet)
+
+## SM90 algorithm integration
+
+Worktree /workspace/gdn-sm90-algorithm-20260926. Reference cuLA
+79be249e61453808e18e5cef7702b363239e7d8d C++ SM90 KDA, not DSL.
+Scalar natural-log gate needs chunk-local prefix, state ABI is V-contiguous,
+fixed-batch tail must not overwrite the next sequence. Preserve WGMMA/TMA roles,
+resident state and inverse algorithm; defaults unchanged. No speed claim.
+Host algebra/negative checks and real SM90 body compile are complete locally.
+
+D128/72 FP64 algebra combinations/four seam negatives PASS. Both actual CuTe A/B
+gate consumers, state/output ownership, all64 tails pass with ASan under CUDA
+and PPU3.6 dependencies. Wrong gate row red on both.104 Python contracts,
+26 boundary tests and7 dialect tests PASS. All4 CUDA and4 PPU-fork source-check
+bodies assemble with WGMMA/TF32/TMA/O/state;7 native-code negatives per image
+red. Both real host bindings link/import; missing launch TU fails with the
+specific undefined symbol, not SKIP. SM80 target negative red.
+Dynamic shared232448->167936B. CUDA128regs/264-296Bstack; PPU-fork CUDA source
+check128regs/224-312Bstack: spills remain, NOT performance-admitted. Real
+SDK2.1.1 cannot supply SM90a/10700, so PPU1.7 native compile SKIP. No GPU or
+simulator execution; no speed or device-accuracy claim. Full commands and
+evidence:docs/SM90_FUSED_GDN.md and SM90_FUSED_GDN_LOCAL_20260926.md.
+Fresh cuda-admitted and ppu-source-admitted builds bind final source bytes;
+both CMake target configurations pass without pulling in legacy AIU.
 
 ## Boundary implementation in progress
 

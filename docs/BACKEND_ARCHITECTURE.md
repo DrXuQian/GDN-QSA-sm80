@@ -1,8 +1,9 @@
 # One repository, independent algorithms and execution families
 
-Status: boundary implementation, 2026-09-26 UTC. The target isolation and optional
-complete-forward entry described below are implemented. New SM90/PPU1.7 kernels
-are not implemented; the remaining algorithm integration is still a design.
+Status: boundary plus independent SM90 source integration, 2026-09-26 UTC.
+The explicit cuLA-derived `fused_sm90` candidate is described in
+[SM90_FUSED_GDN.md](SM90_FUSED_GDN.md). Device admission is still UNVERIFIED;
+source availability is not a claim of native PPU1.7 execution or performance.
 Numerical thresholds and default algorithms are unchanged. The published legacy
 PPU `residual-solve-static` experiment remains pending device admission.
 
@@ -38,8 +39,9 @@ o, ht = gdn_forward(q, k, v, g, beta, initial_state=h0,
                    delivery="warps8-hvlayout")
 ```
 
-Explicit `cuda_sm90`, `ppu17` and distinct `ppu15` builds/calls currently fail
-with reasons. PPU1.5 retains the actlize dependency policy, but the existing
+Distinct `ppu15` builds/calls still fail with a reason. `cuda_sm90` and `ppu17`
+have a separate complete `fused_sm90` source graph, never a legacy fallback.
+PPU1.5 retains the actlize dependency policy, but the existing
 compiler gate had only admitted PPU1.0; this refactor does not invent a PPU1.5
 numerical admission. Do not set an `implemented` bit to bypass this: each target
 needs its own registered source graph and native/body/device checks.

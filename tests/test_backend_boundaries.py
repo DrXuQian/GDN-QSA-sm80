@@ -60,7 +60,7 @@ class Dispatch(unittest.TestCase):
     def test_unsupported_and_incompatible_targets_fail_before_import(self):
         with patch.dict(os.environ, {}, clear=True), patch("gdn_qsa_sm80.gdn_interface.import_module") as importer:
             for target in ("ppu15", "ppu17", "cuda_sm90"):
-                with self.subTest(target=target), self.assertRaisesRegex(RuntimeError, "not implemented"):
+                with self.subTest(target=target), self.assertRaisesRegex(RuntimeError, "not implemented|no .* implementation"):
                     gdn_forward(*self.inputs, backend=target)
             with self.assertRaisesRegex(RuntimeError, "no cuda_sm80 implementation"):
                 gdn_forward(*self.inputs, algorithm="wy", backend="cuda_sm80")
@@ -83,10 +83,11 @@ class Dispatch(unittest.TestCase):
 
     def test_inventory_is_not_mutable_authority_or_device_admission(self):
         inventory = backend_inventory()
-        self.assertFalse(inventory["targets"]["ppu17"]["implemented"])
-        inventory["targets"]["ppu17"]["implemented"] = True
+        self.assertFalse(inventory["targets"]["ppu15"]["implemented"])
+        inventory["targets"]["ppu15"]["implemented"] = True
         with self.assertRaisesRegex(RuntimeError, "not implemented"):
-            require_backend("ppu17")
+            require_backend("ppu15")
+        self.assertEqual(require_backend("ppu17")["device_admission"],"UNVERIFIED")
         with self.assertRaises(ValueError):
             require_backend("typo")
 
@@ -123,12 +124,15 @@ class BuildBoundary(unittest.TestCase):
         self.assertFalse((self.work / "host/actlize").exists())
 
     def test_new_architecture_is_not_successful_legacy_build(self):
-        for target in ("ppu15", "cuda_sm90", "ppu17"):
+        for target in ("ppu15", "ppu17"):
             with self.subTest(target=target):
                 result = self.configure(target, f"-DGDN_QSA_TARGET={target}")
                 self.assertNotEqual(result.returncode, 0)
-                self.assertIn("not implemented", " ".join(result.stderr.split()))
+                self.assertRegex(" ".join(result.stderr.split()),"not implemented|PPU_CUTLASS_ROOT")
                 self.assertFalse((self.work / target / "actlize").exists())
+        result=self.configure("new-cuda", "-DGDN_QSA_TARGET=cuda_sm90")
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertFalse((self.work/"new-cuda/actlize").exists())
 
     def test_unknown_target_and_conflicting_legacy_alias_are_red(self):
         result = self.configure("typo", "-DGDN_QSA_TARGET=pp17")
@@ -168,6 +172,8 @@ class BuildBoundary(unittest.TestCase):
         for entry in (None, "csrc/backends/cuda_sm80/build.py"):
             data = copy.deepcopy(base)
             data['targets']['cuda_sm90']['implemented'] = True
+            data['targets']['cuda_sm90']['build'] = 'setuptools'
+            data['targets']['cuda_sm90'].pop('build_entry',None)
             if entry:
                 data['targets']['cuda_sm90']['build_entry'] = entry
             with patch.dict(os.environ, {'GDN_QSA_TARGET': 'cuda_sm90'}, clear=True), patch(
@@ -199,6 +205,7 @@ class BuildBoundary(unittest.TestCase):
             (directory / 'gdn_qsa_sm80/backends').mkdir(parents=True)
             data = backend_inventory()
             data['targets']['ppu17']['implemented'] = True
+            data['targets']['ppu17'].pop('build_entry',None)
             if entry:
                 data['targets']['ppu17']['build_entry'] = entry
             # Execute the real selector/leaf, not a parallel model of them.
