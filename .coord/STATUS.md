@@ -1,11 +1,29 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 10:23:42 UTC
-working-on: S21 wins both FI control windows; S22/S23 native proof and pending device timing
-blocked-on: H800 foreign workload parent139996/176476; native PPU1.7 SDK/model unavailable
-last-commit: a71922b (S20/S21/S22 checkpoint); immutable incumbent S19 kernel64691d1
+updated-at: 2026-09-26 10:44:08 UTC
+working-on: S24 relative-decay cache admission completed; paired full-forward timing next
+blocked-on: native PPU1.7 SDK/model unavailable; fastest FlashInfer target not yet met
+last-commit: 87530ec (main checkpoint); S24 kernel bc3c154, native-gate cb682f3
 
 ## Current checkpoint
+
+S21 is confirmed faster than S19 and QLA in both gate regimes, but slower
+than fastest FI. S22 valid retry139.5525 versus135.4085us LOSES; S23 combined
+135.2965us also LOSES to S21. Keep neither in the winner. Their two rejected
+timing attempts remain INVALID; foreign GPU work ended before valid retries.
+S24 explicitly registered before edit10:31: move repeated relative exp2 from
+state WGs to existing gate producer, under the unchanged alpha pipeline.
+Actual CuTe8192-element ownership/64-coefficient map and negative PASS;
+14 CPU cases and both overflow stresses complete; same-parent comparison and
+timing next. All4 native state bodies lose96 static EX2 sites, producer gains2;
+matrix/data-barrier families unchanged. Actual remote/local4body native
+equality PASS. PPU CUTLASS3.6 CUDA source-check4body PASS; nativePPU17 SKIP.
+The first local S24 build was invalidated by source edits during compilation;
+only relative-local-r2 and hash-bound relative-build are authoritative.
+No default/SM80 change. Candidate branchsm90-relative-gate-cache-20260926
+pushed. Handoff11:15UTC; no further candidates this run.
+
+### Earlier checkpoints (superseded)
 
 S21 weak129.0085 vs133.5365us; strong128.945 vs133.6005us, both disjoint
 wins over S19. Fastest FI112.848/112.88us still wins: target NOT MET.
