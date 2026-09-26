@@ -177,8 +177,6 @@ struct ScalarGdnAux : Base {
                 out_kk(i) = Inverse(live ? acc_kk(i) * row_beta * decay : 0.f);
             }
             kkp.producer_acquire(kw);
-            qkp.producer_acquire(qw);
-            copy(store_qk, tq.retile_S(out_qk), tq.partition_D(qk(_,_,qw.index())));
             copy(store_kk, tk.retile_S(out_kk), tk.partition_D(kk(_,_,kw.index())));
             if constexpr (AuxInverse) {
                 // KK remains private to the producer until BOTH inversion and
@@ -203,8 +201,15 @@ struct ScalarGdnAux : Base {
                 copy(store_qk,tq.retile_S(operand),tq.partition_D(kk_bf16(_,_,kw.index())));
             }
             cutlass::arch::fence_view_async_shared();
-            qkp.producer_commit(qw); ++qw;
             kkp.producer_commit(kw); ++kw;
+            // State needs the completed inverse for NewV before QK for O2.
+            // The two shared arrays/stage lifetimes are independent: do not
+            // hold KK publication behind a QK empty-slot wait. out_qk stays
+            // live in registers until its own slot is acquired and published.
+            qkp.producer_acquire(qw);
+            copy(store_qk, tq.retile_S(out_qk), tq.partition_D(qk(_,_,qw.index())));
+            cutlass::arch::fence_view_async_shared();
+            qkp.producer_commit(qw); ++qw;
             ap.consumer_release(ar); ++ar;
             bp.consumer_release(br); ++br;
         });
