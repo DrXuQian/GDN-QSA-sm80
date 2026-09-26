@@ -1,11 +1,31 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 07:29:11 UTC
-working-on: S11 wins FlashQLA but loses FlashInfer; paired S12 composition closure and raw evidence archive
-blocked-on: native PPU1.7 SDK/model unavailable; H800 currently idle for guarded serial measurements
-last-commit: 8c2cd50 (main production unchanged; admitted candidate S3 is 1f22ac0)
+updated-at: 2026-09-26 07:51:01 UTC
+working-on: final handoff of bounded SM90 SASS campaign; S11 retained, target NOT MET
+blocked-on: native PPU1.7 SDK/model unavailable; no further H800 jobs required for this handoff
+last-commit: e228378 (main checkpoint before this report closure; best candidate kernel 457267e / branch head d3cf13a)
 
 ## Active SM90 campaign
+
+S11 is the best confirmed both-gate candidate. Same-window nsys complete
+forward kernel sums:148.736/148.480us versus FlashInfer noCP113.440/113.248us
+(LOSE);145.536/145.424us versus FlashQLA auto165.072/163.200us (WIN). The
+full two-library target is NOT MET.14/14 CPU-oracle + parent raw equality,
+8 repeats and every captured call pass. No weaker numerical criterion.
+
+Final S12 and S13 weak screenings are UNRESOLVED versus S11; neither promoted.
+S13:146.832[145.312,148.032]us vs147.984[146.624,148.896]us. Its actual
+compiled metadata consumer counts and dead-consumer negative pass;14/14 raw
+device cases pass. No strong-gate speed claim for a screened-out candidate.
+All20 admitted captures/1,416 forwards are hash-bound in the campaign JSON.
+Raw remote evidence has been downloaded with matching archive SHA256
+79cd3c8e9bc87a2b75731da88a5b3bb82b229d1869575f50aeb8a7cffeccbaa4.
+Report:docs/SM90_FLASHINFER_SASS_20260926.md. Exact PCs, rejected ideas and
+next state-live-range hypothesis are recorded. Experimental branches pushed;
+main production code/default route and SM80/PPU1.0 remain unchanged. S11
+also passes4-body PPU CUTLASS3.6 CUDA source-check; native PPU1.7 is SKIP.
+
+## Previous campaign checkpoints (superseded by the final status above)
 
 07:29checkpoint: S11(457267e)14/14 independent+parentraw PASS,8repeats
 and every captured forward pass. Same-window nsys145.536/145.424us versus

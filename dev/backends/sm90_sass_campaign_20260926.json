@@ -3932,6 +3932,519 @@
       },
       "result_sha256": "0d2b309cca7aa12dbaf3d39e67894fb4685b85e610ab04a0532716de80e0faf2",
       "receipt_sha256": "e0521cd36f28f71464ecdd47ee25dc9573418ac9d233c10c328037278266f9bf"
+    },
+    {
+      "id": "S12",
+      "capture": "meta-gates-fi-weak",
+      "gate": -0.1,
+      "shape": [
+        1,
+        2048,
+        16,
+        32,
+        128
+      ],
+      "input_sha256": "e976de55fd4a2ac5",
+      "roles": {
+        "ours-cuda": {
+          "kernel_sum_us": {
+            "median": 146.416,
+            "range": [
+              145.92,
+              147.392
+            ]
+          },
+          "gpu_memory_median_us": 0.0,
+          "gpu_gaps_median_us": 0.0,
+          "calls": 12,
+          "admission": {
+            "errors": [
+              0.0048543657176196575,
+              0.003361937589943409
+            ],
+            "fingerprint": "462cc9ef1e8a85d4",
+            "repeat": "8/8 RAW-BIT"
+          },
+          "build": {
+            "extension_sha256": "403c7849cd724880c1bd1aa38eb82fe79d097bf8fe565ae95d4d9e841f9b3696",
+            "repository_revision": "457267e16d9f7b2640db60abd56baef830da3d0d",
+            "flags": [
+              "-std=c++17",
+              "-O3",
+              "--expt-relaxed-constexpr",
+              "--extended-lambda",
+              "-gencode=arch=compute_90a,code=sm_90a",
+              "-lineinfo",
+              "-Xcompiler=-fPIC",
+              "-DNDEBUG"
+            ],
+            "compiler_sha256": "59e4e55f9a38b78c590df1e28a69dad91052958f18a03868ca4a547c043fbba7",
+            "dependency_version_sha256": "6b65f8aa05e19cfed770446ab1a5afb3ca1dafdf32d44d84ec01502451dfcc96",
+            "source_map_canonical_sha256": "8cd056d31765a9c94ecec66e0ad19bb6dfb207750f967fa7dd08f5669fd87bfc"
+          }
+        },
+        "ours-ppu-source-check": {
+          "kernel_sum_us": {
+            "median": 334.48,
+            "range": [
+              332.512,
+              335.648
+            ]
+          },
+          "gpu_memory_median_us": 0.0,
+          "gpu_gaps_median_us": 0.0,
+          "calls": 12,
+          "admission": {
+            "errors": [
+              0.0048543657176196575,
+              0.0027694529853761196
+            ],
+            "fingerprint": "bdd2ce0aa6c7cb3d",
+            "repeat": "8/8 RAW-BIT"
+          },
+          "build": {
+            "extension_sha256": "091228dbdaf666de20edbba7ebc02d2504d9f14b6e356eb7bd8c02a7a8eadee9",
+            "repository_revision": "33b6b9ce39034c8a00cb95c54da897dd715948e2",
+            "flags": [
+              "-std=c++17",
+              "-O3",
+              "--expt-relaxed-constexpr",
+              "--extended-lambda",
+              "-gencode=arch=compute_90a,code=sm_90a",
+              "-lineinfo",
+              "-Xcompiler=-fPIC",
+              "-DGDN_SM90_PPU17=1",
+              "-DACOMPUTE_VERSION=10700",
+              "-DGDN_SM90_SOURCE_CHECK=1"
+            ],
+            "compiler_sha256": "59e4e55f9a38b78c590df1e28a69dad91052958f18a03868ca4a547c043fbba7",
+            "dependency_version_sha256": "48484143e34ebfe8a841dc04d0c7da66c4e2d3950cfa110269d78c00a245d924",
+            "source_map_canonical_sha256": "cab465d3fd35c79c3ae6da4c5995b6ae7321ceea8822fcdadbd80323b7bc9cba"
+          }
+        },
+        "flashinfer-auto": {
+          "kernel_sum_us": {
+            "median": 130.448,
+            "range": [
+              129.536,
+              132.32
+            ]
+          },
+          "gpu_memory_median_us": 0.0,
+          "gpu_gaps_median_us": 35.728,
+          "calls": 12,
+          "admission": {
+            "errors": [
+              0.0048543657176196575,
+              0.003810191061347723
+            ],
+            "fingerprint": "b80bf920eb661bcb",
+            "repeat": "8/8 RAW-BIT"
+          }
+        },
+        "flashinfer-no-cp": {
+          "kernel_sum_us": {
+            "median": 112.912,
+            "range": [
+              112.128,
+              113.504
+            ]
+          },
+          "gpu_memory_median_us": 0.0,
+          "gpu_gaps_median_us": 0.0,
+          "calls": 12,
+          "admission": {
+            "errors": [
+              0.0048543657176196575,
+              0.003361937589943409
+            ],
+            "fingerprint": "3a7a1fe996ec0c9a",
+            "repeat": "8/8 RAW-BIT"
+          }
+        },
+        "flashinfer-auto-log-adapter": {
+          "kernel_sum_us": {
+            "median": 138.94400000000002,
+            "range": [
+              137.984,
+              139.936
+            ]
+          },
+          "gpu_memory_median_us": 0.0,
+          "gpu_gaps_median_us": 446.927,
+          "calls": 12,
+          "admission": {
+            "errors": [
+              0.0048543657176196575,
+              0.003810191061347723
+            ],
+            "fingerprint": "e0ddf0ebdcd421d9",
+            "repeat": "8/8 RAW-BIT"
+          }
+        },
+        "ours-candidate": {
+          "kernel_sum_us": {
+            "median": 148.464,
+            "range": [
+              147.104,
+              149.664
+            ]
+          },
+          "gpu_memory_median_us": 0.0,
+          "gpu_gaps_median_us": 0.0,
+          "calls": 12,
+          "admission": {
+            "errors": [
+              0.0048543657176196575,
+              0.003361937589943409
+            ],
+            "fingerprint": "462cc9ef1e8a85d4",
+            "repeat": "8/8 RAW-BIT"
+          },
+          "build": {
+            "extension_sha256": "62dd8df7e5571502d3b95e30e9ced6266183b738cd920576bfe6d5db65dd460e",
+            "repository_revision": "1e295b2839d037fb97fef4dbe008a60c7a69752a",
+            "flags": [
+              "-std=c++17",
+              "-O3",
+              "--expt-relaxed-constexpr",
+              "--extended-lambda",
+              "-gencode=arch=compute_90a,code=sm_90a",
+              "-lineinfo",
+              "-Xcompiler=-fPIC",
+              "-DNDEBUG"
+            ],
+            "compiler_sha256": "59e4e55f9a38b78c590df1e28a69dad91052958f18a03868ca4a547c043fbba7",
+            "dependency_version_sha256": "6b65f8aa05e19cfed770446ab1a5afb3ca1dafdf32d44d84ec01502451dfcc96",
+            "source_map_canonical_sha256": "f81f147b2fa63592b75af9cba682e9db2f00e6fb5cb0325e4b13675b5e6639a2"
+          }
+        }
+      },
+      "comparisons": {
+        "ours-ppu-source-check": {
+          "control": "ours-cuda",
+          "control_over_candidate": 0.4377421669457067,
+          "verdict": "CONTROL-WINS",
+          "criterion": "disjoint-observed-kernel-sum-ranges"
+        },
+        "flashinfer-auto": {
+          "control": "ours-cuda",
+          "control_over_candidate": 1.1224089292285047,
+          "verdict": "CANDIDATE-WINS",
+          "criterion": "disjoint-observed-kernel-sum-ranges"
+        },
+        "flashinfer-no-cp": {
+          "control": "ours-cuda",
+          "control_over_candidate": 1.296726654385716,
+          "verdict": "CANDIDATE-WINS",
+          "criterion": "disjoint-observed-kernel-sum-ranges"
+        },
+        "flashinfer-auto-log-adapter": {
+          "control": "ours-cuda",
+          "control_over_candidate": 1.0537770612620911,
+          "verdict": "CANDIDATE-WINS",
+          "criterion": "disjoint-observed-kernel-sum-ranges"
+        },
+        "ours-candidate": {
+          "control": "ours-cuda",
+          "control_over_candidate": 0.9862054100657398,
+          "verdict": "UNRESOLVED",
+          "criterion": "disjoint-observed-kernel-sum-ranges"
+        }
+      },
+      "candidate_vs_references": {
+        "flashinfer-auto": {
+          "candidate": "ours-candidate",
+          "reference": "flashinfer-auto",
+          "reference_over_candidate": 0.8786507166720552,
+          "verdict": "REFERENCE-WINS",
+          "criterion": "disjoint-observed-kernel-sum-ranges"
+        },
+        "flashinfer-no-cp": {
+          "candidate": "ours-candidate",
+          "reference": "flashinfer-no-cp",
+          "reference_over_candidate": 0.7605345403599526,
+          "verdict": "REFERENCE-WINS",
+          "criterion": "disjoint-observed-kernel-sum-ranges"
+        },
+        "flashinfer-auto-log-adapter": {
+          "candidate": "ours-candidate",
+          "reference": "flashinfer-auto-log-adapter",
+          "reference_over_candidate": 0.9358767108524627,
+          "verdict": "REFERENCE-WINS",
+          "criterion": "disjoint-observed-kernel-sum-ranges"
+        }
+      },
+      "device": "NVIDIA H800 PCIe",
+      "source_map_canonical_sha256": "19a806a7a8c6a126a1eac57bae0520be620c1452704ecebcbf977c63d6600570",
+      "monitor_samples": 87,
+      "evidence": {
+        "/workspace/gdn-sm90-win-20260926/meta-gates-fi-weak/forward.sqlite": "4739c0938dda905ae05fed75f61d9957f9a27fdcb2f2e49a65218a69c7a3a0ab",
+        "/workspace/gdn-sm90-win-20260926/meta-gates-fi-weak/receipt.json": "f762880d45132dbdf77cb3d23e9e0722a74399138f7f398279c298d067e3c0e8",
+        "/workspace/gdn-sm90-win-20260926/meta-gates-source/tools/analyze_sm90_nsys.py": "40555f4b59221a774d98a874ec839fc27dcb506c5fe5ac5538868ee6646d3c86"
+      },
+      "result_sha256": "282b533660600c1e881f5d0a5c0c9cb22e7125d948f1231eeeb63b9738a65ed2",
+      "receipt_sha256": "f762880d45132dbdf77cb3d23e9e0722a74399138f7f398279c298d067e3c0e8"
+    },
+    {
+      "id": "S13",
+      "capture": "protocol-fi-weak",
+      "gate": -0.1,
+      "shape": [
+        1,
+        2048,
+        16,
+        32,
+        128
+      ],
+      "input_sha256": "e976de55fd4a2ac5",
+      "roles": {
+        "ours-cuda": {
+          "kernel_sum_us": {
+            "median": 147.98399999999998,
+            "range": [
+              146.624,
+              148.896
+            ]
+          },
+          "gpu_memory_median_us": 0.0,
+          "gpu_gaps_median_us": 0.0,
+          "calls": 12,
+          "admission": {
+            "errors": [
+              0.0048543657176196575,
+              0.003361937589943409
+            ],
+            "fingerprint": "462cc9ef1e8a85d4",
+            "repeat": "8/8 RAW-BIT"
+          },
+          "build": {
+            "extension_sha256": "403c7849cd724880c1bd1aa38eb82fe79d097bf8fe565ae95d4d9e841f9b3696",
+            "repository_revision": "457267e16d9f7b2640db60abd56baef830da3d0d",
+            "flags": [
+              "-std=c++17",
+              "-O3",
+              "--expt-relaxed-constexpr",
+              "--extended-lambda",
+              "-gencode=arch=compute_90a,code=sm_90a",
+              "-lineinfo",
+              "-Xcompiler=-fPIC",
+              "-DNDEBUG"
+            ],
+            "compiler_sha256": "59e4e55f9a38b78c590df1e28a69dad91052958f18a03868ca4a547c043fbba7",
+            "dependency_version_sha256": "6b65f8aa05e19cfed770446ab1a5afb3ca1dafdf32d44d84ec01502451dfcc96",
+            "source_map_canonical_sha256": "8cd056d31765a9c94ecec66e0ad19bb6dfb207750f967fa7dd08f5669fd87bfc"
+          }
+        },
+        "ours-ppu-source-check": {
+          "kernel_sum_us": {
+            "median": 336.88,
+            "range": [
+              332.608,
+              340.96
+            ]
+          },
+          "gpu_memory_median_us": 0.0,
+          "gpu_gaps_median_us": 0.0,
+          "calls": 12,
+          "admission": {
+            "errors": [
+              0.0048543657176196575,
+              0.0027694529853761196
+            ],
+            "fingerprint": "bdd2ce0aa6c7cb3d",
+            "repeat": "8/8 RAW-BIT"
+          },
+          "build": {
+            "extension_sha256": "091228dbdaf666de20edbba7ebc02d2504d9f14b6e356eb7bd8c02a7a8eadee9",
+            "repository_revision": "33b6b9ce39034c8a00cb95c54da897dd715948e2",
+            "flags": [
+              "-std=c++17",
+              "-O3",
+              "--expt-relaxed-constexpr",
+              "--extended-lambda",
+              "-gencode=arch=compute_90a,code=sm_90a",
+              "-lineinfo",
+              "-Xcompiler=-fPIC",
+              "-DGDN_SM90_PPU17=1",
+              "-DACOMPUTE_VERSION=10700",
+              "-DGDN_SM90_SOURCE_CHECK=1"
+            ],
+            "compiler_sha256": "59e4e55f9a38b78c590df1e28a69dad91052958f18a03868ca4a547c043fbba7",
+            "dependency_version_sha256": "48484143e34ebfe8a841dc04d0c7da66c4e2d3950cfa110269d78c00a245d924",
+            "source_map_canonical_sha256": "cab465d3fd35c79c3ae6da4c5995b6ae7321ceea8822fcdadbd80323b7bc9cba"
+          }
+        },
+        "flashinfer-auto": {
+          "kernel_sum_us": {
+            "median": 131.344,
+            "range": [
+              129.984,
+              133.504
+            ]
+          },
+          "gpu_memory_median_us": 0.0,
+          "gpu_gaps_median_us": 35.936,
+          "calls": 12,
+          "admission": {
+            "errors": [
+              0.0048543657176196575,
+              0.003810191061347723
+            ],
+            "fingerprint": "b80bf920eb661bcb",
+            "repeat": "8/8 RAW-BIT"
+          }
+        },
+        "flashinfer-no-cp": {
+          "kernel_sum_us": {
+            "median": 113.47200000000001,
+            "range": [
+              112.416,
+              113.952
+            ]
+          },
+          "gpu_memory_median_us": 0.0,
+          "gpu_gaps_median_us": 0.0,
+          "calls": 12,
+          "admission": {
+            "errors": [
+              0.0048543657176196575,
+              0.003361937589943409
+            ],
+            "fingerprint": "3a7a1fe996ec0c9a",
+            "repeat": "8/8 RAW-BIT"
+          }
+        },
+        "flashinfer-auto-log-adapter": {
+          "kernel_sum_us": {
+            "median": 139.68,
+            "range": [
+              138.976,
+              140.576
+            ]
+          },
+          "gpu_memory_median_us": 0.0,
+          "gpu_gaps_median_us": 478.752,
+          "calls": 12,
+          "admission": {
+            "errors": [
+              0.0048543657176196575,
+              0.003810191061347723
+            ],
+            "fingerprint": "e0ddf0ebdcd421d9",
+            "repeat": "8/8 RAW-BIT"
+          }
+        },
+        "ours-candidate": {
+          "kernel_sum_us": {
+            "median": 146.832,
+            "range": [
+              145.312,
+              148.032
+            ]
+          },
+          "gpu_memory_median_us": 0.0,
+          "gpu_gaps_median_us": 0.0,
+          "calls": 12,
+          "admission": {
+            "errors": [
+              0.0048543657176196575,
+              0.003361937589943409
+            ],
+            "fingerprint": "462cc9ef1e8a85d4",
+            "repeat": "8/8 RAW-BIT"
+          },
+          "build": {
+            "extension_sha256": "0f1d5d84230cb90ba736c5065f9712958d580259e270baa1322fec1153e11932",
+            "repository_revision": "a322fded38e75e743a9b382197a0e2e031b45172",
+            "flags": [
+              "-std=c++17",
+              "-O3",
+              "--expt-relaxed-constexpr",
+              "--extended-lambda",
+              "-gencode=arch=compute_90a,code=sm_90a",
+              "-lineinfo",
+              "-Xcompiler=-fPIC",
+              "-DNDEBUG"
+            ],
+            "compiler_sha256": "59e4e55f9a38b78c590df1e28a69dad91052958f18a03868ca4a547c043fbba7",
+            "dependency_version_sha256": "6b65f8aa05e19cfed770446ab1a5afb3ca1dafdf32d44d84ec01502451dfcc96",
+            "source_map_canonical_sha256": "0cca0c80d6022f5ed4f2249d622be1c7177eddece4206a8a75af3eed89dc90c0"
+          }
+        }
+      },
+      "comparisons": {
+        "ours-ppu-source-check": {
+          "control": "ours-cuda",
+          "control_over_candidate": 0.43927808121586315,
+          "verdict": "CONTROL-WINS",
+          "criterion": "disjoint-observed-kernel-sum-ranges"
+        },
+        "flashinfer-auto": {
+          "control": "ours-cuda",
+          "control_over_candidate": 1.126690218053356,
+          "verdict": "CANDIDATE-WINS",
+          "criterion": "disjoint-observed-kernel-sum-ranges"
+        },
+        "flashinfer-no-cp": {
+          "control": "ours-cuda",
+          "control_over_candidate": 1.3041455160744497,
+          "verdict": "CANDIDATE-WINS",
+          "criterion": "disjoint-observed-kernel-sum-ranges"
+        },
+        "flashinfer-auto-log-adapter": {
+          "control": "ours-cuda",
+          "control_over_candidate": 1.0594501718213056,
+          "verdict": "CANDIDATE-WINS",
+          "criterion": "disjoint-observed-kernel-sum-ranges"
+        },
+        "ours-candidate": {
+          "control": "ours-cuda",
+          "control_over_candidate": 1.0078457012095454,
+          "verdict": "UNRESOLVED",
+          "criterion": "disjoint-observed-kernel-sum-ranges"
+        }
+      },
+      "candidate_vs_references": {
+        "flashinfer-auto": {
+          "candidate": "ours-candidate",
+          "reference": "flashinfer-auto",
+          "reference_over_candidate": 0.8945189059605535,
+          "verdict": "REFERENCE-WINS",
+          "criterion": "disjoint-observed-kernel-sum-ranges"
+        },
+        "flashinfer-no-cp": {
+          "candidate": "ours-candidate",
+          "reference": "flashinfer-no-cp",
+          "reference_over_candidate": 0.772801569140242,
+          "verdict": "REFERENCE-WINS",
+          "criterion": "disjoint-observed-kernel-sum-ranges"
+        },
+        "flashinfer-auto-log-adapter": {
+          "candidate": "ours-candidate",
+          "reference": "flashinfer-auto-log-adapter",
+          "reference_over_candidate": 0.9512912716574045,
+          "verdict": "REFERENCE-WINS",
+          "criterion": "disjoint-observed-kernel-sum-ranges"
+        }
+      },
+      "device": "NVIDIA H800 PCIe",
+      "source_map_canonical_sha256": "19a806a7a8c6a126a1eac57bae0520be620c1452704ecebcbf977c63d6600570",
+      "monitor_samples": 93,
+      "evidence": {
+        "/workspace/gdn-sm90-win-20260926/protocol-fi-weak/forward.sqlite": "dcd39a8c0ae348c2ba37d1da27e37a637216d474243c8c1ba265a07b54cb58bb",
+        "/workspace/gdn-sm90-win-20260926/protocol-fi-weak/receipt.json": "3d37d8740fbd3d810d6b468ec03384bc1de7e76c4eaf6fb89f3f3c31f16d1187",
+        "/workspace/gdn-sm90-win-20260926/protocol-source/tools/analyze_sm90_nsys.py": "40555f4b59221a774d98a874ec839fc27dcb506c5fe5ac5538868ee6646d3c86"
+      },
+      "result_sha256": "09da596e5c59ad95539a9e18518ce6a3423acde06dd8f54edcbd67f440fc68af",
+      "receipt_sha256": "3d37d8740fbd3d810d6b468ec03384bc1de7e76c4eaf6fb89f3f3c31f16d1187"
     }
-  ]
+  ],
+  "archive": {
+    "path": "/workspace/gdn-sm90-win-20260926/remote-evidence-final.tar.gz",
+    "sha256": "79cd3c8e9bc87a2b75731da88a5b3bb82b229d1869575f50aeb8a7cffeccbaa4",
+    "contents": "all remote campaign sources, builds, numerical cases, raw nsys/sqlite/JIT images and receipts; rejected attempts retained and excluded from runs"
+  },
+  "capture_count": 20,
+  "forward_count": 1416
 }

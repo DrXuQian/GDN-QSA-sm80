@@ -9,7 +9,7 @@ This is **not** a native PPU1.7 result. SM80/PPU1.0 is unchanged.
 FlashInfer is pinned at `5d9f8c8d97fa53e22952ce8672f475d235f07478`, its
 fastest admitted **no-CP** specialization, not its slower auto-CP wrapper.
 The loaded CuTeDSL JIT object was retained in the original timing receipt.
-Its complete embedded CUDA ELF is94,096 bytes, SHA256
+Its complete embedded CUDA ELF is 94,096 bytes, SHA256
 `2ac4802c189420aad6c016c1197cb64141848824fd7bdb015fc0617f6375e877`.
 The initial truncated extraction is NOT evidence; only `fi-nocp-complete.cubin`
 is disassembled. CUDA12.8 cuobjdump/nvdisasm can read the complete image.
@@ -153,11 +153,58 @@ Old `[SM90 goal] beats-all-reference-paths=True` lines in the FlashQLA-only
 captures mean that family ONLY. The display now explicitly names its scope;
 no threshold, trace or original verdict was changed after measurement.
 
-S12 retests cached gate coefficients on the newly cheaper auxiliary parent.
-This composition needs its own fresh admission; it does not turn the earlier
-losing S7 observation into a success. It is not yet performance-admitted.
+S12 retested cached gate coefficients on the newly cheaper auxiliary parent.
+Fresh14/14 parent raw checks PASS. Weak paired nsys148.464us versus S11
+146.416us, envelopes overlap. **UNRESOLVED, no promotion.** This composition
+did not turn the earlier losing S7 observation into a success.
+
+The final bounded S13 test removes recurring state beta/alpha-last protocols
+that became unused when inverse ownership moved to aux. Counts are compiled
+from the actual launcher expressions:alpha384 and beta128; the legacy
+non-aux-owned case stays416/384. Retaining the deleted alpha consumer makes
+the compile-time negative fail. All Q/K/V/QK/KK/O synchronization is kept.
+The native middle-state SYNCS sites become14, matching FlashInfer's count,
+but local spill sites and49 MUFU remain. All14 device cases pass the unchanged
+CPU gate AND parent raw equality. Paired weak timing:146.832us
+[145.312,148.032] versus S11 control147.984us[146.624,148.896].
+**UNRESOLVED, no promotion.** FlashInfer no-CP is113.472us in that same window
+and still wins with disjoint envelopes. Fewer synchronization sites did not
+establish a full-forward improvement; no strong-regime win is inferred.
+
+S11 also compiles all4 native CUDA SM90 bodies using the user's PPU CUTLASS
+3.6.0 dependency in explicit **source-check** mode. This does not establish
+native PPU1.7 execution or speed; that evidence tier remains SKIP.
 
 The experiments remain isolated; device/timing closure is recorded in the
 campaign handoff. The fastest reference remains roughly113us, not surpassed.
 No production routing changes follow from compile-only improvements. Native
 PPU1.7 remains SKIP because the available SDK/model cannot execute that target.
+
+## Closed handoff and remaining gap
+
+The bounded inventory is closed: R1 and S1-S13, with S4 compile-only and S8
+rejected at native-mechanism admission. S11 is the best fully confirmed
+both-gate candidate, on branch `sm90-aux-metadata-20260926` (kernel `457267e`,
+report-scope follow-up `d3cf13a`). All experimental branches are retained and
+pushed; main production routing and SM80 code are unchanged. This is an
+experimental result, not a production promotion or a claim over all shapes.
+
+The remaining state-side differences are real, but not yet a causal latency
+decomposition: spills/local operations, coefficient evaluation/underflow
+handling and accumulator-to-operand conversion/lifetimes. R1, S5, S7, S9,
+S10, S12 and S13 show why reducing a selected opcode count alone is not enough.
+The next bounded experiment should compare state accumulator/operand live
+ranges against the reference and remove an actual spill lifetime while keeping
+the gate arithmetic unchanged. Do not retry register budgets or cache-exp2 in
+isolation, silently enable fast math, or delete required dependency waits.
+
+Machine-readable ledger: `dev/backends/sm90_sass_campaign_20260926.json`,
+20 admitted captures /1,416 complete forwards. Independent 14-case admission
+and repeated correctness are additional to that timing denominator. Raw
+remote campaign archive (sources, builds, cases, nsys, SQLite, JIT objects,
+receipts, and explicitly rejected attempts):
+`/workspace/gdn-sm90-win-20260926/remote-evidence-final.tar.gz`, SHA256
+`79cd3c8e9bc87a2b75731da88a5b3bb82b229d1869575f50aeb8a7cffeccbaa4`.
+The rejected idle capture is present for audit, never counted as a valid run.
+The exact-SASS local evidence and pinned earlier reference artifacts remain at
+the paths given above. No more GPU jobs are required for this handoff.
