@@ -94,7 +94,9 @@ def main():
     changed=copy.deepcopy(runs);changed[-1]['binary_sha256']='wrong-image';assert not admitted(changed)
     result=dict(scope='H800_PHYSICAL_NOT_NATIVE_PPU17',device_uuid=UUID,
         workload='B1/T2048/Hqk16/Hv32/K128/V128/C64; gates-.1/-1; BF16; FP32finalstate',
-        goal_admitted=admitted(runs),native_ppu17='SKIP_SDK_MODEL_UNAVAILABLE',
+        primary_shape_admitted=admitted(runs),
+        expanded_workload_goal='PENDING_NOT_AUTHORIZED_BY_PRIMARY_SHAPE',
+        shutdown_authorized=False,native_ppu17='SKIP_SDK_MODEL_UNAVAILABLE',
         incumbent='S24_RETAINED',selected='S38_EXPLICIT_VALUE_SPLIT_232',routing='UNCHANGED',
         captures=len(runs),complete_forwards=sum(r['forwards'] for r in runs),
         reanalysis='EXACT_SQLITE_REEXTRACTION_ALL_CAPTURES',goal_negatives=3,
@@ -102,6 +104,6 @@ def main():
         host_tests=38,checks=checks,runs=runs)
     a.out.write_text(json.dumps(result,indent=2)+'\n')
     print({k:v for k,v in result.items() if k not in ('runs','checks')})
-    if not result['goal_admitted']:raise RuntimeError('goal NOT MET; retain machine and continue')
+    if not result['primary_shape_admitted']:raise RuntimeError('primary shape NOT MET; retain machine and continue')
 
 if __name__=='__main__':main()

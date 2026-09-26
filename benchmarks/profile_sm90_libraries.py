@@ -24,10 +24,12 @@ from test_ppu_gdn_backend import fixture, assert_pair, digest
 from gdn_qsa_sm80.reference.gdn_chunk_ref import torch_recurrent_gated_delta_rule
 from gdn_qsa_sm80.gdn_sm90_interface import gdn_chunk_sm90
 from analyze_sm90_nsys import LIBRARY_ROLES
+from sm90_workloads import BY_NAME, validate_offsets
+from sm90_library_inputs import (make_inputs, expand_reference_heads, flatten_tokens,
+                                 flatten_gate, flashinfer_initial, flashinfer_outputs)
 
 PINS = {"flashqla": "a97c9783bbcc42fa8fbfe895dfc674131e376b5c",
         "flashinfer": "5d9f8c8d97fa53e22952ce8672f475d235f07478"}
-SHAPE = (1, 2048, 16, 32)
 
 
 def validate_archive(root, archive):
@@ -126,8 +128,10 @@ def main():
                    help="delivery-only admission: candidate must match the CUDA incumbent bits")
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--gate", type=float, choices=(-.1, -1.), required=True)
+    p.add_argument("--workload", choices=tuple(BY_NAME), default="seq2048")
     p.add_argument("--preflight-only", action="store_true")
     args = p.parse_args()
+    workload = BY_NAME[args.workload]
     if args.candidate_raw_bit and not args.candidate_extension:
         p.error("--candidate-raw-bit requires --candidate-extension")
     args.out.mkdir(parents=True, exist_ok=True)
@@ -148,10 +152,14 @@ def main():
     watch = DeviceWatch(0)
     result = dict(status="INCOMPLETE", scope="H800_CONTROL_NOT_NATIVE_PPU17",
                   protocol="NSYS_KERNEL_SUM_PER_SYNCHRONIZED_NVTX_FORWARD",
-                  comparison_family=comparison_family, samples=12, calls=[], shape=[*SHAPE, 128],
+                  comparison_family=comparison_family, samples=12, calls=[],
+                  shape=[*workload.shape, 128], workload=workload.receipt(),
                   gate=args.gate, source=source, versions=versions(), incumbent_builds=builds,
                   candidate_requires_raw_bit=args.candidate_raw_bit,
-                  harness_sha256=sha(__file__), utc=datetime.now(timezone.utc).isoformat())
+                  harness_sha256=sha(__file__),
+                  input_adapter_sha256=sha(ROOT / "benchmarks/sm90_library_inputs.py"),
+                  workload_authority_sha256=sha(ROOT / "tools/sm90_workloads.py"),
+                  utc=datetime.now(timezone.utc).isoformat())
     try:
         for _ in range(3):
             watch.sample(idle=True)
@@ -162,17 +170,23 @@ def main():
             raise RuntimeError("physical CUDA Hopper required; not a simulator runner")
         result.update(device=props.name, sms=props.multi_processor_count, cuda=torch.version.cuda)
         torch.set_num_threads(1)
-        cpu = fixture(*SHAPE, args.gate)
+        cpu, state_cpu = make_inputs(workload, args.gate, fixture)
         q, k, v, g, beta = cpu
+        reference_q, reference_k = expand_reference_heads(cpu, workload)
         want = torch_recurrent_gated_delta_rule(
-            q.repeat_interleave(2, 2), k.repeat_interleave(2, 2), v, g, beta,
-            output_final_state=True)
+            reference_q, reference_k, v, g, beta,
+            initial_state=state_cpu, output_final_state=True)
         tensors = tuple(t.cuda() for t in cpu)
-        result.update(input_sha256=digest(cpu), reference_sha256=digest(want))
+        initial = state_cpu.cuda() if state_cpu is not None else None
+        result.update(input_sha256=digest(cpu), reference_sha256=digest(want),
+                      initial_sha256=digest((state_cpu,)) if state_cpu is not None else None)
+        print(f"[SM90 workload] {workload.receipt()} g={args.gate} "
+              f"inputs={result['input_sha256']} initial={result['initial_sha256']}", flush=True)
 
         def ours(path, backend, source_check):
             os.environ["GDN_QSA_SM90_EXTENSION"] = str(path.resolve())
-            return gdn_chunk_sm90(*tensors, backend=backend, source_check=source_check)
+            return gdn_chunk_sm90(*tensors, initial_state=initial,
+                                  backend=backend, source_check=source_check)
 
         calls = {"ours-cuda": lambda: ours(args.cuda_extension, "cuda_sm90", False),
                  "ours-ppu-source-check": lambda: ours(args.ppu_source_extension, "ppu17", True)}
@@ -180,32 +194,43 @@ def main():
         if args.family == "flashqla":
             from flash_qla import chunk_gated_delta_rule as ref
             from flash_qla.ops.gated_delta_rule.chunk.cp_context import _calc_cp_seqs
-            cu = torch.tensor([0, 2048], dtype=torch.int32, device="cuda")
-            cp = _calc_cp_seqs(cu, 64, 32)
+            cu_cpu = torch.tensor(workload.offsets, dtype=torch.int32, device="cpu")
+            validate_offsets(workload, cu_cpu.tolist())
+            cu = cu_cpu.cuda()
+            cp = _calc_cp_seqs(cu, 64, workload.v_heads)
             result["route"] = dict(auto_cp=bool(cp[0]), cp_offsets=cp[1].cpu().tolist() if cp[0] else None,
-                                   state_layout="KV", backward_cache=False)
+                                   state_layout="KV", backward_cache=False,
+                                   api_layout="FIXED_BATCH", sequence_offsets=cu_cpu.tolist())
             for name, flag in (("auto", True), ("no-cp", False)):
                 calls[f"flashqla-{name}"] = lambda flag=flag: ref(
-                    *tensors, scale=128**-.5, initial_state=None, output_final_state=True,
+                    *tensors, scale=128**-.5, initial_state=initial, output_final_state=True,
                     use_qk_l2norm_in_kernel=False, state_v_first=False, auto_cp=flag,
                     enable_fwd_cp_cache=False)
         else:
             from flashinfer.gdn_prefill import chunk_gated_delta_rule as ref
             from flashinfer.gdn_kernels.delta_rule_dsl.varlen_helper import should_use_cp_host
-            alpha_cpu = g.float().exp().squeeze(0).contiguous()
-            beta_cpu = beta.float().squeeze(0).contiguous()
+            alpha_cpu = flatten_gate(g.float().exp(), workload).contiguous()
+            beta_cpu = flatten_gate(beta.float(), workload).contiguous()
             alpha, beta_fp32 = alpha_cpu.cuda(), beta_cpu.cuda()
-            flat = tuple(t.squeeze(0) for t in tensors[:3])
-            cu = torch.tensor([0, 2048], dtype=torch.int64, device="cuda")
-            result["route"] = dict(auto_cp=should_use_cp_host(32, props.multi_processor_count, props.name, (9, 0)),
+            flat = tuple(flatten_tokens(t, workload, heads) for t, heads in
+                         zip(tensors[:3], (workload.q_heads, workload.q_heads, workload.v_heads)))
+            cu_cpu = torch.tensor(workload.offsets, dtype=torch.int64, device="cpu")
+            validate_offsets(workload, cu_cpu.tolist())
+            cu = cu_cpu.cuda()
+            state_vk_cpu = flashinfer_initial(state_cpu, workload)
+            state_vk = state_vk_cpu.cuda() if state_vk_cpu is not None else None
+            result["route"] = dict(auto_cp=should_use_cp_host(workload.batch * workload.v_heads,
+                                       props.multi_processor_count, props.name, (9, 0)),
                                    backend="auto", state_layout="VK", native_gate="FP32 exp(log-gate)",
-                                   gate_log_roundtrip_max=float((alpha_cpu.log()-g.float().squeeze(0)).abs().max()),
-                                   adapter_inputs_sha256=digest((alpha_cpu, beta_cpu)))
+                                   api_layout="PACKED_BATCH", sequence_offsets=cu_cpu.tolist(),
+                                   gate_log_roundtrip_max=float((alpha_cpu.log()-flatten_gate(g.float(), workload)).abs().max()),
+                                   adapter_inputs_sha256=digest((alpha_cpu, beta_cpu)),
+                                   initial_vk_sha256=digest((state_vk_cpu,)) if state_vk_cpu is not None else None)
 
             def infer(cp, adapter=False):
-                a = tensors[3].float().exp().squeeze(0) if adapter else alpha
-                b = tensors[4].float().squeeze(0) if adapter else beta_fp32
-                return ref(*flat, g=a, beta=b, scale=128**-.5, initial_state=None,
+                a = flatten_gate(tensors[3].float().exp(), workload) if adapter else alpha
+                b = flatten_gate(tensors[4].float(), workload) if adapter else beta_fp32
+                return ref(*flat, g=a, beta=b, scale=128**-.5, initial_state=state_vk,
                            output_final_state=True, cu_seqlens=cu,
                            use_qk_l2norm_in_kernel=False, use_cp=cp)
 
@@ -220,7 +245,7 @@ def main():
         def checked(role, pair):
             actual = tuple(t.detach().cpu() for t in pair)
             if role.startswith("flashinfer"):
-                actual = (actual[0].unsqueeze(0), actual[1].transpose(-2, -1).contiguous())
+                actual = flashinfer_outputs(actual, workload)
             if tuple(t.shape for t in actual) != tuple(t.shape for t in want):
                 raise AssertionError("output/state ABI shape mismatch")
             if actual[0].dtype != torch.bfloat16 or actual[1].dtype != torch.float32:
@@ -229,8 +254,8 @@ def main():
 
         # Independent CPU seam negatives: same shape, deliberately wrong semantics.
         wrong_gate = torch_recurrent_gated_delta_rule(
-            q.repeat_interleave(2, 2), k.repeat_interleave(2, 2), v, g.float().exp(), beta,
-            output_final_state=True)
+            reference_q, reference_k, v, g.float().exp(), beta,
+            initial_state=state_cpu, output_final_state=True)
         for name, bad in (("exp-treated-as-log", wrong_gate),
                           ("state-transpose", (want[0], want[1].transpose(-2, -1))),
                           ("zero-output", (torch.zeros_like(want[0]), want[1]))):
@@ -287,6 +312,10 @@ def main():
                 if fingerprint != admission[role]["fingerprint"]:
                     raise AssertionError(f"{role}: captured result changed")
         watch.sample()
+        if digest(tuple(t.cpu() for t in tensors)) != digest(cpu):
+            raise AssertionError("input mutation during comparison")
+        if state_cpu is not None and not torch.equal(initial.cpu(), state_cpu):
+            raise AssertionError("initial-state mutation during comparison")
         watch.stop.set()
         watch.thread.join(timeout=22)
         if watch.thread.is_alive() or watch.errors:

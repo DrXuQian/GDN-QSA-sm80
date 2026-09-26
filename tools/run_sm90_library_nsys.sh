@@ -40,7 +40,8 @@ fi
     --family "$FAMILY" --reference-root "$REF" \
     --source-archive "$WORK/$FAMILY-source.tar.gz" \
     --cuda-extension "$CUDA_EXTENSION" --ppu-source-extension "$PPU_SOURCE_EXTENSION" \
-    --gate "$GATE" --out "$OUT" "${CANDIDATE_ARGS[@]}" 2>&1 | tee "$OUT/run.log"
+    --gate "$GATE" --workload "${WORKLOAD:-seq2048}" --out "$OUT" \
+    "${CANDIDATE_ARGS[@]}" 2>&1 | tee "$OUT/run.log"
 "$NSYS" export --type sqlite --output "$OUT/forward.sqlite" "$OUT/forward.nsys-rep"
 "$PYTHON" "$ROOT/tools/analyze_sm90_nsys.py" --sqlite "$OUT/forward.sqlite" \
   --receipt "$OUT/receipt.json" --out "$OUT/result.json" | tee "$OUT/summary.log"
