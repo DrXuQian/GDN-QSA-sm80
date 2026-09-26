@@ -3,6 +3,7 @@
 #include <cute/tensor.hpp>
 #include "kda/sm90/device/device_universal.hpp"
 #include "kda/sm90/kernel/builder_kda_fwd.hpp"
+#include "scalar_gdn_aux.cuh"
 #include <climits>
 #include <stdexcept>
 
@@ -17,9 +18,11 @@ void run(Arguments const& a, cudaStream_t stream) {
         Option<Tag::kElementBetaGmem, BF16>,
         Option<Tag::kInitStateFromInput, cute::bool_constant<Initial>>>;
     using Stride = cute::tuple<int64_t, _1, int32_t>;
-    using Kernel = typename FlatBuilderKdaFwd<BF16, float, float, Shape<_64,_64,_128>,
+    using Builder = FlatBuilderKdaFwd<BF16, float, float, Shape<_64,_64,_128>,
         Stride, Stride, Stride, Stride,
-        cutlass::gemm::KernelTmaWarpSpecializedCooperative, Options>::Kernel;
+        cutlass::gemm::KernelTmaWarpSpecializedCooperative, Options>;
+    using Kernel = FlatKernelTmaWarpSpecializedKdaFwd<
+        ScalarGdnAux<typename Builder::CollectiveMainloop>, typename Builder::TileScheduler, Options>;
     using Operation = cutlass::device::Universal<Kernel>;
     typename Operation::Arguments args{};
     args.problem_size.total_seqlen = int64_t(a.batch) * a.length;
