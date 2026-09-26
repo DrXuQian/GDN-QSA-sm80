@@ -14,6 +14,12 @@ struct Arguments {
     float* final; // optional FP32 [B,Hv,K,V], V contiguous
     int batch, length, qk_heads, v_heads;
     bool gate_fp32;
+    void* prepared = nullptr; // optional private scratch, only explicit two-launch build
 };
 void launch(Arguments const&, cudaStream_t);
+#ifdef GDN_SM90_PRECOMPUTED_AUX
+struct KernelResources { int threads, shared_bytes, registers, local_bytes, blocks_per_sm; };
+struct PreparedResources { KernelResources prepare, state; };
+PreparedResources precomputed_resources(bool gate_fp32, bool initial);
+#endif
 } // namespace gdn::sm90

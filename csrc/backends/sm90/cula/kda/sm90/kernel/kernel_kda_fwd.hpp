@@ -73,6 +73,10 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
     static const int NumLoadWarpGroups = 1;
     static constexpr int NumStateMmaWarpGroups = CollectiveMainloop::NumStateMmaWarpGroups;
     static constexpr int NumAuxMmaWarpGroups = CollectiveMainloop::NumAuxMmaWarpGroups;
+    static constexpr bool PrecomputedAuxiliary =
+        find_option_t<Tag::kPrecomputedAuxiliary, cute::false_type, Options>::value;
+    static_assert(!PrecomputedAuxiliary ||
+                  (NumAuxMmaWarpGroups == 0 && NumStateMmaWarpGroups == 1));
 
     static constexpr int NeedsAlpha = CollectiveMainloop::NeedsAlpha;
     static constexpr int NeedsBeta = CollectiveMainloop::NeedsBeta;
@@ -197,7 +201,7 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
     using BetaPipelineState =
         std::conditional_t<NeedsBeta, cutlass::PipelineState<MainloopBetaPipeline::Stages>, Unused>;
 
-    static constexpr int MinBlocksPerMultiprocessor = 1;
+    static constexpr int MinBlocksPerMultiprocessor = PrecomputedAuxiliary ? 2 : 1;
     static constexpr int MaxThreadsPerBlock =
         (NumLoadWarpGroups + NumStateMmaWarpGroups + NumAuxMmaWarpGroups) * cutlass::NumThreadsPerWarpGroup;
 
@@ -209,8 +213,9 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
     static constexpr int DefaultAuxMmaRegisterRequirement = get<2>(RegisterRequirements);
     static constexpr uint32_t AuxMmaRegisterRequirement =
         find_option_t<Tag::kAuxRegisters, Int<DefaultAuxMmaRegisterRequirement>, Options>::value;
-    static_assert((LdStRegisterRequirement + AuxMmaRegisterRequirement +
-                   NumStateMmaWarpGroups*StateMmaRegisterRequirement)*128 <= 65536);
+    static_assert((LdStRegisterRequirement + NumAuxMmaWarpGroups*AuxMmaRegisterRequirement +
+                   NumStateMmaWarpGroups*StateMmaRegisterRequirement)*128 <=
+                  65536 / MinBlocksPerMultiprocessor);
 #ifdef GDN_SM90_VALUE_LOADER_REGS
     static_assert(NumStateMmaWarpGroups == 1 && AuxMmaRegisterRequirement == 232 &&
                   StateMmaRegisterRequirement == 192 && LdStRegisterRequirement == 32);
@@ -325,11 +330,11 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
         o_pipeline_params.consumer_arv_count = cutlass::NumThreadsPerWarp;
 
         QKPipelineParams qk_pipeline_params;
-        qk_pipeline_params.producer_arv_count = NumAuxMathThreads;
+        qk_pipeline_params.producer_arv_count = PrecomputedAuxiliary ? 32 : NumAuxMathThreads;
         qk_pipeline_params.consumer_arv_count = NumStateMathThreads;
 
         KKPipelineParams kk_pipeline_params;
-        kk_pipeline_params.producer_arv_count = NumAuxMathThreads;
+        kk_pipeline_params.producer_arv_count = PrecomputedAuxiliary ? 32 : NumAuxMathThreads;
         kk_pipeline_params.consumer_arv_count = NumStateMathThreads;
 
         AlphaLastPipelineParams alpha_last_pipeline_params;
@@ -360,6 +365,10 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
             o_pipeline_params.role = MainloopOPipeline::ThreadCategory::Consumer;
         }
         if (warp_group_role == WarpGroupRole::LdSt && ldst_warp_role == LdStWarpRole::LoadBeta) {
+            if constexpr (PrecomputedAuxiliary) {
+                qk_pipeline_params.role = MainloopQKPipeline::ThreadCategory::Producer;
+                kk_pipeline_params.role = MainloopKKPipeline::ThreadCategory::Producer;
+            }
             if constexpr (NeedsBeta) {
                 beta_pipeline_params.role = MainloopBetaPipeline::ThreadCategory::Producer;
             }
@@ -518,6 +527,14 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
                             work_desc.o_head_idx(),
                             work_desc.seq_len);
                         auto tile_shape = typename CollectiveMainloop::TileShape{};
+                        if constexpr (PrecomputedAuxiliary) {
+                            collective_mainloop.load_prepared_aux(
+                                params.mainloop, params.problem_size, work_desc,
+                                qk_pipeline, qk_smem_pipe_write,
+                                kk_pipeline, kk_smem_pipe_write,
+                                beta_pipeline, beta_smem_pipe_write,
+                                storage.tensors.mainloop);
+                        } else {
                         collective_mainloop.load_beta(
                             params.mainloop,
                             params.problem_size,
@@ -526,6 +543,7 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
                             beta_pipeline,
                             beta_smem_pipe_write,
                             storage.tensors.mainloop);
+                        }
                     }
                 }
             } else if (ldst_warp_role == LdStWarpRole::LoadAlpha) {
@@ -623,6 +641,7 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
                     storage.tensors.mainloop);
             }
         } else if (warp_group_role == WarpGroupRole::MathA) {
+            if constexpr (!PrecomputedAuxiliary) {
             DPRINTF0_WG(
                 "Compute[aux]: warp_group_idx:%d, RegisterRequirement:%d\n", warp_group_idx, AuxMmaRegisterRequirement);
             if constexpr (AuxMmaRegisterRequirement > 128)
@@ -660,6 +679,7 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
                     alpha_last_pipeline,
                     alpha_last_smem_pipe_write,
                     storage.tensors.mainloop);
+            }
             }
         } else {
             DPRINTF0_WG("Unknown warp role, warp_group_idx:%d\n", warp_group_idx);

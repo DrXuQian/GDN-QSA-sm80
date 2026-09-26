@@ -50,10 +50,21 @@ std::vector<torch::Tensor> forward(torch::Tensor q, torch::Tensor k, torch::Tens
 #endif
     auto out=torch::empty_like(v);
     auto final=output_final_state ? torch::empty({B,HV,128,128},v.options().dtype(torch::kFloat32)) : torch::Tensor();
+#ifdef GDN_SM90_PRECOMPUTED_AUX
+    int64_t chunks = T/64 + (T%64 != 0);
+    TORCH_CHECK(chunks<=65535 && B*HV<=INT64_MAX/(chunks*8192),
+                "precomputed auxiliary extent/grid overflow");
+    // Uninitialized stream-owned storage; prepare writes every halfword before
+    // state is launched on that same stream. No hidden zero/convert kernel.
+    auto prepared = torch::empty({B*HV*chunks*8192},v.options());
+#endif
     gdn::sm90::Arguments args{q.data_ptr(),k.data_ptr(),v.data_ptr(),g.data_ptr(),beta.data_ptr(),
         initial ? initial->data_ptr<float>() : nullptr, out.data_ptr(),
         output_final_state ? final.data_ptr<float>() : nullptr,
         int(B),int(T),int(H),int(HV),g.scalar_type()==torch::kFloat32};
+#ifdef GDN_SM90_PRECOMPUTED_AUX
+    args.prepared = prepared.data_ptr();
+#endif
     gdn::sm90::launch(args,at::cuda::getCurrentCUDAStream(q.get_device()));
     return {out,final};
 }
@@ -65,4 +76,20 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME,m) {
     m.attr("math_contract")="cula-scalar-gdn-fused-bf16-v1";
     m.attr("numeric_schedule")="scalar-GDN-BF16-WGMMA; unchanged FP16 inverse precomputed by auxiliary warpgroup";
     m.attr("device_admission")="UNVERIFIED";
+#ifdef GDN_SM90_PRECOMPUTED_AUX
+    m.attr("execution_structure")="chunk-parallel-aux+V64-state;2-kernels;private-physical-operands";
+    m.def("resources",[](bool gate_fp32, bool initial) {
+        auto r = gdn::sm90::precomputed_resources(gate_fp32,initial);
+        auto fields = [](gdn::sm90::KernelResources x) {
+            pybind11::dict d;
+            d["threads"]=x.threads; d["shared_bytes"]=x.shared_bytes;
+            d["registers"]=x.registers; d["local_bytes"]=x.local_bytes;
+            d["blocks_per_sm"]=x.blocks_per_sm;
+            return d;
+        };
+        pybind11::dict result;
+        result["prepare"]=fields(r.prepare); result["state"]=fields(r.state);
+        return result;
+    });
+#endif
 }
