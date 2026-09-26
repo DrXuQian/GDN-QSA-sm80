@@ -32,6 +32,7 @@ def main():
     p.add_argument("--v-heads",type=int,default=2)
     p.add_argument("--gate",type=float,default=-.1)
     p.add_argument("--fp32-gate",action="store_true")
+    p.add_argument("--vary-gate",action="store_true",help="distinct decay by token and head, generated on CPU")
     p.add_argument("--initial",action="store_true")
     p.add_argument("--output-only",action="store_true")
     p.add_argument("--device",type=int,default=0)
@@ -51,6 +52,10 @@ def main():
     torch.set_num_threads(1)
     cpu=fixture(args.batch,args.length,args.q_heads,args.v_heads,args.gate)
     if args.fp32_gate: cpu=(*cpu[:3],cpu[3].float(),cpu[4])
+    if args.vary_gate:
+        gate = args.gate * (.25 + .75 * torch.rand(cpu[3].shape, device="cpu",
+            generator=torch.Generator(device="cpu").manual_seed(101)))
+        cpu=(*cpu[:3],gate.to(cpu[3].dtype),cpu[4])
     state=(torch.randn(args.batch,args.v_heads,128,128,
         generator=torch.Generator(device="cpu").manual_seed(17),device="cpu")*.005) if args.initial else None
     q,k,v,g,beta=cpu
@@ -83,6 +88,8 @@ def main():
     props=torch.cuda.get_device_properties(args.device)
     result=dict(backend=args.backend,source_check=args.source_check,device=props.name,
         shape=[args.batch,args.length,args.q_heads,args.v_heads,128],gate=args.gate,
+        gate_pattern="token-head-distinct" if args.vary_gate else "constant",
+        harness_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         errors=errors,limit=MAX_RELATIVE_ERROR,input_sha256=digest(cpu),output_sha256=digest(actual),
         extension_sha256=binary_hash,source_sha256=manifest['source_sha256'],
         public_calls=1,trace_kernel_count="REQUIRES_TRACE_VERIFICATION",verdict="NUMERIC/PASS",

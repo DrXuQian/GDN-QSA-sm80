@@ -2,8 +2,10 @@
 
 Status: boundary plus independent SM90 source integration, 2026-09-26 UTC.
 The explicit cuLA-derived `fused_sm90` candidate is described in
-[SM90_FUSED_GDN.md](SM90_FUSED_GDN.md). Device admission is still UNVERIFIED;
-source availability is not a claim of native PPU1.7 execution or performance.
+[SM90_FUSED_GDN.md](SM90_FUSED_GDN.md). Selected physical-H800 numerical checks
+are in [SM90_FUSED_GDN_H800_20260926.md](SM90_FUSED_GDN_H800_20260926.md).
+Native PPU1.7 device admission is still UNVERIFIED; neither source availability
+nor a Hopper control is a claim of PPU execution or performance.
 Numerical thresholds and default algorithms are unchanged. The published legacy
 PPU `residual-solve-static` experiment remains pending device admission.
 

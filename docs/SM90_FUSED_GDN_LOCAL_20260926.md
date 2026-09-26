@@ -3,6 +3,8 @@
 Parent `b9a870b`; isolated worktree `/workspace/gdn-sm90-algorithm-20260926`.
 Evidence `/workspace/gdn-sm90-evidence-20260926`. No GPU, simulator or remote
 device execution was performed. This report is **not a speed verdict**.
+This is the compile/local checkpoint. The user subsequently supplied a physical
+H800; its separate checks are in `SM90_FUSED_GDN_H800_20260926.md`.
 
 ## Completed checks
 

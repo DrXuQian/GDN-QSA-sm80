@@ -147,7 +147,10 @@ the reduced launch/workspace count; actual device or model measurements decide.
 ## Evidence limits
 
 Local admission checks are documented in `SM90_FUSED_GDN_LOCAL_20260926.md`.
+The subsequent physical-H800 checks are recorded separately in
+`SM90_FUSED_GDN_H800_20260926.md`; those are Hopper control results, not
+PPU1.7 native execution or a replacement for the PPU model.
 The supplied SDK2.1.1 wrapper fails the real target gate (legacy architecture and
 overridden ACOMPUTE selection); native PPU1.7 compilation is **SKIP: incapable
 installed toolchain**, not PASS. Full native device correctness and performance
-are **NOT RUN**. No thresholds or old routing are relaxed to hide this gap.
+are **NOT RUN on PPU1.7**. No thresholds or old routing are relaxed to hide this gap.
