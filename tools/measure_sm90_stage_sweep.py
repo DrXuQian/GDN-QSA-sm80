@@ -86,7 +86,7 @@ def main():
         assert hashlib.sha256(extension.read_bytes()).hexdigest()==row['binary_sha256']
         try:
             run(directory,'cases',[sys.executable,str(ROOT/'tests/run_sm90_hopper_cases.py'),
-                '--extension',str(extension),'--backend','cuda_sm90','--out',str(directory/'cases')])
+                '--extension',str(extension),'--backend','cuda_sm90','--physical-batch','--out',str(directory/'cases')])
             verify_cases(directory/'cases',a.parent_data)
             for magnitude in (8,10000):
                 destination=directory/f'stress{magnitude}'

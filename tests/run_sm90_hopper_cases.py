@@ -5,6 +5,8 @@ Do not use the whole orchestrator as a one-call simulator input. Individual
 commands are recorded and can be used separately with the simulation runner.
 """
 import argparse
+from contextlib import redirect_stdout,redirect_stderr
+import importlib.util
 import json
 from pathlib import Path
 import subprocess
@@ -44,8 +46,16 @@ def main():
     p.add_argument("--backend", choices=("cuda_sm90", "ppu17"), required=True)
     p.add_argument("--source-check", action="store_true")
     p.add_argument("--out", type=Path, required=True)
+    p.add_argument("--physical-batch",action="store_true",
+                   help="H800 only: reuse Python/context across the SAME14 single-call admission entrypoints; not a simulator input")
     args = p.parse_args()
     validate_cases(CASES)
+    if args.physical_batch and (args.backend!='cuda_sm90' or args.source_check):
+        p.error('physical-batch is not a PPU/simulator admission mode')
+    batch_app=None
+    if args.physical_batch:
+        spec=importlib.util.spec_from_file_location('physical_sm90_admission',ROOT/'tools/run_sm90_gdn.py')
+        batch_app=importlib.util.module_from_spec(spec);spec.loader.exec_module(batch_app)
     args.out.mkdir(parents=True, exist_ok=True)
     results = []
     for name, b, t, h, hv, g, extra in CASES:
@@ -57,14 +67,23 @@ def main():
         if args.source_check:
             cmd.append("--source-check")
         with (args.out / (name + ".log")).open("w") as log:
-            result = subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT, timeout=120)
-        item = dict(case=name, command=cmd, rc=result.returncode)
-        if result.returncode == 0:
+            if batch_app is None:
+                rc = subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT, timeout=120).returncode
+            else:
+                old_argv=sys.argv
+                try:
+                    sys.argv=cmd[1:]
+                    with redirect_stdout(log),redirect_stderr(log):batch_app.main()
+                    rc=0
+                finally:
+                    sys.argv=old_argv
+        item = dict(case=name, command=cmd, rc=rc, physical_batch=args.physical_batch)
+        if rc == 0:
             item["result"] = json.loads((directory / "result.json").read_text())
         results.append(item)
         (args.out / "cases.json").write_text(json.dumps(
             dict(denominator=len(CASES), completed=len(results), cases=results), indent=2) + "\n")
-        if result.returncode:
+        if rc:
             raise RuntimeError(f"{name} failed; {len(results)}/{len(CASES)} attempted; see {args.out / (name + '.log')}")
         print(f"[SM90 Hopper cases] {len(results)}/{len(CASES)} {name} "
               f"errors={item['result']['errors']} NUMERIC/PASS", flush=True)
