@@ -3,11 +3,14 @@
 
 No timing or routing decision is made here. A numerical failure stops that
 admission sequence for diagnosis; it cannot be relabelled as an environment skip.
+An independently reproduced reference-only failure stays FAIL in the matrix
+but need not block correctness checks of our unrelated candidate kernels.
 """
 import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 from pathlib import Path
 import subprocess
 import sys
@@ -20,6 +23,24 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def admit_reference_diagnosis(diagnosis, criterion):
+    if diagnosis["status"] != "DIAGNOSIS_COMPLETE_NOT_PERFORMANCE":
+        raise ValueError("reference failure not diagnosed")
+    if diagnosis["criterion"] != criterion or diagnosis["device_watch"]["errors"]:
+        raise ValueError("numeric criterion or device evidence changed")
+    roles = diagnosis["roles"]
+    if set(roles) != {"ours-cuda", "ours-candidate", "flashqla-auto", "flashqla-no-cp"}:
+        raise ValueError("diagnostic role denominator changed")
+    for name in ("ours-cuda", "ours-candidate"):
+        if (roles[name]["verdict"] != "PASS" or not all(math.isfinite(e) and 0 <= e < criterion for e in roles[name]["errors"])
+                or roles[name]["repeat"] != "8/8 RAW-BIT"):
+            raise ValueError("our numerical failure cannot be classified as reference-only")
+    if roles["ours-cuda"]["fingerprint"] != roles["ours-candidate"]["fingerprint"]:
+        raise ValueError("our raw-bit failure cannot be classified as reference-only")
+    if not any(max(roles[name]["errors"]) >= criterion for name in ("flashqla-auto", "flashqla-no-cp")):
+        raise ValueError("reference failure not reproduced")
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--matrix", type=Path, required=True)
@@ -28,16 +49,44 @@ def main():
     p.add_argument("--stash-root", type=Path, required=True)
     p.add_argument("--loader-root", type=Path, required=True)
     p.add_argument("--out", type=Path, required=True)
+    p.add_argument("--reference-diagnosis", type=Path, nargs="*", default=[],
+                   help="explicit reproduced reference-only failures; never change the matrix verdict")
     a = p.parse_args()
     matrix = json.loads(a.matrix.read_text())
-    if len(matrix["cells"]) != 56 or any(c["status"] != "PASS" for c in matrix["cells"]):
-        raise RuntimeError("finish the frozen56-capture matrix before running another GPU task")
+    from sm90_workloads import WORKLOADS, GATES, FAMILIES
+    expected_cells = {(w.name, g, f) for w in WORKLOADS for g in GATES for f in FAMILIES}
+    if (len(matrix["cells"]) != 56
+            or {(r["workload"], r["gate"], r["family"]) for r in matrix["cells"]} != expected_cells
+            or any(c["status"] not in ("PASS", "FAIL") for c in matrix["cells"])):
+        raise RuntimeError("finish all frozen56 attempts before running another GPU task")
     if a.out.exists():
         raise RuntimeError("preserve previous admission artifacts; no implicit rerun/overwrite")
     a.out.mkdir(parents=True)
     import torch
     from bench_sm90_hopper import DeviceWatch
     from test_ppu_gdn_backend import MAX_RELATIVE_ERROR
+    failures = [row for row in matrix["cells"] if row["status"] == "FAIL"]
+    diagnoses = {}
+    for path in a.reference_diagnosis:
+        data = json.loads(path.read_text())
+        admit_reference_diagnosis(data, MAX_RELATIVE_ERROR)
+        for name, digest in data["tensor_artifacts"].items():
+            if sha(path.parent / name) != digest:
+                raise ValueError("diagnostic tensors changed")
+        diagnoses[data["failed_receipt_sha256"]] = dict(path=str(path), sha256=sha(path), data=data)
+    if len(diagnoses) != len(failures):
+        raise ValueError("every failed matrix cell needs its own explicit reference diagnosis")
+    for row in failures:
+        receipt_path = a.matrix.parent / row["directory"] / "receipt.json"
+        receipt = json.loads(receipt_path.read_text())
+        entry = diagnoses.get(sha(receipt_path))
+        if (entry is None or receipt["calls"] or receipt["device_watch"]["errors"]
+                or receipt["comparison_family"] != "flashqla-candidate"
+                or "original 2% criterion failed" not in receipt.get("error", "")):
+            raise ValueError("matrix failure is not the diagnosed untimed reference failure")
+        if (entry["data"]["input_sha256"] != receipt["input_sha256"]
+                or entry["data"]["reference_sha256"] != receipt["reference_sha256"]):
+            raise ValueError("diagnosis used different inputs/reference")
     torch.set_num_threads(1)
     DeviceWatch(0).sample(idle=True)
     expected = json.loads((a.parent / "relative-cases/cases.json").read_text())
@@ -48,6 +97,9 @@ def main():
     def save():
         result = dict(updated_at=datetime.now(timezone.utc).isoformat(), denominator=3, rows=rows,
                       matrix_sha256=sha(a.matrix), harness_sha256=sha(__file__),
+                      matrix_failures_preserved=len(failures),
+                      reference_diagnoses={key: {k: v for k, v in entry.items() if k != "data"}
+                                           for key, entry in diagnoses.items()},
                       performance="NOT_RUN", native_ppu17="SKIP_SDK_MODEL_UNAVAILABLE",
                       routing="UNCHANGED", shutdown_authorized=False)
         (a.out / "admission.json").write_text(json.dumps(result, indent=2) + "\n")
