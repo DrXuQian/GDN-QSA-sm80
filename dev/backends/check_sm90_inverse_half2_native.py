@@ -23,10 +23,13 @@ def compare(candidate, parent):
         work = lambda body: Counter(op for _, op, _ in body if op.startswith(PRESERVED))
         assert work(rows) == work(parent[symbol]), "matrix/copy/completion changed"
         parts = []
-        for got, old in zip(intervals(rows), intervals(parent[symbol])):
+        for phase, (got, old) in enumerate(zip(intervals(rows), intervals(parent[symbol]))):
             count = lambda part: Counter(op.split('.')[0] for _,op,_ in part)
             actual, previous = count(got), count(old)
-            assert previous['HADD2'] == 16 and previous['PRMT'] == 8
+            # Only the repeated full-chunk body is scalarized. The actual
+            # parent tail already uses packed adds: do not invent savings.
+            expected = (16, 8) if phase == 0 else (8, 0)
+            assert (previous['HADD2'], previous['PRMT']) == expected
             assert actual['HADD2'] == 8 and actual['PRMT'] == 0, "packed lowering absent"
             for _, op, arg in got:
                 if op.startswith('HADD2'):
