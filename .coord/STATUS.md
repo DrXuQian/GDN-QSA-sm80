@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 01:21:03 UTC
-working-on: SM80/legacy PPU and SM90/PPU1.7 architecture design; complete algorithms share semantics, not a forced stage DAG
+updated-at: 2026-09-26 01:21:36 UTC
+working-on: architecture proposal recorded and reviewed; responding on independent algorithm maintenance in one repository
 blocked-on: no design blocker; new PPU1.7 native build/device admission not attempted; legacy solve-static box verdict still pending
-last-commit: 2182e7c (local published-tree merge; kernel implementation ec6e5d4 remains unchanged)
+last-commit: 9235f6b (local architecture design; kernel implementation ec6e5d4 remains unchanged)
 
 ## Current design checkpoint
 
@@ -21,6 +21,8 @@ is DSL, so it is an algorithm reference, not a new shipping DSL dependency.
 This checkpoint changes documentation only. No kernel/build/default-route edit,
 native compile, simulator job or box launch. Source/worktree:
 /workspace/gdn-backend-design-20260926. Design remains a proposal, not a new API.
+Documentation diff checks passed; only this STATUS and the design document changed.
+Recorded locally; no remote branch update was needed for the design discussion.
 
 ## Previous static-solve handoff
 
