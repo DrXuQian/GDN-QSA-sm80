@@ -3,6 +3,7 @@
 #pragma once
 
 #include "kda/sm90/collective/mainloop_kda_fwd.hpp"
+#include "fragment_convert.cuh"
 
 namespace gdn::sm90 {
 
@@ -92,8 +93,6 @@ struct ScalarGdnAux : Base {
 
             ap.consumer_wait(ar);
             bp.consumer_wait(br);
-            auto out_qk = make_fragment_like<Element>(acc_qk);
-            auto out_kk = make_fragment_like<Inverse>(acc_kk);
             CUTE_UNROLL
             for (int i = 0; i < size(coords); ++i) {
                 auto [row, col] = coords(i);
@@ -101,11 +100,19 @@ struct ScalarGdnAux : Base {
                 // Mask BEFORE exp/cast: future/tail entries must never create
                 // infinities which could leak through a later zero multiply.
                 float decay = live ? exp2f(alpha(row,0,ar.index()) - alpha(col,0,ar.index())) : 0.f;
-                out_qk(i) = Element(live ? acc_qk(i) * decay * params.scale : 0.f);
+                acc_qk(i) = live ? acc_qk(i) * decay * params.scale : 0.f;
+            }
+            auto out_qk = convert_fragment<Element>(acc_qk);
+            CUTE_UNROLL
+            for (int i = 0; i < size(coords); ++i) {
+                auto [row,col] = coords(i);
+                bool live = row >= col && row < valid && col < valid;
+                float decay = live ? exp2f(alpha(row,0,ar.index()) - alpha(col,0,ar.index())) : 0.f;
                 // Inverse expects positive lower input, garbage diagonal and
                 // zero upper triangle, then applies beta along its columns.
-                out_kk(i) = Inverse(live ? acc_kk(i) * beta(row,br.index()) * decay : 0.f);
+                acc_kk(i) = live ? acc_kk(i) * beta(row,br.index()) * decay : 0.f;
             }
+            auto out_kk = convert_fragment<Inverse>(acc_kk);
             kkp.producer_acquire(kw);
             qkp.producer_acquire(qw);
             copy(store_qk, tq.retile_S(out_qk), tq.partition_D(qk(_,_,qw.index())));
