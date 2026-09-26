@@ -204,8 +204,10 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
     static constexpr auto RegisterRequirements =
         get_register_requirements(MaxThreadsPerBlock, MinBlocksPerMultiprocessor, NumStateMmaWarpGroups);
     static constexpr uint32_t LdStRegisterRequirement = get<0>(RegisterRequirements);
-    static constexpr uint32_t StateMmaRegisterRequirement =
+    static constexpr int DefaultStateMmaRegisterRequirement =
         NumStateMmaWarpGroups == 1 ? 192 : get<1>(RegisterRequirements);
+    static constexpr uint32_t StateMmaRegisterRequirement =
+        find_option_t<Tag::kStateRegisters, Int<DefaultStateMmaRegisterRequirement>, Options>::value;
     static constexpr int DefaultAuxMmaRegisterRequirement = get<2>(RegisterRequirements);
     static constexpr uint32_t AuxMmaRegisterRequirement =
         find_option_t<Tag::kAuxRegisters, Int<DefaultAuxMmaRegisterRequirement>, Options>::value;

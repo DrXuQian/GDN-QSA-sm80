@@ -85,6 +85,8 @@ enum class Tag {
     kElementGateGmem,  // GDN scalar gate input dtype     // GMEM element type for beta (default float, can be bf16)
     kValueTile,  // independent value columns per CTA; public head extent stays128
     kAuxRegisters,
+    kStateRegisters,
+    kSharedStateOperand,
 };
 
 }  // namespace kda::sm90::kernel

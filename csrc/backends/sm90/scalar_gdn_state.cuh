@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 #include "scalar_gdn_aux.cuh"
+#include "shared_state_operand.cuh"
 
 namespace gdn::sm90 {
 
@@ -15,7 +16,11 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
     using Element = typename Base::Element;
     using Inverse = typename Base::InverseType;
     using Params = typename Base::Params;
-    using SharedStorage = typename Parent::SharedStorage;
+    static constexpr bool SharedH = Base::SharedStateOperand;
+    using SharedStorage = StateOperandStorage<Parent,SharedH>;
+    using SharedHLayout = SharedStateLayout<Base>;
+    using O1Mma = std::conditional_t<SharedH,typename SharedHLayout::O1Mma,typename Base::TiledMmaO1>;
+    using SKMma = std::conditional_t<SharedH,typename SharedHLayout::SKMma,typename Base::TiledMmaSK>;
     using Value = cute::Int<Base::ValueTile>;
 
     template<class Problem, class Work>
@@ -50,9 +55,9 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
         auto beta = make_tensor(make_smem_ptr(smem.smem_beta.data()), typename Base::SmemLayoutBeta{});
 
         auto kv_mma = typename Base::TiledMmaKV{};
-        auto o1_mma = typename Base::TiledMmaO1{};
+        auto o1_mma = O1Mma{};
         auto o2_mma = typename Base::TiledMmaO2{};
-        auto sk_mma = typename Base::TiledMmaSK{};
+        auto sk_mma = SKMma{};
         auto newv_mma = typename Base::TiledMmaNewV{};
         auto inv_mma = typename Base::TiledMmaKK{};
         auto kv_thread = kv_mma.get_thread_slice(tid);
@@ -92,6 +97,31 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             clear(h);
         }
 
+        // Complete each read before the next chunk may overwrite the shared
+        // operand. The RS control keeps its original conversion and waits.
+        auto state_product = [&](auto mma, auto thread, auto desc_b, auto& acc)
+            __attribute__((always_inline)) {
+            auto issue = [&](auto operand) __attribute__((always_inline)) {
+                warpgroup_fence_operand(acc);
+                order.ordered_or_wait(wg);
+                warpgroup_arrive();
+                gemm_zero_acc(mma,operand,desc_b,acc);
+                warpgroup_commit_batch(); order.notify_next_blocked(wg);
+                warpgroup_wait<0>(); warpgroup_fence_operand(acc);
+            };
+            if constexpr (SharedH) {
+                auto shared_h = make_tensor(make_smem_ptr(smem.state_operand.data()),
+                    typename SharedHLayout::Layout{})(_,_,_0{});
+                auto desc_a = thread.make_fragment_A(thread.partition_A(shared_h));
+                issue(desc_a);
+            } else {
+                auto operand = kda::sm90::collective::make_acc_into_op<Element>(
+                    h,typename decltype(mma)::LayoutA_TV{});
+                warpgroup_fence_operand(operand);
+                issue(operand);
+            }
+        };
+
         auto inverse = [&]() __attribute__((always_inline)) {
             auto slice = kk(_,_,kkr.index());
             typename Base::CollectiveInverse solve(Barriers::StateMathWG0);
@@ -116,18 +146,24 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             constexpr bool first = decltype(first_tag)::value;
             constexpr bool last = decltype(last_tag)::value;
             int valid = last ? int(work.seq_len-chunk*64) : 64;
+            if constexpr (SharedH && !first) {
+                static_assert(AuxInverse && Base::NumStateMmaThreads == 128);
+                auto shared_h = make_tensor(make_smem_ptr(smem.state_operand.data()),
+                    typename SharedHLayout::Layout{})(_,_,_0{});
+                auto store_h = typename SharedHLayout::Store{};
+                auto sh = store_h.get_thread_slice(tid);
+                auto rounded_h = make_fragment_like<Element>(h);
+                copy(h,rounded_h);
+                copy(store_h,sh.retile_S(rounded_h),sh.partition_D(shared_h));
+                cutlass::arch::fence_view_async_shared();
+                // StateMathWG0 is disjoint from the auxiliary inverse barrier.
+                cutlass::arch::NamedBarrier::arrive_and_wait(128,Barriers::StateMathWG0);
+            }
             ap.consumer_wait(ar);
             qp.consumer_wait(qr);
             auto acc_o = partition_fragment_C(o1_thread,Shape<Value,_64>{});
             if constexpr (!first) {
-                auto operand_h = kda::sm90::collective::make_acc_into_op<Element>(h,typename Base::TiledMmaO1::LayoutA_TV{});
-                warpgroup_fence_operand(operand_h);
-                warpgroup_fence_operand(acc_o);
-                order.ordered_or_wait(wg);
-                warpgroup_arrive();
-                gemm_zero_acc(o1_mma,operand_h,q_desc(_,_,_,qr.index()),acc_o);
-                warpgroup_commit_batch(); order.notify_next_blocked(wg);
-                warpgroup_wait<0>(); warpgroup_fence_operand(acc_o);
+                state_product(o1_mma,o1_thread,q_desc(_,_,_,qr.index()),acc_o);
                 CUTE_UNROLL
                 for (int i=0; i<size(acc_o); ++i) {
                     auto [dv,t] = c_output(i);
@@ -139,14 +175,7 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             kp.consumer_wait(kr);
             auto acc_sk = partition_fragment_C(sk_thread,Shape<Value,_64>{});
             if constexpr (!first) {
-                auto operand_h = kda::sm90::collective::make_acc_into_op<Element>(h,typename Base::TiledMmaSK::LayoutA_TV{});
-                warpgroup_fence_operand(operand_h);
-                warpgroup_fence_operand(acc_sk);
-                order.ordered_or_wait(wg);
-                warpgroup_arrive();
-                gemm_zero_acc(sk_mma,operand_h,k_desc(_,_,_,kr.index()),acc_sk);
-                warpgroup_commit_batch(); order.notify_next_blocked(wg);
-                warpgroup_wait<0>(); warpgroup_fence_operand(acc_sk);
+                state_product(sk_mma,sk_thread,k_desc(_,_,_,kr.index()),acc_sk);
             }
             vp.consumer_wait(vr);
             auto residual = make_fragment_like<Element>(acc_sk);
