@@ -1,9 +1,26 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 04:00:08 UTC
-working-on: integration and H800 validation completed/published; no default promotion
-blocked-on: none for source/H800 numerical handoff; NCU permissions and native PPU1.7 SDK/model remain unavailable
-last-commit: be8f2d5 (published H800 validation; tested local 459bf12 has identical tree)
+updated-at: 2026-09-26 04:48:33 UTC
+working-on: original cuLA build/import PASS; idle H800 nsys weak-gate capture starting after numerical admission
+blocked-on: none for nsys capture; native PPU1.7 SDK/model unavailable
+last-commit: faa7bf5 (parent; production kernels/defaults unchanged)
+
+## cuLA / nsys comparison checkpoint
+
+Worktree /workspace/gdn-sm90-cula-nsys-20260926. Registered workload/criteria:
+docs/SM90_CULA_NSYS_PLAN.md. Original cuLA79be249e plus pinned CUTLASS73c59c0
+and FLA3a9ce1c. Original build uses its own flags, including fast-math and
+register-usage-level=10; no source edits. Our two admitted H800 binaries reused
+with exact SHA checks. Scalar gate is CPU-broadcast to K for cuLA; prefix
+preprocessing stays inside full forward, final-state VK/KV conversion is CPU
+oracle interpretation only. Trace denominator is all GPU kernels, with memory
+operations/span/gaps separately accounted. Omitted/duplicate ranges, unassigned
+kernel, absent kernel, foreign-work negatives PASS. A local legacy measurement
+test could not import torch in the default Python3.10; remote existing Torch
+environment rerun is 3/3 PASS. Accounting9/9 and binary-identity four negative
+plants PASS. Original cuLA builds with pinned CUTLASS4.4.1 and original flags;
+all four specializations also emit C7512,128regs,248/336Bstack. GPU job23229
+finished; no GPU PID and0%util observed before launching fail-closed harness.
 
 ## SM90 algorithm integration
 
