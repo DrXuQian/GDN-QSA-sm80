@@ -165,12 +165,14 @@ struct ScalarGdnAux : Base {
                 if constexpr (!cute::is_static<decltype(valid_tag)>::value)
                     live = live && row < valid && col < valid;
                 // Metadata rows are initialized for all64 positions, including
-                // tails. Load independently of the causal predicate to expose
-                // common row values; never exponentiate an invalid difference.
+                // tails. Read and exponentiate independently of the predicate.
+                // Inactive intermediates may overflow; the final live selects
+                // below must discard them before either product is published.
+                // Keep standard exp2f, not an approximate/FTZ substitute.
                 float row_log = alpha(row,0,ar.index());
                 float col_log = alpha(col,0,ar.index());
                 float row_beta = beta(row,br.index());
-                float decay = exp2f(live ? row_log-col_log : 0.f);
+                float decay = exp2f(row_log-col_log);
                 out_qk(i) = Element(live ? acc_qk(i) * decay * params.scale : 0.f);
                 // Inverse expects positive lower input, garbage diagonal and
                 // zero upper triangle, then applies beta along its columns.
