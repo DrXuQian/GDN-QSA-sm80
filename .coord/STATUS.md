@@ -1,11 +1,23 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 11:45:29 UTC
-working-on: S26 timing UNRESOLVED; S27/S25 sequential paired screenings; retain S24
+updated-at: 2026-09-26 11:54:50 UTC
+working-on: S25 LOSE; S26/S27 UNRESOLVED; final evidence validation and archive; retain S24
 blocked-on: native PPU1.7 SDK/model unavailable; fastest FlashInfer target not yet met
-last-commit: 9b8a5ba (resumed plan); S25 ab11c9b/S26 360bd17/S27 80b6d6f kernels
+last-commit: 9235fe5; S25 ab11c9b/S26 360bd17/S27 80b6d6f kernels
 
 ## Current checkpoint
+
+All three weak screenings completed exclusively. S25 153.776 versus120.048us
+is a disjoint loss. S26 122.288 versus120.655 and S27 122.3995 versus120.560us
+overlap: UNRESOLVED, not promoted. Fastest FI112.672/112.960us still wins.
+No strong-gate/QLA confirmation for screened-out candidates; no S28.
+Final host suites40/38/40 PASS. Actual omitted-prefix device negative catches
+160 wrong lane flags; exact EX2 seam retains262560 unguarded differences.
+Actual measured/local native4body identity PASS for all three candidates,
+including missing-body/operand/order negative controls. Main/SM80/default
+unchanged. Final SQLite reanalysis, archive and report are in progress.
+
+### Earlier checkpoint
 
 S25/S26/S27 all14CPU+parentfingerprint cases and2direct raw overflow stresses
 PASS; same errors. EX2 seam1,572,874inputs RAW/PASS, unguarded negative262560
