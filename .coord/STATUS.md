@@ -1,11 +1,24 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 17:51:41 UTC
-working-on: S42-S44 shared-H closed; S46 native-rejected; S45 late-O1 native/progress PASS, remote build then 14-case admission
+updated-at: 2026-09-26 18:07:11 UTC
+working-on: expanded matrix and S39-S46 bounded followups closed; next chunk-parallel auxiliary preparation design registered, not implemented
 blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: e37be37 followup report; S42bbddadd/S4374e2e8c/S44a3a6089/S45-S4661093ac; harness5bbaefc
+last-commit: 533a402 checkpoint; S42bbddadd/S4374e2e8c/S44a3a6089/S45-S4661093ac; harness5f5905b
 
 ## Current checkpoint
+
+18:07 UTC: S45 numerical14CPUparentraw+2stressPASS,8replay/graphoutputsPASS,
+butall4 B1/B2gate screensLOSE(~127vs117us); no promotion ornsysfinalist.
+FirstwrappermonitorFAILpreserved: same-processwatch aroundsubprocess suite;
+r2 provesactualPIDancestry/NSpid,unrelated/stale/recycledPIDsred(3hosttests).
+Timingmonitorunchanged. S45completebuild/sourcehashlocalremoteSASSidentical,
+PPU3.6sourcecheckPASSnotnative; allartifactsnowlocal. Earlierfollowuparchive
+localremoteSHA dad91434fd02f52209c22f0e8c92b82f8ae2ec63ea02ef9b3c7e97d401f120c5;
+firstincompletetar explicitlylabelled, finalstashcheckerbundle81dac54saved.
+NoGPUjobpending. Lasthost18:02:45idle,correctUUID. H800notshutdown,targetunmet.
+Nextdesign docs/SM90_AUX_PRECOMPUTE_PLAN_20260926.md states newtraffic/
+two-kernelaccounting/native+numerics/fullmatrix gates; implementationNOT_STARTED.
+Hopper skill updatedwithscopedlive-FP32-accumulator counterexample,validatorPASS.
 
 17:51 UTC: S43 C7512 andS44 parent-spill ceilingFAIL, no GPU. S45 onlymoves
 unchanged O1 betweenNewV/O2, sourcebinding+3negatives PASS; changed QKV/QKKK
