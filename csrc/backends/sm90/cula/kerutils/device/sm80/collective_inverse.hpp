@@ -35,6 +35,7 @@
 #include <cutlass/arch/barrier.h>
 
 #include "kerutils/common/cute_ext.hpp"
+#include "inverse_half2_add.cuh"
 
 namespace kerutils {
 
@@ -1133,7 +1134,7 @@ private:
       Tensor tOsO_s      = O_thr_s2r.partition_S(sO);
       Tensor tOrO_red_cv = O_thr_s2r.retile_D(tOrO_red);
       copy(O_tiled_s2r, tOsO_s, tOrO_red_cv);
-      transform(tOrO_cvt, tOrO_red, tOrO_cvt, [](auto a, auto b) { return a + b; });
+      gdn_sm90::inverse_add_half_pairs(tOrO_cvt, tOrO_red);
       copy(O_tiled_r2s, tOrO_cvt_cv, tOsO);
     }
   }
