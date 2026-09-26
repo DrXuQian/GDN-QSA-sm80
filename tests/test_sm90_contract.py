@@ -88,7 +88,8 @@ class Contracts(unittest.TestCase):
     def test_scalar_gate_is_not_tma_byte_counted(self):
         src=(ROOT/"csrc/backends/sm90/cula/kda/sm90/kernel/kernel_kda_fwd.hpp").read_text()
         self.assertIn("alpha_pipeline_params.producer_arv_count = cutlass::NumThreadsPerWarp",src)
-        self.assertIn("alpha_pipeline_params.consumer_arv_count = NumStateMathThreads + NumAuxMathThreads + cutlass::NumThreadsPerWarp",src)
+        self.assertIn("alpha_pipeline_params.consumer_arv_count = NumStateMathThreads + NumAuxMathThreads +",src)
+        self.assertIn("(CollectiveMainloop::ScalarAuxOwnsMetadata ? 0 : cutlass::NumThreadsPerWarp)",src)
         self.assertNotIn("alpha_pipeline_params.transaction_bytes",src)
 
     def test_new_build_graph_and_single_launch_runner(self):
