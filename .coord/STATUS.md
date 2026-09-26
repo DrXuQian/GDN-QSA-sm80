@@ -1,9 +1,24 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 04:56:29 UTC
-working-on: nsys comparison complete; source tree unchanged, evidence archived, publishing handoff
-blocked-on: none for H800 comparison; native PPU1.7 SDK/model unavailable
-last-commit: a54e3f1 (complete measured cuLA/nsys verdict and machine-readable evidence)
+updated-at: 2026-09-26 05:23:01 UTC
+working-on: same-input H800 FlashQLA/FlashInfer SM90 comparison; upstream pins, ABI adapters and nsys accounting
+blocked-on: native PPU1.7 unavailable; H800 foreign benchmark just completed, recheck idle before capture
+last-commit: 5ed74d3 (completed cuLA nsys comparison checkpoint)
+
+## FlashQLA / FlashInfer comparison
+
+Pinned official heads before measurement: FlashQLA a97c9783, FlashInfer
+5d9f8c8d. B1/T2048/Hqk16/Hv32/D128, g=-0.1/-1, existing 2% O/state
+criterion. Both auto-CP and CP-off paths, no production kernel/routing changes.
+FlashInfer takes alpha=exp(g) and FP32 beta, unlike our/FlashQLA log-gate ABI;
+record representation adapter and separately include its GPU cost. Latest
+references require incompatible TVM-FFI versions, so use isolated environments
+and the same admitted incumbent binaries as contemporaneous controls.
+
+Reference dependencies installed in isolated H800 environments. Local nsys
+accounting13/13 PASS, including omitted-call-in-both-trace-and-receipt and
+extra-reference-helper negatives. Official source archives verified bytewise
+before launch. Both output/state adapters have numerical negative controls.
 
 ## cuLA / nsys comparison checkpoint
 

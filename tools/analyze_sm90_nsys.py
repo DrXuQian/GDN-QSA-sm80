@@ -8,6 +8,12 @@ from pathlib import Path
 import sqlite3
 import statistics
 
+LIBRARY_ROLES = {
+    "flashqla": ("ours-cuda", "ours-ppu-source-check", "flashqla-auto", "flashqla-no-cp"),
+    "flashinfer": ("ours-cuda", "ours-ppu-source-check", "flashinfer-auto",
+                   "flashinfer-no-cp", "flashinfer-auto-log-adapter"),
+}
+
 
 def union_ns(intervals):
     total = 0
@@ -28,6 +34,14 @@ def extract(connection, receipt):
     expected = receipt["calls"]
     if not expected or len(expected) != len(set(expected)):
         raise ValueError("empty/duplicate expected forward labels")
+    family = receipt.get("comparison_family")
+    if family is not None:
+        if family not in LIBRARY_ROLES or receipt.get("samples") != 12:
+            raise ValueError("unregistered comparison family/sample denominator")
+        registered = {f"GDN_FORWARD|{role}|{sample:03d}"
+                      for role in LIBRARY_ROLES[family] for sample in range(12)}
+        if set(expected) != registered:
+            raise ValueError("registered role/sample denominator mismatch")
     connection.row_factory = sqlite3.Row
     tables = {r[0] for r in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     for name in ("StringIds", "NVTX_EVENTS", "CUPTI_ACTIVITY_KIND_KERNEL"):
@@ -73,7 +87,8 @@ def extract(connection, receipt):
         if not kernels:
             raise ValueError(f"forward contains no GPU kernel: {label}")
         main = [k for k in kernels if "FlatKernelTmaWarpSpecializedKdaFwd" in k["name"]]
-        if len(main) != 1:
+        require_fused = family is None or row["role"].startswith("ours-")
+        if require_fused and len(main) != 1:
             raise ValueError("expected exactly one original/adapted C++ fused kernel per call")
         if row["role"].startswith("ours-") and len(kernels) != 1:
             raise ValueError("incumbent unexpectedly launched extra device kernels")
@@ -81,16 +96,19 @@ def extract(connection, receipt):
         intervals = [(k["start"], k["end"]) for k in all_activity]
         span = max(x[1] for x in intervals) - min(x[0] for x in intervals)
         row.update(kernel_sum_us=sum(k["end"]-k["start"] for k in kernels)/1000,
-                   fused_kernel_us=(main[0]["end"]-main[0]["start"])/1000,
                    memory_sum_us=sum(k["end"]-k["start"] for k in row["memory"])/1000,
                    gpu_span_us=span/1000, gpu_activity_union_us=union_ns(intervals)/1000,
                    gpu_gaps_us=(span-union_ns(intervals))/1000,
                    host_range_us=(row["end"]-row["start"])/1000)
+        if require_fused:
+            row["fused_kernel_us"] = (main[0]["end"]-main[0]["start"])/1000
         roles[row["role"]].append(row)
     summary = {}
     for role, calls in roles.items():
         metrics = {}
         for name in ("kernel_sum_us", "fused_kernel_us", "memory_sum_us", "gpu_span_us", "gpu_gaps_us"):
+            if not all(name in c for c in calls):
+                continue
             values = [c[name] for c in calls]
             metrics[name] = dict(median=statistics.median(values), range=[min(values), max(values)], samples=values)
         metrics["calls"] = len(calls)
@@ -102,16 +120,20 @@ def extract(connection, receipt):
         metrics["symbols"] = {name: dict(count=len(vals), median_us=statistics.median(vals),
                                           total_us=sum(vals)) for name, vals in per_symbol.items()}
         summary[role] = metrics
-    if set(summary) != {"ours-cuda", "ours-ppu-source-check", "cula"}:
+    required_roles = LIBRARY_ROLES[family] if family else ("ours-cuda", "ours-ppu-source-check", "cula")
+    if set(summary) != set(required_roles):
         raise ValueError("role denominator mismatch")
     comparisons = {}
-    for role in ("ours-cuda", "ours-ppu-source-check"):
+    for role in ("ours-cuda", "ours-ppu-source-check") if family is None else required_roles[1:]:
         ours = summary[role]["kernel_sum_us"]
-        ref = summary["cula"]["kernel_sum_us"]
-        verdict = ("OURS-WINS" if ours["range"][1] < ref["range"][0] else
-                   "CULA-WINS" if ref["range"][1] < ours["range"][0] else "UNRESOLVED")
-        comparisons[role] = dict(cula_over_ours=ref["median"]/ours["median"],
-                                  verdict=verdict, criterion="disjoint-observed-kernel-sum-ranges")
+        control = "ours-cuda" if family else "cula"
+        ref = summary[control]["kernel_sum_us"]
+        verdict = (("CANDIDATE-WINS" if family else "OURS-WINS") if ours["range"][1] < ref["range"][0] else
+                   ("CONTROL-WINS" if family else "CULA-WINS") if ref["range"][1] < ours["range"][0] else "UNRESOLVED")
+        comparisons[role] = dict(control=control, control_over_candidate=ref["median"]/ours["median"],
+                                verdict=verdict, criterion="disjoint-observed-kernel-sum-ranges")
+        if family is None:
+            comparisons[role]["cula_over_ours"] = ref["median"]/ours["median"]
     return dict(scope=receipt["scope"], gate=receipt["gate"], shape=receipt["shape"],
                 input_sha256=receipt["input_sha256"], summary=summary,
                 comparisons=comparisons, forwards=list(ranges.values()),
@@ -132,7 +154,7 @@ def main():
     for role, row in result["summary"].items():
         print(f"[nsys kernel sum] role={role} calls={row['calls']} "
               f"median_us={row['kernel_sum_us']['median']:.3f} range={row['kernel_sum_us']['range']} "
-              f"fused_us={row['fused_kernel_us']['median']:.3f} "
+              f"fused_us={row.get('fused_kernel_us', {}).get('median', 'NA')} "
               f"memory_us={row['memory_sum_us']['median']:.3f} gaps_us={row['gpu_gaps_us']['median']:.3f}")
     print(json.dumps(result["comparisons"], indent=2))
 

@@ -85,5 +85,58 @@ class Accounting(unittest.TestCase):
         self.assertEqual(module.union_ns([(0,10),(5,15),(20,23)]),18)
 
 
+class LibraryAccounting(unittest.TestCase):
+    def setUp(self):
+        self.db = sqlite3.connect(":memory:")
+        self.db.executescript("""
+        CREATE TABLE StringIds(id INTEGER,value TEXT);
+        INSERT INTO StringIds VALUES(1,'FlatKernelTmaWarpSpecializedKdaFwd'),(2,'prefix'),(3,'cp_main');
+        CREATE TABLE NVTX_EVENTS(start INTEGER,end INTEGER,text TEXT,textId INTEGER);
+        CREATE TABLE CUPTI_ACTIVITY_KIND_KERNEL(start INTEGER,end INTEGER,demangledName INTEGER);
+        """)
+        labels = []
+        for sample in range(12):
+            for role in module.LIBRARY_ROLES["flashqla"]:
+                start = len(labels)*100000
+                label = f"GDN_FORWARD|{role}|{sample:03d}"
+                labels.append(label)
+                self.db.execute("INSERT INTO NVTX_EVENTS VALUES(?,?,?,NULL)", (start,start+90000,label))
+                if role.startswith("ours-"):
+                    kernels = [(start+10000, start+60000, 1)]
+                else:
+                    kernels = [(start+1000, start+2000, 2), (start+10000, start+80000, 3)]
+                self.db.executemany("INSERT INTO CUPTI_ACTIVITY_KIND_KERNEL VALUES(?,?,?)", kernels)
+        self.receipt = dict(status="CAPTURE_COMPLETE_AWAIT_NSYS_EXTRACTION", calls=labels,
+                            comparison_family="flashqla", samples=12, scope="H800_CONTROL_NOT_NATIVE_PPU17",
+                            shape=[1,2048,16,32,128], gate=-.1, input_sha256="synthetic", device_watch={"errors":[]})
+
+    def tearDown(self):
+        self.db.close()
+
+    def test_multiple_reference_kernels_are_all_counted(self):
+        result = module.extract(self.db,self.receipt)
+        self.assertEqual(result["summary"]["flashqla-auto"]["kernel_sum_us"]["median"],71)
+        self.assertNotIn("fused_kernel_us", result["summary"]["flashqla-auto"])
+        self.assertEqual(len(result["forwards"]),48)
+
+    def test_omitting_same_call_from_trace_and_receipt_still_fails(self):
+        label = self.receipt["calls"].pop()
+        row = self.db.execute("SELECT start,end FROM NVTX_EVENTS WHERE text=?",(label,)).fetchone()
+        self.db.execute("DELETE FROM NVTX_EVENTS WHERE text=?",(label,))
+        self.db.execute("DELETE FROM CUPTI_ACTIVITY_KIND_KERNEL WHERE start>=? AND end<=?", row)
+        with self.assertRaisesRegex(ValueError,"denominator"):
+            module.extract(self.db,self.receipt)
+
+    def test_extra_reference_helper_changes_sum(self):
+        self.db.execute("INSERT INTO CUPTI_ACTIVITY_KIND_KERNEL VALUES(202001,202501,2)")
+        result = module.extract(self.db,self.receipt)
+        self.assertEqual(result["summary"]["flashqla-auto"]["kernel_sum_us"]["samples"][0],71.5)
+
+    def test_foreign_task_invalidates_all_roles(self):
+        self.receipt["device_watch"]["errors"] = ["foreign PID"]
+        with self.assertRaisesRegex(ValueError,"foreign"):
+            module.extract(self.db,self.receipt)
+
+
 if __name__ == "__main__":
     unittest.main()
