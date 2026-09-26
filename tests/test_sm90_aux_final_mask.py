@@ -13,7 +13,9 @@ SOURCE = Path(__file__).resolve().parents[1] / "csrc/backends/sm90/scalar_gdn_au
 def admit(text):
     assert "float decay = exp2f(row_log-col_log);" in text
     assert "Element(live ? acc_qk(i) * decay * params.scale : 0.f)" in text
-    assert "Inverse(live ? acc_kk(i) * row_beta * decay : 0.f)" in text
+    assert "float kk_value = live ? acc_kk(i) * row_beta * decay : 0.f;" in text
+    assert "kk_value = inverse_unit_input(row, col, kk_value);" in text
+    assert "out_kk(i) = Inverse(kk_value);" in text
     assert "__exp2f" not in text and "fast_math" not in text
 
 
@@ -23,6 +25,11 @@ class FinalMask(unittest.TestCase):
         with self.assertRaises(AssertionError):
             admit(text.replace("Element(live ? acc_qk(i) * decay * params.scale : 0.f)",
                                "Element(acc_qk(i) * decay * params.scale)"))
+        with self.assertRaises(AssertionError):
+            admit(text.replace("live ? acc_kk(i) * row_beta * decay : 0.f",
+                               "acc_kk(i) * row_beta * decay"))
+        with self.assertRaises(AssertionError):
+            admit(text.replace("kk_value = inverse_unit_input(row, col, kk_value);", ""))
 
     def test_unused_overflow_cannot_escape(self):
         # Independent output-mask property: include Inf, NaN (0*Inf),
