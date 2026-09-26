@@ -25,6 +25,7 @@ from gdn_qsa_sm80.reference.gdn_chunk_ref import torch_recurrent_gated_delta_rul
 from gdn_qsa_sm80.gdn_sm90_interface import gdn_chunk_sm90
 from analyze_sm90_nsys import LIBRARY_ROLES
 from sm90_workloads import BY_NAME, validate_offsets
+from sm90_execution_contract import from_build, validate_contracts
 from sm90_library_inputs import (make_inputs, expand_reference_heads, flatten_tokens,
                                  flatten_gate, flashinfer_initial, flashinfer_outputs)
 
@@ -151,11 +152,13 @@ def main():
                   comparison_family=comparison_family, samples=12, calls=[],
                   shape=[*workload.shape, 128], workload=workload.receipt(),
                   gate=args.gate, source=source, versions=versions(), incumbent_builds=builds,
+                  execution_contracts={role:from_build(build) for role,build in builds.items()},
                   candidate_requires_raw_bit=args.candidate_raw_bit,
                   harness_sha256=sha(__file__),
                   input_adapter_sha256=sha(ROOT / "benchmarks/sm90_library_inputs.py"),
                   workload_authority_sha256=sha(ROOT / "tools/sm90_workloads.py"),
                   utc=datetime.now(timezone.utc).isoformat())
+    validate_contracts(result)
     try:
         for _ in range(3):
             watch.sample(idle=True)

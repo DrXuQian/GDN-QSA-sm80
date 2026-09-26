@@ -29,7 +29,7 @@ def main():
     a = p.parse_args()
     admission = json.loads(a.admission.read_text())
     inventory = [r["id"] for r in admission["rows"]]
-    if (inventory not in (["s39", "s40", "s41"], ["s45"])
+    if (inventory not in (["s39", "s40", "s41"], ["s45"], ["s47"])
             or admission["denominator"] != len(inventory)
             or any(row["status"] != "PASS" for row in admission["rows"])):
         raise ValueError("every candidate in the registered inventory must first pass numerical admission")

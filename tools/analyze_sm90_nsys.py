@@ -7,6 +7,9 @@ import json
 from pathlib import Path
 import sqlite3
 import statistics
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from sm90_execution_contract import FUSED, PREPARED, validate_contracts
 
 LIBRARY_ROLES = {
     "flashqla": ("ours-cuda", "ours-ppu-source-check", "flashqla-auto", "flashqla-no-cp"),
@@ -33,6 +36,7 @@ def extract(connection, receipt):
         raise ValueError("capture receipt is not admitted")
     if receipt.get("device_watch", {}).get("errors"):
         raise ValueError("foreign work or monitor failure invalidates trace")
+    execution_contracts = validate_contracts(receipt)
     expected = receipt["calls"]
     if not expected or len(expected) != len(set(expected)):
         raise ValueError("empty/duplicate expected forward labels")
@@ -92,7 +96,18 @@ def extract(connection, receipt):
         require_fused = family is None or row["role"].startswith("ours-")
         if require_fused and len(main) != 1:
             raise ValueError("expected exactly one original/adapted C++ fused kernel per call")
-        if row["role"].startswith("ours-") and len(kernels) != 1:
+        contract = execution_contracts.get(row["role"], FUSED)
+        if contract == PREPARED:
+            prepared = [k for k in kernels if 'prepare_aux_device' in k['name']]
+            if len(kernels)!=2 or len(prepared)!=1 or 'PrecomputedState' not in main[0]['name']:
+                raise ValueError('prepared forward needs exactly one prepare and one explicit state kernel')
+            if (prepared[0]['end']>main[0]['start'] or
+                    prepared[0].get('streamId') is None or
+                    prepared[0]['streamId']!=main[0].get('streamId') or row['memory']):
+                raise ValueError('prepared forward ordering/stream/hidden-memory contract violated')
+            row['prepare_kernel_us']=(prepared[0]['end']-prepared[0]['start'])/1000
+            row['state_kernel_us']=(main[0]['end']-main[0]['start'])/1000
+        elif row["role"].startswith("ours-") and len(kernels) != 1:
             raise ValueError("incumbent unexpectedly launched extra device kernels")
         all_activity = kernels + row["memory"]
         intervals = [(k["start"], k["end"]) for k in all_activity]
@@ -102,13 +117,14 @@ def extract(connection, receipt):
                    gpu_span_us=span/1000, gpu_activity_union_us=union_ns(intervals)/1000,
                    gpu_gaps_us=(span-union_ns(intervals))/1000,
                    host_range_us=(row["end"]-row["start"])/1000)
-        if require_fused:
+        if require_fused and contract != PREPARED:
             row["fused_kernel_us"] = (main[0]["end"]-main[0]["start"])/1000
         roles[row["role"]].append(row)
     summary = {}
     for role, calls in roles.items():
         metrics = {}
-        for name in ("kernel_sum_us", "fused_kernel_us", "memory_sum_us", "gpu_span_us", "gpu_gaps_us"):
+        for name in ("kernel_sum_us", "fused_kernel_us", "prepare_kernel_us", "state_kernel_us",
+                     "memory_sum_us", "gpu_span_us", "gpu_gaps_us"):
             if not all(name in c for c in calls):
                 continue
             values = [c[name] for c in calls]

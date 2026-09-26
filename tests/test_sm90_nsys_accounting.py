@@ -171,5 +171,62 @@ class LibraryAccounting(unittest.TestCase):
             module.extract(self.db, self.receipt)
 
 
+class PreparedAccounting(unittest.TestCase):
+    def setUp(self):
+        LibraryAccounting.setUp(self)
+        self.db.execute('ALTER TABLE CUPTI_ACTIVITY_KIND_KERNEL ADD COLUMN streamId INTEGER')
+        self.db.execute("INSERT INTO StringIds VALUES(4,'prepare_aux_device'),(5,'FlatKernelTmaWarpSpecializedKdaFwd<PrecomputedState>')")
+        self.receipt.update(comparison_family='flashqla-candidate',candidate_requires_raw_bit=True,
+            execution_contracts={'ours-candidate':'PREPARED_AUX_THEN_STATE_V1'},
+            incumbent_builds={'ours-candidate':{'flags':['-DGDN_SM90_PRECOMPUTED_AUX=1']}})
+        for sample in range(12):
+            start=(48+sample)*100000
+            label=f'GDN_FORWARD|ours-candidate|{sample:03d}'
+            self.receipt['calls'].append(label)
+            self.db.execute('INSERT INTO NVTX_EVENTS VALUES(?,?,?,NULL)',(start,start+90000,label))
+            self.db.executemany('INSERT INTO CUPTI_ACTIVITY_KIND_KERNEL VALUES(?,?,?,7)',
+                ((start+1000,start+50000,4),(start+51000,start+85000,5)))
+
+    def tearDown(self):
+        self.db.close()
+
+    def test_omitting_a_registered_call_still_fails(self):
+        LibraryAccounting.test_omitting_same_call_from_trace_and_receipt_still_fails(self)
+
+    def test_fast_state_does_not_hide_slower_complete_call(self):
+        result=module.extract(self.db,self.receipt)
+        row=result['summary']['ours-candidate']
+        self.assertEqual(row['kernel_sum_us']['median'],83)
+        self.assertEqual(row['prepare_kernel_us']['median'],49)
+        self.assertEqual(row['state_kernel_us']['median'],34)
+        self.assertNotIn('fused_kernel_us',row)
+        self.assertEqual(result['candidate_vs_references']['flashqla-auto']['verdict'],'REFERENCE-WINS')
+
+    def test_missing_prepare_is_red(self):
+        self.db.execute('DELETE FROM CUPTI_ACTIVITY_KIND_KERNEL WHERE demangledName=4')
+        with self.assertRaisesRegex(ValueError,'exactly one prepare'):module.extract(self.db,self.receipt)
+
+    def test_unregistered_extra_kernel_is_red(self):
+        self.receipt['execution_contracts']={}
+        self.receipt['incumbent_builds']={}
+        with self.assertRaisesRegex(ValueError,'extra device kernels'):module.extract(self.db,self.receipt)
+
+    def test_missing_flag_cannot_relabel_old_binary(self):
+        self.receipt['incumbent_builds']['ours-candidate']['flags']=[]
+        with self.assertRaisesRegex(ValueError,'build-flag'):module.extract(self.db,self.receipt)
+
+    def test_missing_new_contract_is_red(self):
+        self.receipt['execution_contracts']={}
+        with self.assertRaisesRegex(ValueError,'single-kernel accounting'):module.extract(self.db,self.receipt)
+
+    def test_out_of_order_child_is_red(self):
+        self.db.execute('UPDATE CUPTI_ACTIVITY_KIND_KERNEL SET end=end+2000 WHERE demangledName=4')
+        with self.assertRaisesRegex(ValueError,'ordering'):module.extract(self.db,self.receipt)
+
+    def test_different_stream_is_red(self):
+        self.db.execute('UPDATE CUPTI_ACTIVITY_KIND_KERNEL SET streamId=8 WHERE demangledName=4')
+        with self.assertRaisesRegex(ValueError,'stream'):module.extract(self.db,self.receipt)
+
+
 if __name__ == "__main__":
     unittest.main()
