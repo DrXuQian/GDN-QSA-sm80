@@ -83,6 +83,9 @@ enum class Tag {
     kSafeGate,            // KDA
     kElementBetaGmem,
     kElementGateGmem,  // GDN scalar gate input dtype     // GMEM element type for beta (default float, can be bf16)
+    kStagesO,
+    kStagesAlpha,
+    kStagesBeta,
 };
 
 }  // namespace kda::sm90::kernel

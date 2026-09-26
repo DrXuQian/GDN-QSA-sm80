@@ -71,6 +71,7 @@ def main():
     p.add_argument("--cutlass-root",default=os.getenv("PPU_CUTLASS_ROOT"))
     p.add_argument("--device-only",action="store_true")
     p.add_argument("--release",action="store_true",help="explicit NDEBUG candidate; flags remain hash-bound")
+    p.add_argument("--stage-config",type=int,choices=range(32),help="bounded stage-only configuration; no math/role change")
     p.add_argument("--reuse-device",action="store_true",help="reuse only an exactly hash-bound device object; recheck target/codegen/link/import")
     args=p.parse_args()
     out=args.out.resolve(); out.mkdir(parents=True,exist_ok=True)
@@ -89,6 +90,8 @@ def main():
     # Keep wrapper path: SDK nvcc wrappers may locate their runtime relative to it.
     include=[f"-I{SOURCE}",f"-I{SOURCE/'cula'}",f"-I{dep/'include'}"]
     options=flags(args.target,args.mode,args.release)
+    if args.stage_config is not None:
+        options += [f"-DGDN_SM90_STAGE_CONFIG={args.stage_config}"]
     identity=dict(target=args.target,mode=args.mode,compiler=str(compiler),compiler_sha256=sha(compiler),
                   dependency=str(dep),flags=options,include=include,device_admission="NOT_RUN")
     identity["dependency_version_sha256"]=sha(dep/"include/cutlass/version.h")
@@ -113,6 +116,14 @@ def main():
         if result.returncode:
             raise RuntimeError(f"{label} failed rc={result.returncode}; see {out/f'{label}.log'}")
     run("target",[compiler,*options,*include,"-c",ROOT/"dev/backends/sm90_target_probe.cu","-o",out/"target.o"])
+    if args.stage_config is not None:
+        run("stage_types",[compiler,*options,*include,ROOT/"dev/backends/sm90_stage_config.cu","-o",out/"stage_types"])
+        actual=subprocess.check_output([str(out/"stage_types")],text=True)
+        (out/"stage_types.jsonl").write_text(actual)
+        identity["stage_config"]=args.stage_config
+        identity["stage_types"]=[json.loads(line) for line in actual.splitlines()]
+        if len(identity["stage_types"])!=4 or {r["config"] for r in identity["stage_types"]}!={args.stage_config}:
+            raise RuntimeError("stage authority did not instantiate all4 selected specializations")
     if not args.reuse_device:
         run("device",[compiler,*options,*include,"-Xptxas=-v","-c",SOURCE/"launch.cu","-o",out/"launch.o"])
     else:
