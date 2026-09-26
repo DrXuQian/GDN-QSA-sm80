@@ -26,6 +26,7 @@ def inspect(rows, require_inplace):
     for first in (0,21):
         end=next(i for i in range(sh[first+20],len(rows)) if rows[i][2].startswith("BAR.SYNC"))
         selected=rows[sh[first]:end]
+        assert all(not pred for _,pred,o,_ in selected if o.startswith("SHFL")), "shuffle source lanes must participate"
         fmas=[(pred,a) for _,pred,o,a in selected if o=="FFMA"]
         assert len(fmas)==21 and all(pred.strip().startswith("@") for pred,_ in fmas)
         in_place=sum(a.split(",")[0].strip()==a.split(",")[-1].strip() for _,a in fmas)
@@ -44,6 +45,13 @@ def main():
     result={}
     for symbol,rows in c.items():
         current,old=inspect(rows,True),inspect(b[symbol],False)
+        # A lost predicate changes the algorithm even with identical counts.
+        plant=list(rows)
+        victim=next(i for i,(_,pred,o,_) in enumerate(plant) if o=="FFMA" and pred)
+        pc,_,op,operand=plant[victim];plant[victim]=(pc,"",op,operand)
+        try:inspect(plant,True)
+        except AssertionError:pass
+        else:raise AssertionError("unconditional update negative escaped")
         try:inspect(b[symbol],True)
         except AssertionError:pass
         else:raise AssertionError("old body negative escaped")
