@@ -3,7 +3,7 @@
 #include <cute/tensor.hpp>
 #include "kda/sm90/device/device_universal.hpp"
 #include "kda/sm90/kernel/builder_kda_fwd.hpp"
-#include "scalar_gdn_aux.cuh"
+#include "scalar_gdn_state.cuh"
 #include <climits>
 #include <stdexcept>
 
@@ -22,7 +22,7 @@ void run(Arguments const& a, cudaStream_t stream) {
         Stride, Stride, Stride, Stride,
         cutlass::gemm::KernelTmaWarpSpecializedCooperative, Options>;
     using Kernel = FlatKernelTmaWarpSpecializedKdaFwd<
-        ScalarGdnAux<typename Builder::CollectiveMainloop>, typename Builder::TileScheduler, Options>;
+        ScalarGdnState<typename Builder::CollectiveMainloop>, typename Builder::TileScheduler, Options>;
     using Operation = cutlass::device::Universal<Kernel>;
     typename Operation::Arguments args{};
     args.problem_size.total_seqlen = int64_t(a.batch) * a.length;

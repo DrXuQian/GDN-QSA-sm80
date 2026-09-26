@@ -57,7 +57,7 @@ def main():
     result=dict(kernels=inspect(sass),negative_controls=negatives(sass),scope="CUDA-SM90-ASSEMBLY-NOT-PPU-EXECUTION")
     (a.out/"codegen.json").write_text(json.dumps(result,indent=2)+"\n")
     print(f"[SM90 codegen] PASS kernels={len(result['kernels'])} negatives={result['negative_controls']} "
-          "live=WGMMA+TF32+TMA-load+TMA-store+state-store; device=NOT_RUN")
+          "live=WGMMA+HMMA+TMA-load+TMA-store+state-store; device=NOT_RUN")
 
 
 if __name__=="__main__":main()

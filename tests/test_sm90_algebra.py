@@ -52,6 +52,23 @@ def data(length,gate,seed=33):
     return q,k,v,g,beta,state
 
 
+def scalar_post_dot(q,k,v,g,beta,state,plant=None):
+    """S2: scalar gates after QH/KH; decay residual V, not the K tile."""
+    h=state.clone(); out=[]
+    for start in range(0,len(q),64):
+        qc,kc,vc,bc=q[start:start+64],k[start:start+64],v[start:start+64],beta[start:start+64]
+        p=g[start:start+64].cumsum(0)
+        d=(p[:,None]-p[None,:]).exp()
+        tri=torch.tril((kc@kc.T)*d*bc[:,None],diagonal=-1)
+        identity=torch.eye(len(qc),dtype=q.dtype)
+        inv=torch.linalg.solve_triangular(identity+tri,identity,upper=False)*bc[None,:]
+        delta=inv@(vc-(kc@h)*p.exp()[:,None])
+        out.append(((qc@h)*p.exp()[:,None]+torch.tril((qc@kc.T)*d)@delta)/q.shape[-1]**.5)
+        gain=(p-p[-1]).exp() if plant=="reverse-delta-decay" else (p[-1]-p).exp()
+        h=h*p[-1].exp()+kc.T@(delta*gain[:,None])
+    return torch.cat(out),h
+
+
 class Algebra(unittest.TestCase):
     def test_scalar_kda_is_gdn_with_tail_and_initial_state(self):
         count=0
@@ -61,6 +78,8 @@ class Algebra(unittest.TestCase):
                     inputs=list(data(length,gate))
                     if not initial: inputs[-1].zero_()
                     for got,want in zip(fused_formula(*inputs),recurrent(*inputs)):
+                        torch.testing.assert_close(got,want,rtol=1e-11,atol=1e-12)
+                    for got,want in zip(scalar_post_dot(*inputs),recurrent(*inputs)):
                         torch.testing.assert_close(got,want,rtol=1e-11,atol=1e-12)
                     count+=1
         print(f"[SM90 algebra] cases={count} scalar-KDA=GDN FP64/PASS; not device admission")
@@ -74,6 +93,12 @@ class Algebra(unittest.TestCase):
                 for a,b in zip(got,want):
                     torch.testing.assert_close(a,b,rtol=1e-11,atol=1e-12)
             print(f"[SM90 negative] {plant} EXPECTED-RED/PASS")
+
+    def test_scalar_state_decay_negative(self):
+        inputs=data(129,-.1)
+        with self.assertRaises(AssertionError):
+            for got,want in zip(scalar_post_dot(*inputs,plant="reverse-delta-decay"),recurrent(*inputs)):
+                torch.testing.assert_close(got,want,rtol=1e-11,atol=1e-12)
 
 
 if __name__=="__main__": unittest.main()
