@@ -1,11 +1,22 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 16:31:00 UTC
-working-on: repair fresh/cached FlashQLA JIT identity, preserve attempts, then resume frozen 56-capture matrix
-blocked-on: native PPU1.7 SDK/model unavailable; metadata admission defect under repair, no user input needed
-last-commit: 26d1a18 checkpoint; matrix d8d56e3, stash81dac54, loaderc5c0584 published
+updated-at: 2026-09-26 16:38:33 UTC
+working-on: resumed frozen 56-capture matrix after actual fresh/cached JIT identity proof
+blocked-on: native PPU1.7 SDK/model unavailable; expanded performance goal not yet met
+last-commit: 7fe7df3 checkpoint; matrix4ea24d1, stash81dac54, loaderc5c0584 published
 
 ## Current checkpoint
+
+16:38 UTC: actual fresh/cached FlashQLA proof PASS, four compiled/live CUDA
+images vs four cache-loaded images, all four SHA identical; five arms pass
+CPU oracle plus 8 repeats in both processes. Binary serialization avoids
+TVM JSON's unsupported TMA dtype30; exact serialized extent is checked.
+Unchanged measurement AST outside reference_binaries; input/timing/threshold
+mutations remain negative controls. Host suite55 PASS before latest extra
+serialized-extent negative; helper5 PASS separately. Repaired matrix retains
+old failure/three incomplete attempts and original state; 30 admitted,
+26 pending at restart, session69074. No timing, numerical, source-reference
+or frozen-kernel change. Finish all56 before queued candidate GPU tests.
 
 16:31 UTC: matrix 33 PASS / 1 identity FAIL / 22 PENDING. All five arms of
 the failed heads64-gva4 QLA cell passed numerics/replay before timing stopped.
