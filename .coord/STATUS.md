@@ -1,11 +1,20 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 12:03:26 UTC
-working-on: bounded S25-S27 inventory closed and pushed; S24 retained
+updated-at: 2026-09-26 12:08:13 UTC
+working-on: D28 isolated role/chunk timestamp diagnostic on S24; no promotion
 blocked-on: native PPU1.7 SDK/model unavailable; fastest FlashInfer target not yet met
-last-commit: 813642d (completed report/evidence before this status-only seal)
+last-commit: b7be8ec; diagnostic parent06b7471/kernelbc3c154
 
 ## Current checkpoint
+
+User requested next step. New bounded plan in task docs/plan.md: observe
+auxiliary inverse/publication versus state waiting/compute without removing
+sync or changing math. Normal compile must stay4body native-identical;
+diagnostic-only timestamps never enter speed ranking. Validate denominator,
+numeric/raw parent and actual perturbation before interpretation. No new
+optimization until this evidence; max2candidates this turn; handoff13:40UTC.
+
+### Previous closed inventory
 
 FINAL: three captures/216 full forwards exactly re-extracted;12/12 archive
 trace hashes and3/3 binary hashes checked, CSV3/3 matches. No new winner.
