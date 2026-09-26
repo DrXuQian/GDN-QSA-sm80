@@ -20,11 +20,12 @@ def main():
     build=root/'s45-build'
     binary=next(build.glob('_gdn_fused_sm90*.so'))
     identity=build_receipt(binary,'cuda_sm90','native')
-    out=root/'s45-admission';out.mkdir()
+    out=root/'s45-admission-r2';out.mkdir()
     row=dict(id='s45',root=str(root),build=str(build),status='RUNNING',
              binary_sha256=identity['extension_sha256'])
     result=dict(denominator=1,rows=[row],performance='NOT_RUN',routing='UNCHANGED')
-    watch=DeviceWatch(0)
+    from sm90_process_family import admission_watch
+    watch=admission_watch(DeviceWatch)(0)
     def run(label,command):
         with (out/(label+'.log')).open('x') as log:
             p=subprocess.run([sys.executable,*map(str,command)],stdout=log,stderr=subprocess.STDOUT,timeout=300)
