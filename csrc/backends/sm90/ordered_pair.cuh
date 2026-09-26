@@ -5,8 +5,9 @@
 
 namespace gdn::sm90 {
 
-// Two state warpgroups, fixed named IDs. Do not materialize an indexed array:
-// nvcc otherwise lowers the runtime WG lookup to LDL on the critical path.
+// Two state warpgroups, fixed named IDs. Keep the CALLS inside the uniform
+// branch, not a selected ID argument: nvcc can spill even a two-way selected
+// value across the state recurrence. Constant operands need no local lookup.
 // This is the same ordered protocol, NOT a removed wait or a polling shortcut.
 template<uint32_t First, uint32_t Second>
 struct OrderedPair {
@@ -26,10 +27,18 @@ struct OrderedPair {
         if (wg == 1) cutlass::arch::NamedBarrier::arrive(Participants, Id(First));
     }
     CUTE_DEVICE void ordered_or_wait(int wg) {
-        cutlass::arch::NamedBarrier::sync(Participants, Id(wait_id(wg)));
+        if (wg == 0) {
+            cutlass::arch::NamedBarrier::sync(Participants, Id(First));
+        } else {
+            cutlass::arch::NamedBarrier::sync(Participants, Id(Second));
+        }
     }
     CUTE_DEVICE void notify_next_blocked(int wg) {
-        cutlass::arch::NamedBarrier::arrive(Participants, Id(notify_id(wg)));
+        if (wg == 0) {
+            cutlass::arch::NamedBarrier::arrive(Participants, Id(Second));
+        } else {
+            cutlass::arch::NamedBarrier::arrive(Participants, Id(First));
+        }
     }
 };
 
