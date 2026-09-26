@@ -329,7 +329,7 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
             q_pipeline_params.role = MainloopQPipeline::ThreadCategory::Producer;
             k_pipeline_params.role = MainloopKPipeline::ThreadCategory::Producer;
             v_pipeline_params.role = MainloopVPipeline::ThreadCategory::Producer;
-            if constexpr (NeedsAlpha) {
+            if constexpr (NeedsAlpha && !CollectiveMainloop::SeparateScalarGateProducer) {
                 alpha_pipeline_params.role = MainloopAlphaPipeline::ThreadCategory::Producer;
             }
         }
@@ -345,7 +345,10 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
         if (warp_group_role == WarpGroupRole::LdSt && ldst_warp_role == LdStWarpRole::LoadAlpha) {
             // LoadAlpha warp consumes alpha_pipeline (reads last row) and produces alpha_last_pipeline
             if constexpr (NeedsAlpha) {
-                alpha_pipeline_params.role = MainloopAlphaPipeline::ThreadCategory::Consumer;
+                if constexpr (CollectiveMainloop::SeparateScalarGateProducer)
+                    alpha_pipeline_params.role = MainloopAlphaPipeline::ThreadCategory::ProducerConsumer;
+                else
+                    alpha_pipeline_params.role = MainloopAlphaPipeline::ThreadCategory::Consumer;
             }
             alpha_last_pipeline_params.role = MainloopAlphaLastPipeline::ThreadCategory::Producer;
         }
@@ -516,6 +519,13 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
                             work_desc.o_head_idx(),
                             work_desc.seq_len);
                         auto tile_shape = typename CollectiveMainloop::TileShape{};
+                        if constexpr (CollectiveMainloop::SeparateScalarGateProducer) {
+                            collective_mainloop.load_alpha_and_last(
+                                params.mainloop, params.problem_size, tile_shape, work_desc,
+                                alpha_pipeline, alpha_smem_pipe_write, alpha_smem_pipe_read,
+                                alpha_last_pipeline, alpha_last_smem_pipe_write,
+                                storage.tensors.mainloop);
+                        } else {
                         collective_mainloop.extract_alpha_last(
                             params.mainloop,
                             params.problem_size,
@@ -526,6 +536,7 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
                             alpha_last_pipeline,
                             alpha_last_smem_pipe_write,
                             storage.tensors.mainloop);
+                        }
                     }
                 }
             } else if (ldst_warp_role == LdStWarpRole::StoreO) {
