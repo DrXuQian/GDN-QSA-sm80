@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 #include "scalar_gdn_aux.cuh"
+#include "fragment_convert.cuh"
 
 namespace gdn::sm90 {
 
@@ -174,7 +175,8 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             kkp.consumer_release(kkr); ++kkr;
             bp.consumer_release(br); ++br;
 
-            auto operand_delta = kda::sm90::collective::make_acc_into_op<Element>(acc_delta,typename Base::TiledMmaKV::LayoutA_TV{});
+            auto delta_bf16 = convert_fragment<Element>(acc_delta);
+            auto operand_delta = kda::sm90::collective::make_acc_into_op<Element>(delta_bf16,typename Base::TiledMmaKV::LayoutA_TV{});
             qkp.consumer_wait(qkr);
             warpgroup_fence_operand(operand_delta);
             warpgroup_fence_operand(acc_o);
