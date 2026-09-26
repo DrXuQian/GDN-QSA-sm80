@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 05:23:01 UTC
-working-on: same-input H800 FlashQLA/FlashInfer SM90 comparison; upstream pins, ABI adapters and nsys accounting
-blocked-on: native PPU1.7 unavailable; H800 foreign benchmark just completed, recheck idle before capture
-last-commit: 5ed74d3 (completed cuLA nsys comparison checkpoint)
+updated-at: 2026-09-26 05:33:38 UTC
+working-on: both libraries/gates measured; finalizing actual JIT image hashes and reproducible evidence
+blocked-on: none for H800 measurement; native PPU1.7 still unavailable
+last-commit: cd662dd (registered pinned reference harness and nsys denominator tests)
 
 ## FlashQLA / FlashInfer comparison
 
@@ -19,6 +19,23 @@ Reference dependencies installed in isolated H800 environments. Local nsys
 accounting13/13 PASS, including omitted-call-in-both-trace-and-receipt and
 extra-reference-helper negatives. Official source archives verified bytewise
 before launch. Both output/state adapters have numerical negative controls.
+
+qla-weak-r1 INVALID: monitor observed PID44469 during preflight; no timing
+accepted. qla-weak-r2 complete48 calls, all assigned. Kernel sums(auto/noCP)
+165.713/175.346us; same-window ours CUDA354.338 and PPU-fork331.234us.
+FlashQLA max O/state errors1.4563%/1.1505%, below unchanged2% but not bit
+equivalent to incumbent. Eight repeats and every captured output checked.
+Automatic CP has7.2us memory activity plus large host gaps, kept separate from
+kernel sums. Do not describe these numbers as full API latency.
+
+Both gate regimes now pass. FlashInfer CP-off111.9-114.0us is the fastest
+measured arm, autoCP130.1-132.0us; FlashQLA auto162.9-166.3us vs noCP174.8-
+175.0us. This supersedes any suggestion that beating original cuLA completes
+SM90 tuning. User objective: strongest admitted SM90 forward; portable
+algorithm/dataflow improvements should subsequently inform SM80/PPU1.0,
+without trying to share TMA/WGMMA with its AIU implementation.
+Source unchanged; final rerun binds actual in-memory CuTeDSL cubins and loaded
+TileLang executable images, not only Python source or environment labels.
 
 ## cuLA / nsys comparison checkpoint
 

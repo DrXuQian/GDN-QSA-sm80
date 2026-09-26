@@ -61,6 +61,38 @@ def versions():
     return result
 
 
+def reference_binaries(family, out):
+    """Hash the actual loaded JIT code, without changing compiler options."""
+    result = []
+    if family == "flashqla":
+        cache = Path(os.environ["TILELANG_CACHE_DIR"]).resolve()
+        mapped = {line.split()[-1] for line in Path("/proc/self/maps").read_text().splitlines()
+                  if line.rstrip().endswith("/executable.so")}
+        for name in sorted(mapped):
+            path = Path(name).resolve()
+            if path.is_relative_to(cache):
+                result.append(dict(path=str(path), sha256=sha(path), bytes=path.stat().st_size))
+    else:
+        from flashinfer.gdn_kernels.delta_rule_dsl.custom_compile_cache import _in_mem_compile_cache
+        from cutlass.base_dsl.jit_executor import walk_module_and_get_cubin_data
+        output = out / "jit-binaries"
+        output.mkdir(exist_ok=True)
+
+        def record(symbol, function, data):
+            digest = hashlib.sha256(data).hexdigest()
+            path = output / f"{digest}.cubin"
+            path.write_bytes(data)
+            result.append(dict(symbol=symbol, function=function, path=str(path),
+                               sha256=digest, bytes=len(data)))
+
+        for compiled in _in_mem_compile_cache.values():
+            for symbol in compiled.kernel_info:
+                walk_module_and_get_cubin_data(compiled.ir_module, symbol, record)
+    if not result:
+        raise RuntimeError("reference JIT binary identity unavailable")
+    return result
+
+
 @torch.inference_mode()
 def main():
     p = argparse.ArgumentParser(description=__doc__)
@@ -189,7 +221,10 @@ def main():
             admission[role] = dict(errors=errors, fingerprint=fingerprint, repeat="8/8 RAW-BIT")
             print(f"[SM90 library admission] role={role} {admission[role]}", flush=True)
         result["admission"] = admission
+        result["reference_binaries"] = reference_binaries(args.family, args.out)
         torch.cuda.synchronize()
+        if watch.errors:
+            raise RuntimeError(f"concurrency monitor invalidates preflight: {watch.errors}")
         if not args.preflight_only:
             watch.sample()
             torch.cuda.cudart().cudaProfilerStart()

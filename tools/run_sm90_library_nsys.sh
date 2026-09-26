@@ -24,6 +24,9 @@ export TILELANG_CACHE_DIR="$WORK/cache/tilelang"
 export TILELANG_TMP_DIR="$WORK/scratch/tilelang"
 export TRITON_CACHE_DIR="$WORK/cache/triton"
 export FLASHINFER_WORKSPACE_BASE="$WORK/cache"
+export CUTE_DSL_CACHE_DIR="$WORK/cache/cute-dsl"
+export CUTE_DSL_DUMP_DIR="$WORK/cache/cute-dsl-codegen"
+export CUTE_DSL_KEEP=ptx,cubin
 "$NSYS" profile --trace=cuda,nvtx --sample=none --cpuctxsw=none \
   --capture-range=cudaProfilerApi --capture-range-end=stop -o "$OUT/forward" \
   "$PYTHON" -u "$ROOT/benchmarks/profile_sm90_libraries.py" \
