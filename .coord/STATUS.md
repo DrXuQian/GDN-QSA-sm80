@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 09:18:22 UTC
+updated-at: 2026-09-26 09:19:44 UTC
 working-on: bounded follow-up closed; S19 confirmed incumbent, final evidence handoff
 blocked-on: native PPU1.7 SDK/model unavailable; two-library speed target remains NOT MET
-last-commit: e05397e (observed main before final checkpoint); S19 kernel64691d1; all experiment branches pushed
+last-commit: 15a7ed7 (completed report/evidence); S19 kernel64691d1; all experiment branches pushed
 
 ## Active SM90 campaign
 
@@ -18,6 +18,7 @@ All11 follow-up captures/744forwards independently re-extracted; archive
 44/44 receipt/result/SQLite/nsys hashes verified. Failed idle attempts are
 preserved and excluded. S14/S17/S18 UNRESOLVED, S15 native-identical rejected.
 Main production/defaults and SM80 unchanged. No own GPU jobs remain.
+Own H800 SSH master/session closed after verification; ledger/CSV11/11 agree.
 Full report:docs/SM90_SASS_FOLLOWUP_20260926.md. Next useful hypothesis is
 matched auxiliary inverse/epilogue instruction lifetimes, not another blind
 barrier deletion or register cap. Skill reference updated with scoped lessons.
