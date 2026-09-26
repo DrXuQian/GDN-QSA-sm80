@@ -5,6 +5,7 @@
 #include "kda/sm90/collective/mainloop_kda_fwd.hpp"
 #include "ordered_pair.cuh"
 #include "aux_chunk_loop.cuh"
+#include "relative_gate_layout.cuh"
 
 namespace gdn::sm90 {
 
@@ -25,6 +26,7 @@ struct ScalarGdnAux : Base {
     struct SharedStorage : Base::SharedStorage {
         // [alpha stage][exp / scaled-exp][token], protected by alpha_pipeline.
         cute::array_aligned<float, 128 * Base::StagesAlpha::value> gate_factors;
+        cute::array_aligned<float, 64 * Base::StagesAlpha::value> relative_gate;
     };
     using QPipeline = typename Base::MainloopQPipeline;
     using KPipeline = typename Base::MainloopKPipeline;
@@ -74,23 +76,33 @@ struct ScalarGdnAux : Base {
         auto last = make_tensor(make_smem_ptr(smem.smem_alpha_last.data()),
                                 typename Base::SmemLayoutAlphaLast{});
         int lane = int(threadIdx.x) & 31;
-        // Same S12 values/rounding/stage storage; only producer ownership moves.
+        int valid;
+        // Same prefix/O1 factors, plus the state-update coefficient. All
+        // channels are initialized before the existing alpha publication.
         auto factors = [&](int lane, float lo, float hi, int stage) __attribute__((always_inline)) {
             float elo = exp2f(lo), ehi = exp2f(hi);
             smem.gate_factors[stage*128+lane] = elo;
             smem.gate_factors[stage*128+lane+32] = ehi;
             smem.gate_factors[stage*128+64+lane] = elo * params.scale;
             smem.gate_factors[stage*128+64+lane+32] = ehi * params.scale;
+            float last_prefix = __shfl_sync(0xffffffffu,
+                relative_gate_last_is_hi(valid) ? hi : lo, relative_gate_last_lane(valid));
+            // Original state reads rounded FP32 prefixes from shared; do not
+            // contract their subtraction into the producer's LOG2E multiply.
+            float rlo = lane < valid ? exp2f(__fsub_rn(last_prefix,lo)) : 0.f;
+            float rhi = lane+32 < valid ? exp2f(__fsub_rn(last_prefix,hi)) : 0.f;
+            smem.relative_gate[relative_gate_index(stage,lane)] = rlo;
+            smem.relative_gate[relative_gate_index(stage,lane+32)] = rhi;
         };
         CUTE_NO_UNROLL
         for (int block=0; block<ceil_div(work.seq_len,64); ++block) {
+            valid = min(int(work.seq_len-block*64),64);
             load_scalar_gate<64,128>(params.gate_ptr, problem.num_v_heads, work,
                                     block,ap,aw,alpha,factors);
             // Preserve the existing32-thread alpha consumer and alpha-last
             // producer: no changed barrier count, no new stage ownership.
             ap.consumer_wait(ar);
             lp.producer_acquire(lw);
-            int valid = min(int(work.seq_len-block*64),64);
             CUTE_UNROLL
             for (int k=lane; k<128; k+=32) last(k,lw.index())=alpha(valid-1,k,ar.index());
             cutlass::arch::fence_view_async_shared();

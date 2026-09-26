@@ -197,14 +197,13 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             // Consume the inherited alpha-last pipeline even though the scalar
             // prefix supplies the same value; do not change barrier counts.
             alp.consumer_wait(alr);
-            float last_log = alpha(valid-1,0,ar.index());
             float decay_h = smem.gate_factors[ar.index()*128+valid-1];
             CUTE_UNROLL
             for (int i=0; i<size(h); ++i) h(i) *= decay_h;
             CUTE_UNROLL
             for (int i=0; i<size(operand_delta); ++i) {
                 auto [dv,t] = c_value(i);
-                float gain = t<valid ? exp2f(last_log-alpha(t,0,ar.index())) : 0.f;
+                float gain = smem.relative_gate[relative_gate_index(ar.index(),t)];
                 operand_delta(i) = Element(float(operand_delta(i))*gain);
             }
             warpgroup_fence_operand(operand_delta);
