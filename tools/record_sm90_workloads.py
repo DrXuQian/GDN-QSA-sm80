@@ -136,7 +136,10 @@ def main():
     args = p.parse_args()
     result = record(args.root)
     args.out.write_text(json.dumps(result, indent=2) + "\n")
-    print({k: v for k, v in result.items() if k not in ("rows", "unfinished", "bindings")})
+    print({k: v for k, v in result.items() if k not in
+           ("rows", "unfinished", "bindings", "identity_epochs", "superseded_attempts")})
+    print(f"identity_epochs={len(result['identity_epochs'])} "
+          f"preserved_superseded_attempts={len(result['superseded_attempts'])}")
     for row in result["rows"]:
         print(f"{row['workload']:16s} g={row['gate']:4} {row['family']:10s} "
               f"S38={row['candidate']['median']:9.3f} S24={row['control']['median']:9.3f} "
