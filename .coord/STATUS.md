@@ -1,9 +1,9 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 07:51:01 UTC
+updated-at: 2026-09-26 07:52:03 UTC
 working-on: final handoff of bounded SM90 SASS campaign; S11 retained, target NOT MET
 blocked-on: native PPU1.7 SDK/model unavailable; no further H800 jobs required for this handoff
-last-commit: e228378 (main checkpoint before this report closure; best candidate kernel 457267e / branch head d3cf13a)
+last-commit: 59de89a (completed report/evidence commit; best candidate kernel 457267e / branch head d3cf13a; this status-only update may be newer)
 
 ## Active SM90 campaign
 
@@ -20,6 +20,10 @@ device cases pass. No strong-gate speed claim for a screened-out candidate.
 All20 admitted captures/1,416 forwards are hash-bound in the campaign JSON.
 Raw remote evidence has been downloaded with matching archive SHA256
 79cd3c8e9bc87a2b75731da88a5b3bb82b229d1869575f50aeb8a7cffeccbaa4.
+Final verification:33 SM90 host tests PASS on the best branch;2 actual-SASS
+parser tests and2 compiled-participant tests PASS. All20 nsys reports and60
+record/SQLite archive hashes verified. Experimental worktrees are clean and
+no own GPU benchmark/profiler process remains at the handoff checkpoint.
 Report:docs/SM90_FLASHINFER_SASS_20260926.md. Exact PCs, rejected ideas and
 next state-live-range hypothesis are recorded. Experimental branches pushed;
 main production code/default route and SM80/PPU1.0 remain unchanged. S11
