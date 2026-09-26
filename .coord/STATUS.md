@@ -1,11 +1,24 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 13:45:36 UTC
-working-on: user-directed full FlashInfer pipeline alignment S34; actual stages/resources compiled, raw admission next
+updated-at: 2026-09-26 14:03:00 UTC
+working-on: S34 rejected by paired timing; S35 reference state-body writing passed 14 cases and native identity, final native gate then paired profile
 blocked-on: native PPU1.7 SDK/model unavailable; fastest FlashInfer target not yet met
-last-commit: 3397d00; S34 kernel1736ecb/proofb290d18; incumbentS24 bc3c154/head06b7471 unchanged
+last-commit: a6eb544; S35 kernel d5fda8b/proof ee029a4; S34 head154925f; incumbent S24 bc3c154/head06b7471 unchanged
 
 ## Current checkpoint
+
+14:03 checkpoint: S34 complete reference stages/publication profile loses
+128.8165[127.425,129.601]us vs S24 120.704[120.129,121.761]; no promotion.
+S35 directly aligns state writing on S24: one first/min(T,64) body, middle,
+tail, and RNE packed NewV conversion. Actual iterator proof266240 visits/
+2negative plants PASS. Four native bodies local/measured identity24352sites
+PASS; scalar F2F removed, noinit HGMMA112->100, init144->116 (static clones,
+NOT claimed reduction in runtime GEMMs). Target noinit spill20->12B; init
+spill worsens28->92store/144loadB, explicitly not a universal improvement.
+14CPU cases and2raw overflow captures complete; parent binding/host tests
+and native completion gate closing before exclusive weak paired nsys.
+No full config sweep has been done. No further candidate in this inventory;
+14:30 handoff. PPU3.6 CUDA source-check PASS is NOT native PPU1.7 evidence.
 
 S31-S33 CLOSED loss/unresolved/unresolved;42CPUcases/6directstresses/216
 profiledforwards exactly re-extracted;no newwinner. User corrected methodology:
