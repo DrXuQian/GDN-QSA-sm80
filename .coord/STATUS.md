@@ -1,11 +1,44 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 18:07:11 UTC
-working-on: expanded matrix and S39-S46 bounded followups closed; next chunk-parallel auxiliary preparation design registered, not implemented
+updated-at: 2026-09-26 18:53:03 UTC
+working-on: S47 complete-call diagnostics closed/rejected; S48 V128 native/maps pass, remote build then fixed numerics underway
 blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: 533a402 checkpoint; S42bbddadd/S4374e2e8c/S44a3a6089/S45-S4661093ac; harness5f5905b
+last-commit: 57aa0b1 main; S47 8bd9fe4; S48 164560e; prepared harness364535e
 
 ## Current checkpoint
+
+2026-09-26 18:53:03 UTC: S47 14CPUparentraw+2extremesPASS, actualprepare4/state2
+CTA slots,69CPUharness testsPASS(CUDAhidden). Graph2B1winsS24/2B2losses.
+Two diagnostic nsys144forwards: B1sum106.654 versusS38 99.454 andFI112.862;
+B2sum161.277 versusS24 127.598 andFI114.958. No promotion. Stage medians
+prepare26.7035/51.375,state80.1105/110.014(B1/B2); both child kernels counted.
+Allraw data nowlocal,SQLite locallyreimported. Reportdocs/SM90_PRECOMPUTED_AUX_20260926.md.
+S48registered18:45:55beforeedit: V128two-stateWG sharesQ/K/prepared reads,
+samepreparernativeopcodes. Native6bodies0spill,state168staticregs/118528Bdynamic,
+384threads; actualmaps+1..8chunkdependencyprogressPASS. Remotecompilethen
+numerics session40630; sourcechecksession80307. Performance NOT_RUN forS48.
+No concurrent GPUjobs, no clocks/power/reference/default/SM80 changes.
+ExpandedgoalNOTMET; H800ON, nativePPU17SKIP.
+
+18:35 UTC: S47 local/remote CUDA native SASS identical SHA03cef08c1506ba60...
+Six bodies asynchronous, all0stack/0spill; state128 staticregs withactual
+setmaxnreg192/load24,102144Bdynamicshared; prepare95regs50560Bdynamicshared.
+Initial build gate caught1072B per-thread parameter copy and generic store;
+using the same grid-constant Params contract as CUTLASS removed it. Old FAIL
+preserved, not re-labelled. Actual8192-cell STSM/image/reader map+2negatives
+PASS; full1..8chunk pipeline progress+3negative gates PASS, not memory-order
+proof. Native9negative gates PASS. Complete-two-kernel nsys accounting22CPU
+testsPASS, including fast-state/slower-total negative. Both launches counted.
+14numerical cases+2stress andactual2residentCTA query now start sequentially;
+performance NOT_RUN. PPU3.6sourcecheck compiling; nativePPU remains SKIP.
+No default/SM80 changes; expandedgoal NOTMET, H800 remainsON.
+
+18:17 UTC: 57aa0b1 push confirmed; S47 isolated worktree and plan registered
+at /workspace/gdn-sm90-precomputed-aux-20260926 before kernel edits.
+Deadline20:00 for this bounded compile/numeric/screen round. Both child
+kernels count in complete forward; fixed14workload inventory retained.
+No GPU work yet;18:15:39 exacthost/UUID idle0%,0MiB, no foreign process.
+H800 remains ON, expanded goal unmet; nativePPU17 SKIP as before.
 
 18:07 UTC: S45 numerical14CPUparentraw+2stressPASS,8replay/graphoutputsPASS,
 butall4 B1/B2gate screensLOSE(~127vs117us); no promotion ornsysfinalist.
