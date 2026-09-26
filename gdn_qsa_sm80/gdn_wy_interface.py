@@ -1,19 +1,12 @@
 """Explicit experimental WY backend. Does not change original auto routing."""
-from functools import lru_cache
-from importlib import util
-import os
-from pathlib import Path
+from .backends.loading import load_wy, clear_backend_cache
 
 
-@lru_cache(maxsize=1)
 def _backend():
-    path = os.environ.get("GDN_QSA_WY_EXTENSION")
-    if not path or not Path(path).is_file():
-        raise RuntimeError("set GDN_QSA_WY_EXTENSION to the built _gdn_wy_ppu*.so")
-    spec = util.spec_from_file_location("_gdn_wy_ppu", Path(path).resolve())
-    module = util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return load_wy()
+
+
+_backend.cache_clear = clear_backend_cache
 
 
 PACKED_DELIVERIES = ("prepare", "state", "output", "all")

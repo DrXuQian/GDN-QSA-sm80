@@ -1,9 +1,65 @@
 # PPU original-structure port
 
-updated-at: 2026-09-25 15:25:34 UTC
-working-on: static solve A/B published; awaiting user box numerical admission and complete ACU capture
-blocked-on: device verdict not measured locally; retained HV/default routing unchanged
-last-commit: ec6e5d4 (published static solve, tested8434d88/577ef7d identical tree)
+updated-at: 2026-09-26 02:03:13 UTC
+working-on: backend boundary implementation fully verified locally; committing and publishing unchanged legacy kernel bodies
+blocked-on: none for boundary refactor; independent SM90/PPU1.7 algorithms remain next work, legacy solve-static box verdict pending
+last-commit: e2c4e7a (parent; boundary refactor in isolated worktree)
+
+## Boundary implementation in progress
+
+/workspace/gdn-backend-boundaries-20260926. Split legacy primitive header into
+CUDA SM80 / PPU AIU files without arithmetic edits. Isolate legacy PPU CMake
+source graph. One JSON target catalog drives CMake, setuptools and new opt-in
+complete-forward API; existing APIs/default algorithms retained. PPU1.5 policy
+stays actlize but distinct target is not falsely claimed implemented. SM90 and
+PPU1.7 are explicitly unavailable until complete kernels are admitted.
+Next: negative tests, actual full compile/link and old native-body comparison.
+No speed claim, no device launch, no threshold/default promotion.
+
+01:48UTC checkpoint: PPU full build/link passed, 23/23 CTest and 95 existing
+contract tests passed. All36 WY/residual and15 original native kernel instruction
+sequences+operands match parent exactly (67815+42477 static sites). Empty body,
+missing kernel, changed operand and reordered instruction negatives all red.
+21 new boundary/dispatch/loader tests passed; added two further target/cache
+checks under verification. CUDA SM80 before/after compile+link is running.
+
+01:57UTC: CUDA SM80 all6 device TUs compiled/linked before+after; all15 native
+kernels/31200 sites incl encoding+control bits IDENTICAL (only source-path
+identifier lines excluded). New boundary tests26/26 passed. ACU archive now
+includes moved target headers/build modules/catalog, with omission negatives.
+Final full local replay running after these last source-bundle/build changes.
+Precision difference remains explicit: original BF16 state versus WY/residual
+FP32 state; unified call entry does not cast, auto-switch or erase this contract.
+
+02:03UTC complete-replay.log exit0:23/23CTest,26/26new boundary tests,
+96/96existing+archive contracts,7/7dialect,45WY+61residual algebra PASS.
+PPU51/51native bodies+operands+fullresources identical; CUDA15/15 SASS including
+encoding/control bits identical. Actual CUDA6TU before/after link and PPU2DSO+
+2Python binding link PASS. Setuptools real --name entry PASS. No device run.
+False implemented flag cannot borrow legacy builder or produce empty success;
+initial-state omission, mismatched target, stale loader selection and missing
+source-bundle dependency negatives red. Report BACKEND_BOUNDARIES_20260926.md.
+
+## Current design checkpoint
+
+Inspected PPU CUTLASS3.6.0 commit023e82d: explicit ACOMPUTE10700 ->90a;
+standard BF16/FP16 TMA/GMMA separate from FP8/FP4 extensions. Legacy GDN's
+GDN_QSA_PPU branch is AIU-specific, so replacing include paths is not a port.
+User policy: PPU1.0/1.5 retain actlize; PPU1.7 uses the supplied CUTLASS fork.
+
+Proposed docs/BACKEND_ARCHITECTURE.md separates algorithm/numerical contract,
+execution family and target/toolchain. Share API/oracle/registry; private DAG,
+workspace and pipeline per implementation. No full Cartesian-product promise,
+no cross-algorithm RAW-BIT claim, no loss of existing scan/reset winners.
+cuLA C++ fused KDA is not automatically scalar-gate GDN; latest FlashInfer GDN
+is DSL, so it is an algorithm reference, not a new shipping DSL dependency.
+This checkpoint changes documentation only. No kernel/build/default-route edit,
+native compile, simulator job or box launch. Source/worktree:
+/workspace/gdn-backend-design-20260926. Design remains a proposal, not a new API.
+Documentation diff checks passed; only this STATUS and the design document changed.
+Recorded locally; no remote branch update was needed for the design discussion.
+
+## Previous static-solve handoff
 
 User authorized next step. Worktree /workspace/gdn-wy-solve-static-20260925;
 plan/evidence /workspace/gdn-wy-solve-static-evidence-20260925. Only diagonal

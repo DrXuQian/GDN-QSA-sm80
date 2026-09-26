@@ -5,6 +5,8 @@ from importlib import import_module
 # A GDN-only installation must not need the three unrelated NVIDIA extensions.
 # Symbols and default NVIDIA behavior are unchanged; load the chosen op lazily.
 _MODULES = {
+    "gdn_forward": "gdn_interface",
+    "backend_inventory": "backends",
     "gdn_chunk": "gdn_chunk_interface",
     "gdn_chunk_reference": "gdn_chunk_interface",
     "gdn_chunk_twolevel": "gdn_chunk_interface",
@@ -33,6 +35,8 @@ def __getattr__(name):
 __version__ = "0.1.0"
 __all__ = [
     # GDN
+    "gdn_forward",
+    "backend_inventory",
     "gdn_chunk",
     "gdn_chunk_twolevel",
     "gdn_chunk_wy",
