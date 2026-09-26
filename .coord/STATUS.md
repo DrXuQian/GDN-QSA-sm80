@@ -1,11 +1,21 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 15:39:00 UTC
+updated-at: 2026-09-26 15:45:33 UTC
 working-on: frozen S24/S38 multi-workload admission; 14 workloads x2 gates x2 libraries, sequential nsys captures
 blocked-on: native PPU1.7 SDK/model unavailable; expanded speed coverage pending (not blocked on user)
-last-commit: 9f9db1b checkpoint; multi-workload harness388f212 pushed; S38 kernelc490c8d immutable
+last-commit: 8a4f454 primary result/expanded-scope report; multi-workload recorder71534d6; S38 kernelc490c8d immutable
 
 ## Current checkpoint
+
+15:45 UTC: expanded matrix10/56 capturePASS,0numericFAIL,1running,45pending.
+Oldanchor4/4 reproducesS38win. B2bothgates: S38~194/197us vsS24~125/127us
+vsFI114/116us LOSES; QLA218/221us stilllosesS38. B2 is a genuine counterexample
+to unconditionalVsplit; do not hide viaoverallmean. Seq512weakwins30.29vs31.81usFI.
+OneCTA/SM and128splitCTAs on114SM explain a newwave boundary to investigate;
+no kernel changes yet. Registeredmatrix continues sequential session52749.
+10actualCPUadapter testsPASS includingmissing/loss/failedcapturegoal negatives.
+H800 staysON; target acrossexpandedcases NOTMET. Scope-specificlesson appended
+to ppu17-hopper-porting/performance.md; nativePPU17 remainsSKIP.
 
 15:39 UTC: primary closure7captures/480forwards EXACT_SQLITE_REEXTRACTION,
 allS38 referenceswin inclfreshFI confirmations101.457/101.329 vs112.737us.
