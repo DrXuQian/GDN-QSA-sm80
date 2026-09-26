@@ -41,6 +41,8 @@ def main():
     from profile_sm90_libraries import build_receipt
     torch.set_num_threads(1)
     torch.set_grad_enabled(False)
+    if os.getenv("CUDA_VISIBLE_DEVICES") not in (None, "0"):
+        raise ValueError("require the unremapped single H800 host")
     watch = DeviceWatch(0)
     rows = []
     result = dict(scope="H800_GRAPH_SCREEN_NOT_NSYS_ADMISSION", denominator=12,
@@ -51,6 +53,13 @@ def main():
             watch.sample(idle=True)
             time.sleep(.2)
         watch.thread.start()
+        props = torch.cuda.get_device_properties(0)
+        if (props.major, props.minor) != (9, 0) or "H800" not in props.name:
+            raise ValueError("this screen requires the admitted physical H800")
+        if any(r["telemetry"].split(",")[0] != "GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c" for r in watch.records):
+            raise ValueError("physical device identity differs")
+        result.update(device=props.name, sms=props.multi_processor_count,
+                      torch=torch.__version__, cuda=torch.version.cuda)
         for candidate in admission["rows"]:
             control = (Path("/workspace/gdn-sm90-value-split-20260926/s38-build") if candidate["id"] == "s41"
                        else Path("/workspace/gdn-sm90-win-20260926/relative-build"))
@@ -131,6 +140,8 @@ def main():
         watch.stop.set()
         if watch.thread.ident is not None:
             watch.thread.join(timeout=22)
+        if watch.thread.is_alive() or watch.errors:
+            result.update(status="FAIL", error="incomplete exclusive device evidence")
         result.update(updated_at=datetime.now(timezone.utc).isoformat(), device_watch=dict(records=watch.records, errors=watch.errors))
         (a.out / "screen.json").write_text(json.dumps(result, indent=2) + "\n")
     if watch.thread.is_alive() or watch.errors:
