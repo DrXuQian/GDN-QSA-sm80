@@ -14,7 +14,7 @@ sys.path[:0]=[str(ROOT),str(ROOT/'benchmarks'),str(ROOT/'tests')]
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--candidate',choices=('s45','s49','s50','s51','s52','s53'),default='s45')
+    parser.add_argument('--candidate',choices=('s45','s49','s50','s51','s52','s53','s54','s55'),default='s45')
     choice=parser.parse_args().candidate
     import torch
     from bench_sm90_hopper import DeviceWatch
@@ -24,7 +24,9 @@ def main():
                's50':'/workspace/gdn-sm90-paired-tail-20260927',
                's51':'/workspace/gdn-sm90-local-inverse-20260927',
                's52':'/workspace/gdn-sm90-v64-paired-tail-20260927',
-               's53':'/workspace/gdn-sm90-inverse-tail-20260927'}[choice])
+               's53':'/workspace/gdn-sm90-inverse-tail-20260927',
+               's54':'/workspace/gdn-sm90-independent-tail-20260927',
+               's55':'/workspace/gdn-sm90-v64-inverse-tail-20260927'}[choice])
     parent=Path('/workspace/gdn-sm90-win-20260926')
     build=root/(choice+'-build')
     binary=next(build.glob('_gdn_fused_sm90*.so'))
@@ -51,14 +53,21 @@ def main():
                 run('native-'+label,[root/'source/dev/backends'/checker,
                     '--candidate',build/'codegen/image.sass','--parent',Path(control)/'codegen/image.sass',
                     '--device-log',build/'device.log'])
-        elif choice in ('s50','s51','s52'):
-            checker='check_sm90_inverse_local.py' if choice=='s51' else 'check_sm90_paired_tail.py'
+        elif choice=='s54':
+            run('native-source',[root/'source/dev/backends/check_sm90_independent_tail.py',
+                '--candidate',build/'codegen/image.sass',
+                '--parent','/workspace/gdn-sm90-paired-tail-20260927/s50-build/codegen/image.sass',
+                '--device-log',build/'device.log'])
+        elif choice in ('s50','s51','s52','s55'):
+            checker='check_sm90_inverse_local.py' if choice in ('s51','s55') else 'check_sm90_paired_tail.py'
             native_parent=(Path('/workspace/gdn-sm90-value-split-20260926/s38-build')
                            if choice=='s52' else parent/'relative-build')
-            if choice=='s52':
+            if choice=='s55':
+                native_parent=Path('/workspace/gdn-sm90-v64-paired-tail-20260927/s52-build')
+            if choice in ('s52','s55'):
                 flags=json.loads((build/'build.json').read_text())['flags']
                 if '-DGDN_SM90_VALUE_SPLIT_AUX_REGS=232' not in flags:
-                    raise ValueError('S52 must compile the registered V64/aux232 geometry')
+                    raise ValueError('V64 candidate must compile the registered aux232 geometry')
             run('native-source',[root/'source/dev/backends'/checker,
                 '--candidate',build/'codegen/image.sass','--parent',native_parent/'codegen/image.sass',
                 '--device-log',build/'device.log'])
