@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bind S72 exact exponent producer and unchanged alpha-ring lifetime."""
+"""Bind S73 exact exponent producer,32/96/192 roles and alpha lifetime."""
 import argparse
 from collections import Counter
 import hashlib
@@ -46,11 +46,16 @@ def native(candidate,parent,log):
     c,p=bodies(candidate),bodies(parent)
     if c.keys()!=p.keys() or len(c)!=4:raise ValueError('four-body denominator changed')
     result={}
-    fixed=('HMMA','HGMMA','UTMA','WARPGROUP','USETMAXREG','BAR.','SYNCS')
+    fixed=('HMMA','HGMMA','UTMA','WARPGROUP','BAR.','SYNCS')
     for key,rows in c.items():
         cc,pc=Counter(o for _,o,_ in rows),Counter(o for _,o,_ in p[key])
         if {o:n for o,n in cc.items() if o.startswith(fixed)} != {o:n for o,n in pc.items() if o.startswith(fixed)}:
             raise ValueError('matrix/TMA/barrier/register role protocol changed')
+        roles={(op,args.strip()) for _,op,args in rows if op.startswith('USETMAXREG')}
+        expected={('USETMAXREG.DEALLOC.CTAPOOL','0x20'),
+                  ('USETMAXREG.DEALLOC.CTAPOOL','0x60'),
+                  ('USETMAXREG.TRY_ALLOC.CTAPOOL','UP0, 0xc0')}
+        if roles!=expected:raise ValueError('not the registered32/96/192 role tuple')
         intervals=[]
         for data,expected in ((p[key],30),(rows,0)):
             indices=[i for i,(_,o,_) in enumerate(data) if o.startswith('HGMMA')]
