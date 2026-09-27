@@ -42,7 +42,7 @@ get_register_requirements(
     uint32_t reg_alloc_granularity = 8;
 
 #if !defined(FLAT_DEBUG_PRINT) || !FLAT_DEBUG_PRINT
-    uint32_t load_registers = 40 - 2 * reg_alloc_granularity;
+    uint32_t load_registers = 32; // S73 exact decay producer; aux becomes96.
 #else
     uint32_t load_registers = 40;
 #endif

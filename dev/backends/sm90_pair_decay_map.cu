@@ -19,7 +19,7 @@ void need(bool ok) {if(!ok) throw std::runtime_error("pair-decay map/bank/denomi
 template<class Gate,bool Initial> void type() {
     using T=Types<Gate,Initial>;using K=typename T::Kernel;
     static_assert(K::MaxThreadsPerBlock==512 && K::SharedStorageSize+1024<=232448);
-    static_assert(K::LdStRegisterRequirement==24 && K::AuxMmaRegisterRequirement==104 && K::StateMmaRegisterRequirement==192);
+    static_assert(K::LdStRegisterRequirement==32 && K::AuxMmaRegisterRequirement==96 && K::StateMmaRegisterRequirement==192);
     static_assert(T::Collective::StagesAlpha::value==2);
     static_assert(sizeof(std::declval<typename T::Collective::SharedStorage>().pair_decay)==32768);
     std::cout<<"S72 gate_float="<<std::is_same_v<Gate,float><<" initial="<<Initial<<" shared="<<K::SharedStorageSize<<"\n";
