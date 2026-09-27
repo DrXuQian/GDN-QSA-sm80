@@ -160,18 +160,6 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
                 cutlass::arch::NamedBarrier::arrive_and_wait(128,Barriers::StateMathWG0);
             }
             ap.consumer_wait(ar);
-            qp.consumer_wait(qr);
-            auto acc_o = partition_fragment_C(o1_thread,Shape<Value,_64>{});
-            if constexpr (!first) {
-                state_product(o1_mma,o1_thread,q_desc(_,_,_,qr.index()),acc_o);
-                CUTE_UNROLL
-                for (int i=0; i<size(acc_o); ++i) {
-                    auto [dv,t] = c_output(i);
-                    acc_o(i) *= smem.gate_factors[ar.index()*128+64+t];
-                }
-            }
-            qp.consumer_release(qr); ++qr;
-
             kp.consumer_wait(kr);
             auto acc_sk = partition_fragment_C(sk_thread,Shape<Value,_64>{});
             if constexpr (!first) {
@@ -211,6 +199,21 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             bp.consumer_release(br); ++br;
 
             auto operand_delta = kda::sm90::collective::make_acc_into_op<Element>(acc_delta,typename Base::TiledMmaKV::LayoutA_TV{});
+            // The whole V128 single-WG path cannot keep H128, O1_64 and
+            // SK64 in FP32 simultaneously. Produce O1 only after NewV has
+            // become its existing BF16 operand; shared H still contains the
+            // same rounded pre-update state and is not overwritten here.
+            qp.consumer_wait(qr);
+            auto acc_o = partition_fragment_C(o1_thread,Shape<Value,_64>{});
+            if constexpr (!first) {
+                state_product(o1_mma,o1_thread,q_desc(_,_,_,qr.index()),acc_o);
+                CUTE_UNROLL
+                for (int i=0; i<size(acc_o); ++i) {
+                    auto [dv,t] = c_output(i);
+                    acc_o(i) *= smem.gate_factors[ar.index()*128+64+t];
+                }
+            }
+            qp.consumer_release(qr); ++qr;
             qkp.consumer_wait(qkr);
             warpgroup_fence_operand(operand_delta);
             warpgroup_fence_operand(acc_o);
