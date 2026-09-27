@@ -6,6 +6,7 @@
 #include "ordered_pair.cuh"
 #include "aux_chunk_loop.cuh"
 #include "relative_gate_layout.cuh"
+#include "aux_causal_sectors.cuh"
 
 namespace gdn::sm90 {
 
@@ -170,8 +171,8 @@ struct ScalarGdnAux : Base {
             bp.consumer_wait(br);
             auto out_qk = make_fragment_like<Element>(acc_qk);
             auto out_kk = make_fragment_like<Inverse>(acc_kk);
-            CUTE_UNROLL
-            for (int i = 0; i < size(coords); ++i) {
+            auto compute_cell = [&](auto index) __attribute__((always_inline)) {
+                constexpr int i=decltype(index)::value;
                 auto [row, col] = coords(i);
                 bool live = row >= col;
                 if constexpr (!cute::is_static<decltype(valid_tag)>::value)
@@ -189,7 +190,12 @@ struct ScalarGdnAux : Base {
                 // Inverse expects positive lower input, garbage diagonal and
                 // zero upper triangle, then applies beta along its columns.
                 out_kk(i) = Inverse(live ? acc_kk(i) * row_beta * decay : 0.f);
-            }
+            };
+            auto clear_cell = [&](auto index) __attribute__((always_inline)) {
+                out_qk(index)=Element(0.f);
+                out_kk(index)=Inverse(0.f);
+            };
+            for_aux_causal_sectors<decltype(mma)>(tid,compute_cell,clear_cell);
             kkp.producer_acquire(kw);
             qkp.producer_acquire(qw);
             copy(store_qk, tq.retile_S(out_qk), tq.partition_D(qk(_,_,qw.index())));
