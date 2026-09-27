@@ -1,11 +1,23 @@
 # PPU original-structure port
 
-updated-at: 2026-09-27 06:25:50 UTC
-working-on: 13/16 high-head nsys captures complete; audit relaxed majority-win/remaining-loss<=5% target, then seal evidence before authorized H800 shutdown
+updated-at: 2026-09-27 06:32:02 UTC
+working-on: revised performance condition MET; save and verify all remote evidence before authorized H800 shutdown, then local source cleanup and PPU1.0 transfer
 blocked-on: native PPU1.7 SDK/model unavailable; pinned weak-GVA1 QLA fails original 2% numerical gate and is excluded from speed, not counted as a win
-last-commit: 75ea0ac main; S74 86c3ef6; S73 31289c6; harness d859d80
+last-commit: a73e4b8 main; S74 86c3ef6; S73 31289c6; harness d859d80
 
 ## Current checkpoint
+
+2026-09-27 06:32:02 UTC: final16 high-head captures / 1,056 complete forwards
+locally re-extracted EXACT. Fixed14x2x2 composite ledger: FI20W/8L (largest
+median loss4.8565%), QLA25W/2U/1reference numericalFAIL; 17/28 scenarios
+strictly beat both references. User's relaxed majority/<=5% condition MET.
+Fastmath does not consistently win; retain standard. Original disjoint-range
+verdicts are unchanged, including8LOSS and2U. This is NOT an integrated
+library certificate. Full Git-history bundle verified; all remote experiment
+sources/reports/binaries being copied to data-disk-backed closure archive.
+H800 still ON until archive checksum verification and exact idle-identity
+check. User order is shutdown THEN local cleanup/PPU1.0 transfer; no more
+performance sweeps. Docs/SM90_H800_CLOSURE_20260927.md records final scope.
 
 2026-09-27 06:25:50 UTC: all8 FI captures completed. Standard S69 median
 losses are 3.23--4.86%, within the user's newly authorized 5% closure limit;

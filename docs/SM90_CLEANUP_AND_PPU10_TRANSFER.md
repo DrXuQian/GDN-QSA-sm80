@@ -1,16 +1,21 @@
 # Integration and PPU1.0 transfer boundary
 
 Status: plan/analysis, not a new shipping route or PPU performance claim.
-Registered 2026-09-27 03:04:25 UTC. User requests cleanup and H800 shutdown after
-the expanded performance objective is closed. The objective is still open.
+Registered 2026-09-27 03:04:25 UTC. Updated 06:29 UTC: the user relaxed closure
+to majority wins and remaining median losses <=5%, and explicitly ordered
+H800 shutdown before local cleanup/PPU1.0 transfer. That performance condition
+is met; see `SM90_H800_CLOSURE_20260927.md` for the complete denominator.
 
 ## Close performance before replacing the public path
 
 Keep the fixed14-workload x2gate inventory, exact pinned references and all
 complete-forward kernel sums. A lower graph/API median is not admission.
 Retain the reference numerical failure separately; it is not our speed win.
-Repeat the integrated selector on the entire inventory before shutdown;
-composite per-experiment wins do not certify a newly linked library.
+Composite per-experiment wins do not certify a newly linked library. Under
+the revised user order, stop the H800 after durable evidence, then perform
+local cleanup with source/native-equivalence gates. A changed integrated
+binary remains device-unverified until it has its own numerical/performance
+admission; do not relabel the retained composite evidence.
 Save raw reports, source/dependency/build identities and all losing results,
 verify the local artifact copy, commit/push the code, then close the exact
 user-authorized H800 instance. Do not stop another GPU job or change hardware
