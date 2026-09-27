@@ -1,11 +1,24 @@
 # PPU original-structure port
 
-updated-at: 2026-09-27 05:09:30 UTC
-working-on: S68 rejected all6screens; matched S50/FI SASS audit closed; S69 pure packed-NewV conversion nativePASS, numeric admission restart after checker bundle-dependency failure
+updated-at: 2026-09-27 05:31:00 UTC
+working-on: S69 full nsys reextracted still loses FI by4.1%; S70/S71 native-rejected; S72 exact pair-decay producer channel compiling/maps, no route changes
 blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: c324e21 main; S55 6317ea4; S68 f84e0d6; S69 0d3fc4b; harness e42643d
+last-commit: b2cbcd3 main; S69 d29ba16; S70 4d5f418; S71 eaae228; S72 83884e0; harness12e63bb
 
 ## Current checkpoint
+
+2026-09-27 05:31:00 UTC: S69 all14CPUparentRAW+2stress/repeatsPASS. Six
+graphscreens3wins/3unresolved. Four nsys captures264completeforwards locally
+reextracted exact. B2S69 weak/strong118.897/119.569us vs fastestFI114.129/
+114.913; stillREFERENCE-WINS. VersusS50 median improves~2.2–2.5% but full
+sample ranges overlap in all4epochs, hence no formal parent speed admission.
+QLA still clearly slower; no new target cell closed. S70 packed+state184
+again all4C7512 (112/144MMA andsamewait counts), compile-rejected. S71 16EX2
+tuples reallyhalvebranches but fastblock contains2STL and initialstack120>
+104, reject before GPU. S72 registered05:29: move identical pair-decay
+exp2f onto existing32-thread alpha producer under unchanged ring lifetime;
+32KiBextra shared and4096stores/reads priced, not assumed free. Compile/maps
+before device; no GPU job active. H800ON, full goal notmet.
 
 2026-09-27 05:09:30 UTC: matched measured B2S50/FI auxiliary1064/920sites,
 state665/642. Matrix counts equal. FI explicitlyfastmathEX2; standardexp2f
