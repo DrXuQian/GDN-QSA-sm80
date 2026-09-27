@@ -46,9 +46,10 @@ get_register_requirements(
 #else
     uint32_t load_registers = 40;
 #endif
-    // Leave two 192-register state warpgroups alongside LD/ST24 + auxiliary104.
-    // The auxiliary role must release its share before state can acquire it.
-    uint32_t total_aux_load_budget = 128;
+    // S70, isolated experiment after packed NewV conversion:24/120/184/184.
+    // The previous unpacked parent serialized at this tuple; native gates
+    // must reject it again if the shorter conversion lifetime is insufficient.
+    uint32_t total_aux_load_budget = 144;
     uint32_t aux_registers = total_aux_load_budget - load_registers;  // (24 + X) or (40 + X)
 
     uint32_t total_registers =
