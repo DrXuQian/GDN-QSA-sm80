@@ -14,18 +14,19 @@ sys.path[:0]=[str(ROOT),str(ROOT/'benchmarks'),str(ROOT/'tests')]
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--candidate',choices=('s45','s49'),default='s45')
+    parser.add_argument('--candidate',choices=('s45','s49','s50'),default='s45')
     choice=parser.parse_args().candidate
     import torch
     from bench_sm90_hopper import DeviceWatch
     from profile_sm90_libraries import build_receipt
-    root=Path('/workspace/gdn-sm90-late-o1-20260926' if choice=='s45' else
-              '/workspace/gdn-sm90-paired-state-20260926')
+    root=Path({'s45':'/workspace/gdn-sm90-late-o1-20260926',
+               's49':'/workspace/gdn-sm90-paired-state-20260926',
+               's50':'/workspace/gdn-sm90-paired-tail-20260927'}[choice])
     parent=Path('/workspace/gdn-sm90-win-20260926')
     build=root/(choice+'-build')
     binary=next(build.glob('_gdn_fused_sm90*.so'))
     identity=build_receipt(binary,'cuda_sm90','native')
-    out=root/('s45-admission-r2' if choice=='s45' else 's49-admission');out.mkdir()
+    out=root/('s45-admission-r2' if choice=='s45' else choice+'-admission');out.mkdir()
     row=dict(id=choice,root=str(root),build=str(build),status='RUNNING',
              binary_sha256=identity['extension_sha256'])
     result=dict(denominator=1,rows=[row],performance='NOT_RUN',routing='UNCHANGED')
@@ -40,11 +41,16 @@ def main():
         if any(r['telemetry'].split(',')[0]!='GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c' for r in watch.records):
             raise RuntimeError('unexpected device identity')
         watch.thread.start()
-        native='check_sm90_late_o1_native.py' if choice=='s45' else 'check_sm90_paired_state_native.py'
-        progress='check_sm90_late_o1.py' if choice=='s45' else 'check_sm90_paired_state.py'
-        run('native',[root/'source/dev/backends'/native,build/'codegen/image.sass',
-            parent/'relative-build/codegen/image.sass','--device-log',build/'device.log'])
-        run('progress',[root/'source/dev/backends'/progress])
+        if choice=='s50':
+            run('native-progress',[root/'source/dev/backends/check_sm90_paired_tail.py',
+                '--candidate',build/'codegen/image.sass','--parent',parent/'relative-build/codegen/image.sass',
+                '--device-log',build/'device.log'])
+        else:
+            native='check_sm90_late_o1_native.py' if choice=='s45' else 'check_sm90_paired_state_native.py'
+            progress='check_sm90_late_o1.py' if choice=='s45' else 'check_sm90_paired_state.py'
+            run('native',[root/'source/dev/backends'/native,build/'codegen/image.sass',
+                parent/'relative-build/codegen/image.sass','--device-log',build/'device.log'])
+            run('progress',[root/'source/dev/backends'/progress])
         run('cases',[ROOT/'tests/run_sm90_hopper_cases.py','--extension',binary,'--backend','cuda_sm90','--out',out/'cases'])
         expected=json.loads((parent/'relative-cases/cases.json').read_text())
         actual=json.loads((out/'cases/cases.json').read_text())
