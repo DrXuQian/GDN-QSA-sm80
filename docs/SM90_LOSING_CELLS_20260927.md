@@ -147,11 +147,37 @@ PPU3.6CUDA source-check PASS; nativePPU1.7 remains SKIP, not an H800 inference.
   UNRESOLVED with slightly slower medians. Reject as a speed candidate; no
   reference promotion. Earlier O publication did not improve complete forward.
 
-S59 is separately registered on S50: batch eight exponent values behind a
-real uniform fast/fallback branch, leaving the common epilogue outside. It
-must avoid the failed whole-epilogue duplication and still-executed per-value
-guard of S25/S27. Native branch and exact underflow seam are preconditions;
-no S59 device result yet. Deadline03:35UTC.
+S59/6ecd300 is rejected before device testing: the compiler if-converted the
+full-chunk branches despite inline `bra.uni`. Tail branches alone do not
+admit the intended experiment. No speed result is claimed.
+
+S60/37e7d13 changes only that dispatch to indexed uniform branches. All four
+native bodies retain eight real tuple branches; exact target-table bytes and
+hoisted definitions are checked, with five negative controls. The actual
+1,572,874-input seam is byte-identical to standard exp2f, including underflow;
+197 producer fixtures/all32lanes pass. Full numerical/replay admission passes.
+But six high-head graph screens give four parent losses/two unresolved:
+B2 114.982/113.468 versusS50 112.822/111.438us, B4 249.140/244.520 versus
+242.592/238.120us, Hv64 114.020/114.804 versus113.596/112.704us. Rejected;
+real instruction suppression still is not a full-forward speedup.
+
+S61/9f9c2e7 gives each next8->16 inverse-merge warp its two8x8 diagonals,
+replacing the first cross-warp publication by warp-local synchronization.
+Actual4096-cell physical ownership/four negatives pass. All four native
+bodies remove two CTA barriers and preserve matrix work. The source-bound
+PTX warp fence remains; native compilation elides its explicit opcode at
+this straight-line seam. Stack24/112B versus16/104B is an explicit cost.
+Numerical/replay admission passes, but all six high-head screens overlap
+the S50 parent and have slightly slower medians. Rejected. Fewer barriers
+alone did not improve the pipeline. No reference nsys capture for S60/S61.
+
+S62 is independently registered on S50: issue next-chunk KK before current
+inverse, retain its accumulator and K slot through next QK completion. All
+1..8-chunk source-bound ring interleavings terminate; making K single-stage
+or omitting final publication is rejected. Four native bodies keep KK live
+across14inverse HMMA sites with disjoint registers and no premature retirement.
+Its extra liveness increases stack to88/152B, so overlap is not a speed claim.
+Fixed numerical admission and six screens are pending, deadline04:15UTC.
 
 Each has a pre-edit plan, fixed deadline and independent worktree under
 /workspace. GPU work is sequential and DeviceWatch-gated. H800 remains on.
