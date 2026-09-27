@@ -15,7 +15,9 @@ sys.path[:0]=[str(ROOT),str(ROOT/'benchmarks'),str(ROOT/'tests')]
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--candidate',choices=('s45','s49','s50','s51','s52','s53','s54','s55','s56','s57','s58','s60','s61','s62','s63','s64','s65','s66','s68','s69'),default='s45')
-    choice=parser.parse_args().candidate
+    parser.add_argument('--out',type=Path,help='fresh evidence directory; existing results are never overwritten')
+    args=parser.parse_args()
+    choice=args.candidate
     import torch
     from bench_sm90_hopper import DeviceWatch
     from profile_sm90_libraries import build_receipt
@@ -43,7 +45,8 @@ def main():
     build=root/(choice+'-build')
     binary=next(build.glob('_gdn_fused_sm90*.so'))
     identity=build_receipt(binary,'cuda_sm90','native')
-    out=root/('s45-admission-r2' if choice=='s45' else choice+'-admission');out.mkdir()
+    out=args.out or root/('s45-admission-r2' if choice=='s45' else choice+'-admission')
+    out.mkdir()
     row=dict(id=choice,root=str(root),build=str(build),status='RUNNING',
              binary_sha256=identity['extension_sha256'])
     result=dict(denominator=1,rows=[row],performance='NOT_RUN',routing='UNCHANGED')
