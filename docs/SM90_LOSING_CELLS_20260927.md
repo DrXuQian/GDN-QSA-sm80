@@ -1,6 +1,6 @@
 # Closing the remaining SM90 GDN losses
 
-Checkpoint:2026-09-27 02:21:53 UTC. Physical H800 PCIe,114SMs,CUDA12.8.93.
+Checkpoint:2026-09-27 02:45:54 UTC. Physical H800 PCIe,114SMs,CUDA12.8.93.
 The fixed14-workload inventory and both gate regimes are unchanged. This is
 not a native PPU1.7 result. No default routing, SM80, reference, clock, power
 or numerical-tolerance change. **Expanded speed goal remains unmet.**
@@ -134,8 +134,24 @@ PPU3.6CUDA source-check PASS; nativePPU1.7 remains SKIP, not an H800 inference.
 - S57 parentS50: separately publish completed inverse KK before acquiring the
   QK output slot. This explicitly retries S20's old losing axis after S50
   extended QK consumption through KV completion. Register pressure and native
-  ordering must be checked again. No assumed additive gain; six high-head
-  screens and the same full correctness gate registered, deadline03:05UTC.
+  ordering were checked again. Actual4type offsets, native full/tail and
+  outlined retry paths and all numerical/replay gates pass. Six high-head
+  screens are all UNRESOLVED with slightly slower medians; no promotion.
+- S58 source37f0975/kernelcf4ee8a, independent S50 parent: retire O2 with
+  wait1, publish output/release QK while KV may continue, then retain wait0
+  before H/input reuse. The [PTX specification](https://docs.nvidia.com/cuda/parallel-thread-execution/index.html#asynchronous-warpgroup-level-matrix-instructions-wgmma-wait-group)
+  guarantees completion of the older group, not an arbitrary completed one.
+  Four actual native bodies preserve paired operands/math/data with4added
+  wait1 sites/body and all finalwait0. Source/native negatives and actual
+  8192operand map pass;14CPUparentRAW+2stress pass. Six high-head screens all
+  UNRESOLVED with slightly slower medians. Reject as a speed candidate; no
+  reference promotion. Earlier O publication did not improve complete forward.
+
+S59 is separately registered on S50: batch eight exponent values behind a
+real uniform fast/fallback branch, leaving the common epilogue outside. It
+must avoid the failed whole-epilogue duplication and still-executed per-value
+guard of S25/S27. Native branch and exact underflow seam are preconditions;
+no S59 device result yet. Deadline03:35UTC.
 
 Each has a pre-edit plan, fixed deadline and independent worktree under
 /workspace. GPU work is sequential and DeviceWatch-gated. H800 remains on.

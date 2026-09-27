@@ -1,11 +1,41 @@
 # PPU original-structure port
 
-updated-at: 2026-09-27 02:21:53 UTC
-working-on: S55 reference wins closed; S56 rejected six-cell slowdown; S57 independent KK-publication interaction compiling
+updated-at: 2026-09-27 02:45:54 UTC
+working-on: S58 closed without gain; S59 branch-batched exact auxiliary EX2 registered before edit
 blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: c3bcfa1 main; S55 6317ea4; S56 29550cd; S57 fdcb56b; harness 72461c5
+last-commit: 700ef26 main; S55 6317ea4; S56 29550cd; S57 1f46010; S58 37f0975; harness eb50a17
 
 ## Current checkpoint
+
+2026-09-27 02:45:54 UTC: S58 six high-head screens allUNRESOLVED; no
+promotion. Full raw artifacts copied locally. S59 independentS50 plan
+registered; finite-prefix proof plus explicit eight-value PTX branch must
+actually omit fast-path correction, unlike S25/S27. Native/probe beforeGPU.
+Deadline03:35UTC. User adds final cleanup and PPU1.0 transfer assessment;
+shutdown only after target closure and durable evidence. TargetNOTMET,
+H800ON, fixedFI20W/8L andQLA25W/2U/1numeric-invalid retained.
+
+2026-09-27 02:37:09 UTC: S57 six high-head cells allUNRESOLVED with slightly
+slower medians, no promotion. S58 staged-retirement source/native gatesPASS,
+actual8192operand cells/2negativesPASS, full14CPUparentRAW+2stressPASS.
+Six-cell high-head screen now exclusive session30325. Native retains4O2/KV
+epochs, adds4wait1/body beforeO publication and keepswait0 beforeH/input
+reuse. Old-body/wrong-limit/missing-retirement negatives fail. No speedclaim.
+S56 actual local/remote native streams identical SHA
+c52b580a68e8ec37695b2a287b38c7a1e8733b21ac4e3509ae51e31dd7d26c7d.
+Goal NOTMET, H800ON, nativePPU17SKIP; S55wins retained independently.
+
+2026-09-27 02:34:21 UTC: S57 exact4type barrier offsets and native CFG pass,
+including two outlined retry paths returning to their own QK acquire. A
+negative initially changed initialization rather than publication; corrected
+plant now targets the actual publishing opcode and fails. All14CPUparentRAW
+and2stressPASS; first four high-head cellsUNRESOLVED, no claimed gain.
+S58 registered02:30:17UTC, separate S50 parent: wait1 fences/reads only O2,
+publishes output while KV may continue, thenwait0 beforeH/input reuse.
+Local/remote four-body compilePASS; native lifetime gate running, no GPUyet.
+CUDA12.8 emits four wait1 sites/body. PTX FIFO semantics verified against
+NVIDIA documentation, no deleted final retirement or math change. S55 wins
+retained; FI eight high-head losses and two QLA unresolved remain. H800ON.
 
 2026-09-27 02:21:53 UTC: S55 eight captures528forwards locally re-extracted
 EXACT. T8192 andHv16, both gates, now beat fastest FI; Hv16QLA remainsU.
