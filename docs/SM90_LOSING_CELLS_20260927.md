@@ -1,6 +1,6 @@
 # Closing the remaining SM90 GDN losses
 
-Checkpoint:2026-09-27 01:43:35 UTC. Physical H800 PCIe,114SMs,CUDA12.8.93.
+Checkpoint:2026-09-27 02:08:52 UTC. Physical H800 PCIe,114SMs,CUDA12.8.93.
 The fixed14-workload inventory and both gate regimes are unchanged. This is
 not a native PPU1.7 result. No default routing, SM80, reference, clock, power
 or numerical-tolerance change. **Expanded speed goal remains unmet.**
@@ -78,15 +78,27 @@ S50 remains the confirmed B2 improvement; no S51 reference win is claimed.
 
 - S53 source8e89c8a: exactly compose S51 with S50 on V128. Four-arm,
   six-cell B2/B4/Hv64-GVA4 screen includes both single-change controls.
-  Native/map gates pass; device14CPUparentraw+2stress pass; screen in progress.
+  Native/map gates and device14CPUparentraw+2stress pass. Six graph cells:
+  three parent wins/three unresolved, no new best. Reject as a speed candidate.
 - S54 sourcefa0dfa7: only remove optional alternating state issue on S50;
   every S50 data/lifetime source is bound unchanged. Actual physical H/O
   owners are disjoint in all four types; old inverse-owned-by-state retains
   ordering. Native33/41 issue sites become zero with all matrix/TMA/async/data
-  families preserved. Device admission is queued; no speed claim.
+  families preserved. Device14CPUparentraw+2stress pass. Six graph cells:
+  three parent wins/three unresolved. Reject as a speed candidate; removing
+  a legal ordering constraint did not improve this complete forward.
 - S55 source6317ea4: exactly compose S51 with S52 V64/aux232. Native/map
-  gates pass. Four-cell T8192/Hv16 screen will compare S52 and S38 after
-  fixed numerical admission. Device performance NOT_RUN.
+  gates and fixed14CPUparentraw+2stress pass. Four-cell T8192/Hv16 screen:
+  three parent wins/one unresolved. Eight nsys captures have completed;
+  reference verdicts await local SQLite re-extraction, not inferred from graphs.
+- S56 parent170f34f/S50: skip warp-uniform empty causal sectors in auxiliary
+  QK/KK epilogue, preserving every live arithmetic expression. Actual-layout
+  1048576-cell coverage and3negatives pass. CUDA12.8 if-converts the full
+  chunk into22 genuinely predicated EX2 sites per body; this suppresses SFU
+  evaluation, not necessarily fetch/issue slots. Four bodies preserve all
+  matrix/TMA/barrier families with noC7512;4native negatives pass. Numerical
+  admission and speed remain pending. No approximate exponent or precision
+  relaxation. Deadline02:45UTC, six high-head screens pre-registered.
 
 Each has a pre-edit plan, fixed deadline and independent worktree under
 /workspace. GPU work is sequential and DeviceWatch-gated. H800 remains on.

@@ -1,11 +1,24 @@
 # PPU original-structure port
 
-updated-at: 2026-09-27 01:43:35 UTC
-working-on: S52 nsys closed (reference gaps now unresolved); S53 six-cell screen and then S54; S55 CPU build
+updated-at: 2026-09-27 02:08:52 UTC
+working-on: S55 eight nsys captures complete, local re-extraction pending; S56 causal-sector native gate passed, preparing device admission
 blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: d47b4ce main; S52 2d5e78d; S53 8e89c8a; S54 fa0dfa7; S55 6317ea4; harness 758bed0
+last-commit: f257409 main; S52 2d5e78d; S53 8e89c8a; S54 fa0dfa7; S55 6317ea4; harness 3be35ea
 
 ## Current checkpoint
+
+2026-09-27 02:08:52 UTC: S53 and S54 six high-head graph cells complete,
+each3parent losses/3unresolved; no reference promotion. Both fixed14 CPU+
+parent RAW cases and2extreme stresses PASS. S55 four screens3parentwins/1U;
+eight registered nsys captures completed without failure, results copied
+for independent SQLite re-extraction (no speed verdict yet).
+S53/54/55 PPU3.6CUDA source-check PASS; nativePPU1.7 remains SKIP.
+S56 source skips only guaranteed-empty causal quadrants. Actual4types x
+64tails x4096cells=1048576 coverage checks and3negative controls PASS.
+Four native bodies suppress22 EX2 sites by real local-warp predicates,
+not merely a final output select; compiler if-conversion remains an issue-
+slot cost. All matrix/TMA/barrier families fixed, noC7512;4native negatives
+PASS. Device admission NOT_RUN. GPU sequential, H800 ON, goalNOTMET.
 
 2026-09-27 01:43:35 UTC: S52 eight nsys captures528forwards all locally
 re-extracted byte-identically. T8192~351.5/352.6vsFI354.7/353.4us and
