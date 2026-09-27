@@ -12,12 +12,14 @@
 
 namespace gdn::sm90 {
 // Opt-in arithmetic variant, matching FlashInfer's exp2(fastmath=True).
-// __exp2f may flush subnormals; it is NOT a RAW-equivalent replacement for
+// EX2's approximate/FTZ form is NOT a RAW-equivalent replacement for
 // standard exp2f. Keep this confined to gate exponentiation, not global
 // --use_fast_math (which would also change division, contraction and FTZ).
 CUTE_DEVICE float gate_exp2(float value) {
 #if GDN_SM90_FAST_EXP2
-    return __exp2f(value);
+    float result;
+    asm("ex2.approx.ftz.f32 %0, %1;" : "=f"(result) : "f"(value));
+    return result;
 #else
     return exp2f(value);
 #endif
