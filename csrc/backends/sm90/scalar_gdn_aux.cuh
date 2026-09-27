@@ -6,6 +6,7 @@
 #include "ordered_pair.cuh"
 #include "aux_chunk_loop.cuh"
 #include "relative_gate_layout.cuh"
+#include "aux_exp2_batch.cuh"
 
 namespace gdn::sm90 {
 
@@ -27,6 +28,7 @@ struct ScalarGdnAux : Base {
         // [alpha stage][exp / scaled-exp][token], protected by alpha_pipeline.
         cute::array_aligned<float, 128 * Base::StagesAlpha::value> gate_factors;
         cute::array_aligned<float, 64 * Base::StagesAlpha::value> relative_gate;
+        cute::array_aligned<int, Base::StagesAlpha::value> aux_normal_exp2;
     };
     using QPipeline = typename Base::MainloopQPipeline;
     using KPipeline = typename Base::MainloopKPipeline;
@@ -93,6 +95,8 @@ struct ScalarGdnAux : Base {
             float rhi = lane+32 < valid ? exp2f(__fsub_rn(last_prefix,hi)) : 0.f;
             smem.relative_gate[relative_gate_index(stage,lane)] = rlo;
             smem.relative_gate[relative_gate_index(stage,lane+32)] = rhi;
+            bool normal_span = collect_aux_normal_span(lo, hi);
+            if (lane == 0) smem.aux_normal_exp2[stage] = normal_span;
         };
         CUTE_NO_UNROLL
         for (int block=0; block<ceil_div(work.seq_len,64); ++block) {
@@ -170,25 +174,30 @@ struct ScalarGdnAux : Base {
             bp.consumer_wait(br);
             auto out_qk = make_fragment_like<Element>(acc_qk);
             auto out_kk = make_fragment_like<Inverse>(acc_kk);
+            bool normal_span = smem.aux_normal_exp2[ar.index()];
+            static_assert(size(coords) % 8 == 0);
             CUTE_UNROLL
-            for (int i = 0; i < size(coords); ++i) {
-                auto [row, col] = coords(i);
-                bool live = row >= col;
-                if constexpr (!cute::is_static<decltype(valid_tag)>::value)
-                    live = live && row < valid && col < valid;
-                // Metadata rows are initialized for all64 positions, including
-                // tails. Read and exponentiate independently of the predicate.
-                // Inactive intermediates may overflow; the final live selects
-                // below must discard them before either product is published.
-                // Keep standard exp2f, not an approximate/FTZ substitute.
-                float row_log = alpha(row,0,ar.index());
-                float col_log = alpha(col,0,ar.index());
-                float row_beta = beta(row,br.index());
-                float decay = exp2f(row_log-col_log);
-                out_qk(i) = Element(live ? acc_qk(i) * decay * params.scale : 0.f);
-                // Inverse expects positive lower input, garbage diagonal and
-                // zero upper triangle, then applies beta along its columns.
-                out_kk(i) = Inverse(live ? acc_kk(i) * row_beta * decay : 0.f);
+            for (int base = 0; base < size(coords); base += 8) {
+                float decay[8];
+                CUTE_UNROLL
+                for (int j = 0; j < 8; ++j) {
+                    auto [row, col] = coords(base+j);
+                    decay[j] = alpha(row,0,ar.index()) - alpha(col,0,ar.index());
+                }
+                auxiliary_exp2_batch8(decay, normal_span);
+                CUTE_UNROLL
+                for (int j = 0; j < 8; ++j) {
+                    int i = base+j;
+                    auto [row, col] = coords(i);
+                    bool live = row >= col;
+                    if constexpr (!cute::is_static<decltype(valid_tag)>::value)
+                        live = live && row < valid && col < valid;
+                    // All metadata is initialized including tails. Keep the
+                    // exact live-lane multiply order and final causal select.
+                    float row_beta = beta(row,br.index());
+                    out_qk(i) = Element(live ? acc_qk(i) * decay[j] * params.scale : 0.f);
+                    out_kk(i) = Inverse(live ? acc_kk(i) * row_beta * decay[j] : 0.f);
+                }
             }
             kkp.producer_acquire(kw);
             qkp.producer_acquire(qw);
