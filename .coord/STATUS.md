@@ -1,11 +1,23 @@
 # PPU original-structure port
 
-updated-at: 2026-09-27 04:03:36 UTC
-working-on: QK/KK rings closed with no winner; S66 two-warp inverse subtree passed actual map/native/PTX, device admission next
+updated-at: 2026-09-27 04:18:49 UTC
+working-on: S63-S66 screens closed without a winner; compile-first S67 single-state shared-H + late-O1 lifetime interaction
 blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: 7147e73 main; S55 6317ea4; rings5a873fe; S66 1ac05a3; harnessf895710
+last-commit: 9435fac main; S55 6317ea4; rings2bb8196; S66 1ac05a3; harnessbb08cc9
 
 ## Current checkpoint
+
+2026-09-27 04:18:49 UTC: S66 six-screen completion4parent wins/2unresolved, all candidate
+medians slower; reject. Full14CPUparentRAW+2stress and repeated/captured
+outputs PASS; PPU3.6CUDA sourcecheck PASS/nativePPU17 SKIP. Ring18screens
+also no winner. Whole-four-tuple inventory now checked with missing-tuple,
+duplicate-tuple and missing-type plants; all correctly fail. All raw screen/
+admission results copied locally, task ledgers closed. S67 registered before
+edits: compose S42 shared-H one-state V128 with late O1 to avoid the proved
+256-FP32-value lifetime overlap. Compile first, reject serialization/large
+stack before GPU. No new speed claim or route change. H800 UUID rechecked
+idle/no GPU processes; machineON, full goal stillFI20W/8L andQLA25W/2U/
+1reference numericFAIL (composite, not integrated fresh matrix).
 
 2026-09-27 04:03:36 UTC: four QK/KK tuples/16actual types nativePASS,
 default2/2 native-identical; wrong KK-as-QK asymmetric negative compileFAIL.

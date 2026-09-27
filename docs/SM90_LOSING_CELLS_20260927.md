@@ -1,6 +1,6 @@
 # Closing the remaining SM90 GDN losses
 
-Checkpoint:2026-09-27 02:45:54 UTC. Physical H800 PCIe,114SMs,CUDA12.8.93.
+Checkpoint:2026-09-27 04:18:49 UTC. Physical H800 PCIe,114SMs,CUDA12.8.93.
 The fixed14-workload inventory and both gate regimes are unchanged. This is
 not a native PPU1.7 result. No default routing, SM80, reference, clock, power
 or numerical-tolerance change. **Expanded speed goal remains unmet.**
@@ -190,7 +190,23 @@ KK storage used QK's depth while both were fixed2; no existing unequal-depth
 runtime defect is claimed. Asymmetric configurations now independently bind
 storage and pipeline. The wrong-QK-depth negative fails all4actual types.
 Default2/2 reproduces every S50 native instruction/operand. All4tuples pass
-native/progress gates; device numerics/screens are pending. No promotion.
+native/progress gates. All three changed candidates pass14CPUparentRAW,
+two extreme stresses and repeated/captured outputs. Eighteen screens close:
+S63 three parent wins/three unresolved, S64 the same, S65 five parent wins/
+one unresolved. No candidate wins; retain2/2. Smaller result rings also reduce
+producer lead and are not a free scheduling simplification. Raw results are
+local; no reference capture or promotion for these nonfinalists.
+
+S66/1ac05a3 retains the original two-warp8x8 inverse ownership through the
+16x16 and32x32 subtrees, leaving the final cross-warp publication intact.
+Actual6144-cell maps/four negatives, source-bound PTX and native gates pass.
+Four native bodies remove four CTA barrier sites but execute the middle-level
+work on two rather than four warps. Stack8/104B is not a speed verdict.
+All14CPUparentRAW+2stress/replay gates pass. Six high-head screens produce
+four parent wins/two unresolved; every candidate median is slower. Reject.
+Evidence:/workspace/gdn-sm90-local-inverse-prefix-20260927. Native instruction
+SHA791b29629877095185bfb1210729325f4e803c06687bded4a4dd001452149fd1.
+PPU3.6CUDA source-check PASS; nativePPU17 still SKIP.
 
 Each has a pre-edit plan, fixed deadline and independent worktree under
 /workspace. GPU work is sequential and DeviceWatch-gated. H800 remains on.
