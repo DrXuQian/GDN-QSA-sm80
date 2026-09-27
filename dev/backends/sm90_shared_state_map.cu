@@ -78,16 +78,37 @@ template<class Gate,bool Initial> void actual_type() {
     static_assert(T::Collective::NumStateMmaWarpGroups==1 && K::MaxThreadsPerBlock==384);
     static_assert(K::LdStRegisterRequirement==24 && K::StateMmaRegisterRequirement==248 && K::AuxMmaRegisterRequirement==232);
     static_assert(K::SharedStorageSize<=232448);
+    static_assert(T::Collective::StagesKK::value==1);
+    static_assert(cosize_v<typename T::Collective::SmemLayoutKK> == 4096);
+    static_assert(sizeof(std::declval<typename T::Collective::SharedStorage>().state_park) == 65536);
     static_assert(K::QKInputConsumers==256 && K::AlphaConsumers==288 && K::BetaConsumers==256);
-    std::cout<<"S42 gate_fp32="<<std::is_same_v<Gate,float><<" initial="<<Initial
+    std::cout<<"S68 gate_fp32="<<std::is_same_v<Gate,float><<" initial="<<Initial
              <<" threads="<<K::MaxThreadsPerBlock<<" shared="<<K::SharedStorageSize<<"\n";
+}
+void park_map(int plant=0) {
+    std::array<int,16384> memory{},count{};
+    for(int tid=0;tid<(plant==3?127:128);++tid) for(int i=0;i<128;++i) {
+        int pos=gdn::sm90::state_park_index(tid,i);
+        if(plant==1) pos=(pos+1)%16384;
+        if(plant==2) pos%=8192;
+        need(pos>=0 && pos<16384);
+        memory[pos]=tid*128+i; ++count[pos];
+    }
+    for(int tid=0;tid<128;++tid) for(int i=0;i<128;++i) {
+        int pos=gdn::sm90::state_park_index(tid,i);
+        need(count[pos]==1 && memory[pos]==tid*128+i);
+        if(i%4==0) need(pos%4==0);
+    }
 }
 int main() {
     actual_type<BF16,false>();actual_type<BF16,true>();actual_type<float,false>();actual_type<float,true>();
     map();
+    park_map();
     for(int plant=1;plant<=3;++plant) {
         bool red=false;try{map(plant);}catch(std::runtime_error const&){red=true;}
         need(red);
+        red=false;try{park_map(plant);}catch(std::runtime_error const&){red=true;}
+        need(red);
     }
-    std::cout<<"shared H: actual STSM lane map -> SS O1/SK, 16384/16384 EXACT-ONCE; transpose/alias/missing negatives PASS\n";
+    std::cout<<"shared H: actual STSM lane map -> SS O1/SK, 16384/16384 EXACT-ONCE; FP32 park16384/16384;6negatives PASS\n";
 }
