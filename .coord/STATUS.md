@@ -1,11 +1,33 @@
 # PPU original-structure port
 
-updated-at: 2026-09-26 19:06:00 UTC
-working-on: S47/S48 closed with no new winner; archive evidence, inspect bounded paired O1/SK scheduling on immutable S24
+updated-at: 2026-09-27 00:58:03 UTC
+working-on: S49 rejected after eight diverse cells; S50 O2/KV overlap native/map/progress PASS, H800 build in progress
 blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: 6315f2f main; S47 8bd9fe4; S48 164560e; prepared harness364535e
+last-commit: 5f3c283 main; S49 fbdea2d; S50 170f34f; harness e3ba4ba
 
 ## Current checkpoint
+
+2026-09-27 00:58:03 UTC: S49 full14CPUparentraw+2stressesPASS;8screenscomplete,
+7parentUNRESOLVED/1parentWIN, no newbestpath. Reject, no nsysthresholdchange.
+Allraw artifacts local; actualnativepair preserved but doesnotimprovelatency.
+S50 onindependentS24 parent: native4pairedO2/KVgroups, distinctliveoperands,
+matrix/TMAunchanged, noC7512;8192map+2negatives and1..8data-ringprogressPASS.
+Initial-state stack104B/spills are explicitcosts, no blanketresourcewin.
+Remote CPUbuildsession81419; no GPUjobpending. PPU17nativeSKIP, no routing.
+S47/S48 archiveSHA58d6ecdfac941bee2092c646ee37210b58e2b491e2f505ea03b56a19d6f4dc51
+verifiedlocalremote. Mainreportdocs/SM90_PAIRED_STATE_20260927.md. Goalunmet,
+H800notshutdown. New boundedS50rounddeadline01:45UTC.
+
+2026-09-27 00:38:10 UTC: user asks continue losingcases after fullstatus.
+Best-retained matrix FI16win/10loss/2unresolved; QLA25win/2loss/1reference
+numeric-invalid. B2/B4/Hv64 deficits~9-10%,T8192~1.5-2.3%,Hv16QLA~2.2-2.5%.
+S49 local4bodycompile noC7512, exactHmap16384+2negative and1..8chunk
+progress+5source negativesPASS. Cast-count expectation not yet established;
+native retire18->16(noinitial),22->18(initial), initialspill grows.
+Execution/session discontinuity observed; olddeadline elapsed without GPU
+measurement. Newboundedcontinuation01:30UTC, criteria unchanged. Reconnected
+exact H800host/UUID0MiB/0%/no computeprocess withnewprivateSSHsocket. No
+shutdown/power/clock/reference/default/SM80 actions. NativePPU17stillSKIP.
 
 2026-09-26 19:06:00 UTC: S48 all14fixedCPUparentraw+2stressPASS, four-arm
 screen4/4complete, all8direct/64graphoutputsPASS. B1 S48~114us losesS38~91
