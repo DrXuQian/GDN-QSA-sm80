@@ -8,13 +8,24 @@ from pathlib import Path
 import re
 import subprocess
 
-from check_sm90_aux_final_mask import bodies
 from check_sm90_paired_tail import native as paired_native
 
 ROOT = Path(__file__).resolve().parents[2]
 FILE = 'csrc/backends/sm90/scalar_gdn_state.cuh'
 OLD = 'auto operand_delta = kda::sm90::collective::make_acc_into_op<Element>(acc_delta,typename Base::TiledMmaKV::LayoutA_TV{});'
 NEW = 'auto delta_bf16 = convert_fragment<Element>(acc_delta);\n            auto operand_delta = kda::sm90::collective::make_acc_into_op<Element>(delta_bf16,typename Base::TiledMmaKV::LayoutA_TV{});'
+
+
+def bodies(text):
+    result = {}
+    for part in text.split('Function :')[1:]:
+        symbol = part.splitlines()[0].strip()
+        if 'FlatKernelTmaWarpSpecializedKdaFwd' not in symbol:
+            continue
+        if symbol in result:
+            raise ValueError('duplicate body')
+        result[symbol] = re.findall(r'/\*([0-9a-f]+)\*/\s*(?:@!?\w+\s+)?([A-Z][\w.]*)\s*(.*?)\s*;\s*/\*',part)
+    return result
 
 
 def source_check(text):
