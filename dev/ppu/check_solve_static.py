@@ -75,8 +75,8 @@ def check_source(control, subject, helper, hv, binding):
     for name,text,body in required:
         if block(text,name) != code(name)+body:
             raise AssertionError('same-symbol host reuse/launch contract changed: '+name)
-    for token in ('Variant<=11&&(!Variant||Residual)',
-        'Variant==10?gdn_wy_forward_residual_warps8_metadata:gdn_wy_forward_residual_solve_static;',
+    for token in ('Variant<=12&&(!Variant||Residual)',
+        'Variant==10?gdn_wy_forward_residual_warps8_metadata:Variant==11?gdn_wy_forward_residual_solve_static:',
         'm.def("residual_solve_static",&forward<true,11>,'):
         if b.count(token)!=1: raise AssertionError('exact variant11 binding absent')
 

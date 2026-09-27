@@ -17,6 +17,7 @@ from check_residual_warps8_hlayout import check_native as check_warps8_hlayout_n
 from check_residual_warps8_hvlayout import check_native as check_warps8_hvlayout_native
 from check_residual_metadata import check_native as check_metadata_native
 from check_solve_static import check_native as check_solve_static_native
+from check_gate_cache import check_native as check_gate_cache_native
 
 
 def kernel_sequences(isa):
@@ -33,8 +34,8 @@ def kernel_sequences(isa):
 
 def compare_controls(before, after):
     old, new = kernel_sequences(before), kernel_sequences(after)
-    if len(old) != 35 or len(new) != 36:
-        raise AssertionError("control comparison must cover all35 old and all36 current images")
+    if len(old) != 36 or len(new) != 37:
+        raise AssertionError("control comparison must cover all36 old and all37 current images")
     for name, sequence in old.items():
         if new.get(name) != sequence:
             raise AssertionError(f"admitted control native instructions changed: {name}")
@@ -193,10 +194,11 @@ def audit(isa, resources, symbols):
     check_warps8_hvlayout_native(isa)
     check_metadata_native(isa)
     check_solve_static_native(isa)
+    check_gate_cache_native(isa)
     funcs = re.findall(r"Func \d+ (\S+) RESOURCE INFO:\n(.*?)(?=Func \d+ \S+ RESOURCE INFO:|\Z)",
                        resources, flags=re.S)
-    if len(funcs) != 36:
-        raise AssertionError(f"WY image denominator must be35 controls +1 static solve image, got {len(funcs)}")
+    if len(funcs) != 37:
+        raise AssertionError(f"WY image denominator must be36 controls +1 gate-cache image, got {len(funcs)}")
     rows = []
     mma_counts = {}
     for role, packed in ((role, packed) for role in ("prepare", "state", "output") for packed in (False, True)):
@@ -519,7 +521,17 @@ def audit(isa, resources, symbols):
     rows.append(dict(role="solve",algorithm="residual",delivery="solve-static",registers=regs,
                      stack=stack,static_instructions=len(sequences[name]),shared_bytes=49664,
                      diagonal_ordered_fmas=120,tf32_mma_sites=12,indirect_register_reads=0))
-    for name in ("gdn_wy_forward", "gdn_wy_forward_delivery", "gdn_wy_forward_residual",
+    matches=[(name,body) for name,body in funcs if "gdn_wy_residual_gate_cache_stateE" in name]
+    if len(matches)!=1: raise AssertionError("gate-cache resource image missing/ambiguous")
+    name,body=matches[0]
+    regs=int(re.search(r"vreg_number:(\d+)",body)[1])
+    stack=int(re.search(r"STACK SIZE:(\d+)",body)[1])
+    if stack or regs>256 or name not in sequences:
+        raise AssertionError("gate-cache spills or lacks exact native body")
+    rows.append(dict(role="state",algorithm="residual",delivery="gate-cache",
+                     registers=regs,stack=stack,shared_bytes=46080,
+                     static_instructions=len(sequences[name]),device="NOT_RUN"))
+    for name in ("gdn_wy_forward_residual_gate_cache", "gdn_wy_forward", "gdn_wy_forward_delivery", "gdn_wy_forward_residual",
                  "gdn_wy_forward_residual_prefetch", "gdn_wy_forward_residual_operands", "gdn_wy_forward_residual_v16",
                  "gdn_wy_forward_residual_blayout", "gdn_wy_forward_residual_warps8",
                  "gdn_wy_forward_residual_warps8_blayout", "gdn_wy_forward_residual_warps8_operands",

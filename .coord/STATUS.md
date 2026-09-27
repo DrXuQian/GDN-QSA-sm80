@@ -1,11 +1,29 @@
 # PPU original-structure port
 
-updated-at: 2026-09-27 06:39:04 UTC
-working-on: performance campaign CLOSED; authorized H800 shutdown invoked after sealed evidence; next is local SM90 cleanup and controlled PPU1.0 transfer
+updated-at: 2026-09-27 08:28:36 UTC
+working-on: PPU1.0 gate reuse locally closed (24/24 host CTest, full hgcc/link, 36 controls unchanged); closing SM90 V128/control native preservation
 blocked-on: native PPU1.7 SDK/model unavailable; pinned weak-GVA1 QLA fails original 2% numerical gate and is excluded from speed, not counted as a win
-last-commit: 0a0d6eb main; S74 86c3ef6; S73 31289c6; harness d859d80
+last-commit: 5e27868 (cleanup worktree parent; changes not yet committed)
 
 ## Current checkpoint
+
+2026-09-27 08:28:36 UTC: PPU gate-cache state uses124regs/0stack and46080B
+shared vs122/0/45568; native1194->1166 positions, exp sites5->2. Actual
+64-tail/C-layout test393216reads and3negativesPASS;6source+4native plantsPASS.
+Full37-image auditPASS; all36old instruction/operand streamsUNCHANGED.
+SM90 V64/V64-local-inverse four bodies each match measured S38/S55 exactly.
+First unified V128/control comparison FAIL (load-role codegen, not numerics);
+testing removal of V64-only work descriptor member from nonsliced targets.
+Do not weaken native equality or reuse measured timing for that refactor yet.
+All work local; H800 still closed. NativePPU17 SKIP(no SDK/model).
+
+2026-09-27 08:20:00 UTC: control-before-r2 compiled all four original SM90
+device bodies. Actual CUTLASS header-tree identity now includes untracked
+headers and archives; four negative/provenance tests pass. Integrating the
+three measured variants as named build configurations, not three collectives.
+PPU1.0 candidate keeps native AIU.swzl/ld.swzl and residual arithmetic; only
+prefix/relative gate exponentials move to unique row producers, +512 B shared.
+No PPU timing claim. H800 remains closed; native PPU1.7 still unavailable.
 
 2026-09-27 06:39:04 UTC: H800 vendor shutdown invoked06:38:39 after exact
 host/GPU/idle/supervisor/wrapper validation. Fresh SSH now connection-refused;
