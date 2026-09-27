@@ -139,7 +139,7 @@ struct FlatMainloopTmaWarpSpecializedKdaFwd {
     using ClusterShape = Shape<_1, _1, _1>;
 
     using StagesQK = cutlass::gemm::collective::StageCount<2>;
-    using StagesKK = cutlass::gemm::collective::StageCount<2>;
+    using StagesKK = cutlass::gemm::collective::StageCount<SharedStateOperand ? 1 : 2>;
 
     using StagesAlpha = cutlass::gemm::collective::StageCount<2>;
     using StagesBeta = cutlass::gemm::collective::StageCount<2>;
@@ -328,7 +328,7 @@ struct FlatMainloopTmaWarpSpecializedKdaFwd {
 
     using SmemLayoutKK = decltype(tile_to_shape(
         GMMA::Layout_K_INTER_Atom<Element>{},
-        flatten(make_shape(select<0, 1>(TileShapeQK{}), Int<StagesQK::value>{})),
+        flatten(make_shape(select<0, 1>(TileShapeQK{}), Int<StagesKK::value>{})),
         Step<_1, _2, _3>{}));
 
     using InverseType = cutlass::half_t;
@@ -439,7 +439,8 @@ struct FlatMainloopTmaWarpSpecializedKdaFwd {
             SmemLayoutKK{})) cute::array_aligned<InverseType, cute::cosize_v<SmemLayoutKK>> smem_kk;
         // smemq_k_scaled for exp(alpha) * Q and exp(alpha) * K in QS and KS, computed in Math WG2/3
         alignas(alignment_for_swizzle(
-            QKScaledSmemLayoutQ{})) cute::array_aligned<Element, cute::cosize_v<QKScaledSmemLayoutQ>> smem_q_k_scaled;
+            QKScaledSmemLayoutQ{})) cute::array_aligned<Element,
+                SharedStateOperand ? 1 : cute::cosize_v<QKScaledSmemLayoutQ>> smem_q_k_scaled;
 
         SharedStorageO smem_o;
 

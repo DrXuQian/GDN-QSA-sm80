@@ -24,6 +24,7 @@ template<class Parent>
 struct StateOperandStorage<Parent,true> : Parent::SharedStorage {
     using Layout = typename SharedStateLayout<Parent>::Layout;
     alignas(128) cute::array_aligned<typename Parent::Element,cute::cosize_v<Layout>> state_operand;
+    alignas(128) cute::array_aligned<float,16384> state_park;
 };
 
 } // namespace gdn::sm90

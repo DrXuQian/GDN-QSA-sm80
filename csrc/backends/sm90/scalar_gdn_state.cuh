@@ -3,6 +3,7 @@
 #pragma once
 #include "scalar_gdn_aux.cuh"
 #include "shared_state_operand.cuh"
+#include "state_park.cuh"
 
 namespace gdn::sm90 {
 
@@ -39,6 +40,8 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
         using namespace cute;
         using kda::sm90::collective::gemm_zero_acc;
         using Barriers = kda::sm90::collective::KdaNamedBarriers;
+        static_assert(SharedH && AuxInverse && Base::NumStateMmaThreads == 128,
+                      "S68 is an explicit single-state shared-H experiment");
         int tid = int(threadIdx.x) - Base::NumLoadThreads;
         int wg = tid / 128;
         int local_tid = tid % 128;
@@ -66,7 +69,6 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
         auto sk_thread = sk_mma.get_thread_slice(tid);
         auto newv_thread = newv_mma.get_thread_slice(tid);
         auto inv_thread = inv_mma.get_thread_slice(local_tid);
-        auto h = partition_fragment_C(kv_thread, Shape<Value,_128>{});
         auto q_desc = o1_thread.make_fragment_B(o1_thread.partition_B(q));
         auto k_desc = sk_thread.make_fragment_B(sk_thread.partition_B(k));
         auto kt_desc = kv_thread.make_fragment_B(kv_thread.partition_B(kt));
@@ -82,7 +84,19 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
         auto so = store_o.get_thread_slice(tid);
         auto copy_h = make_tiled_copy_C(Copy_Atom<AutoVectorizingCopy,float>{}, kv_mma);
         auto ch = copy_h.get_thread_slice(tid);
+        auto publish_h_operand = [&](auto& h) __attribute__((always_inline)) {
+            auto shared_h = make_tensor(make_smem_ptr(smem.state_operand.data()),
+                typename SharedHLayout::Layout{})(_,_,_0{});
+            auto store_h = typename SharedHLayout::Store{};
+            auto sh = store_h.get_thread_slice(tid);
+            auto rounded_h = make_fragment_like<Element>(h);
+            copy(h,rounded_h);
+            copy(store_h,sh.retile_S(rounded_h),sh.partition_D(shared_h));
+            cutlass::arch::fence_view_async_shared();
+            cutlass::arch::NamedBarrier::arrive_and_wait(128,Barriers::StateMathWG0);
+        };
         if constexpr (Base::kInitStateFromInput) {
+            auto h = partition_fragment_C(kv_thread, Shape<Value,_128>{});
             auto global_h = make_tensor(make_gmem_ptr(params.ptr_input_state),
                 state_layout<128,128>(problem.num_v_heads,problem.num_seqs))(
                     _,_,work.o_head_idx(),work.seq_idx);
@@ -93,8 +107,8 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
                                        Shape<_128,Value>{},make_coord(_0{},_0{}));
                 copy(copy_h,ch.partition_S(kda::sm90::collective::select_tensor<1,0>(half)),h);
             }
-        } else {
-            clear(h);
+            state_park_copy<true>(smem.state_park.data(),local_tid,h);
+            publish_h_operand(h);
         }
 
         // Complete each read before the next chunk may overwrite the shared
@@ -109,17 +123,10 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
                 warpgroup_commit_batch(); order.notify_next_blocked(wg);
                 warpgroup_wait<0>(); warpgroup_fence_operand(acc);
             };
-            if constexpr (SharedH) {
-                auto shared_h = make_tensor(make_smem_ptr(smem.state_operand.data()),
-                    typename SharedHLayout::Layout{})(_,_,_0{});
-                auto desc_a = thread.make_fragment_A(thread.partition_A(shared_h));
-                issue(desc_a);
-            } else {
-                auto operand = kda::sm90::collective::make_acc_into_op<Element>(
-                    h,typename decltype(mma)::LayoutA_TV{});
-                warpgroup_fence_operand(operand);
-                issue(operand);
-            }
+            auto shared_h = make_tensor(make_smem_ptr(smem.state_operand.data()),
+                typename SharedHLayout::Layout{})(_,_,_0{});
+            auto desc_a = thread.make_fragment_A(thread.partition_A(shared_h));
+            issue(desc_a);
         };
 
         auto inverse = [&]() __attribute__((always_inline)) {
@@ -146,19 +153,6 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             constexpr bool first = decltype(first_tag)::value;
             constexpr bool last = decltype(last_tag)::value;
             int valid = last ? int(work.seq_len-chunk*64) : 64;
-            if constexpr (SharedH && !first) {
-                static_assert(AuxInverse && Base::NumStateMmaThreads == 128);
-                auto shared_h = make_tensor(make_smem_ptr(smem.state_operand.data()),
-                    typename SharedHLayout::Layout{})(_,_,_0{});
-                auto store_h = typename SharedHLayout::Store{};
-                auto sh = store_h.get_thread_slice(tid);
-                auto rounded_h = make_fragment_like<Element>(h);
-                copy(h,rounded_h);
-                copy(store_h,sh.retile_S(rounded_h),sh.partition_D(shared_h));
-                cutlass::arch::fence_view_async_shared();
-                // StateMathWG0 is disjoint from the auxiliary inverse barrier.
-                cutlass::arch::NamedBarrier::arrive_and_wait(128,Barriers::StateMathWG0);
-            }
             ap.consumer_wait(ar);
             kp.consumer_wait(kr);
             auto acc_sk = partition_fragment_C(sk_thread,Shape<Value,_64>{});
@@ -236,6 +230,12 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             // Consume the inherited alpha-last pipeline even though the scalar
             // prefix supplies the same value; do not change barrier counts.
             alp.consumer_wait(alr);
+            // Exact FP32 state is not live across SK/NewV/O1/O2. Load each
+            // owner's words only now; a zero-state first chunk never reads
+            // uninitialized scratch.
+            auto h = partition_fragment_C(kv_thread, Shape<Value,_128>{});
+            if constexpr (first) clear(h);
+            else state_park_copy<false>(smem.state_park.data(),local_tid,h);
             float decay_h = smem.gate_factors[ar.index()*128+valid-1];
             CUTE_UNROLL
             for (int i=0; i<size(h); ++i) h(i) *= decay_h;
@@ -252,6 +252,15 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             gemm(kv_mma,operand_delta,kt_desc(_,_,_,kr.index()),h);
             warpgroup_commit_batch(); order.notify_next_blocked(wg);
             warpgroup_wait<0>(); warpgroup_fence_operand(h);
+            if constexpr (!last) {
+                state_park_copy<true>(smem.state_park.data(),local_tid,h);
+                publish_h_operand(h);
+            } else if (params.ptr_output_state) {
+                auto global_h = make_tensor(make_gmem_ptr(params.ptr_output_state),
+                    state_layout<128,128>(problem.num_v_heads,problem.num_seqs))(
+                        _,_,work.o_head_idx(),work.seq_idx);
+                copy(copy_h,h,ch.partition_D(kda::sm90::collective::select_tensor<1,0>(global_h)));
+            }
             kp.consumer_release(kr); ++kr;
             ap.consumer_release(ar); ++ar;
             alp.consumer_release(alr); ++alr;
@@ -263,18 +272,6 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
         CUTE_NO_UNROLL
         for (int chunk=1; chunk<chunks-1; ++chunk) body(chunk,cute::false_type{},cute::false_type{});
         if (chunks>1) body(chunks-1,cute::false_type{},cute::true_type{});
-        if (params.ptr_output_state) {
-            auto global_h = make_tensor(make_gmem_ptr(params.ptr_output_state),
-                state_layout<128,128>(problem.num_v_heads,problem.num_seqs))(
-                    _,_,work.o_head_idx(),work.seq_idx);
-            if constexpr (Base::ValueTile == 128) {
-                copy(copy_h,h,ch.partition_D(kda::sm90::collective::select_tensor<1,0>(global_h)));
-            } else {
-                auto half = local_tile(domain_offset(make_coord(_0{},work.value_offset),global_h),
-                                       Shape<_128,Value>{},make_coord(_0{},_0{}));
-                copy(copy_h,h,ch.partition_D(kda::sm90::collective::select_tensor<1,0>(half)));
-            }
-        }
     }
 };
 
