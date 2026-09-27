@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 #include "kda/sm90/kernel/options.hpp"
+#include <cutlass/bfloat16.h>
 #include <cute/numeric/integral_constant.hpp>
 #include <type_traits>
 
@@ -25,8 +26,8 @@ struct AuxRings {
     template<class Gate, bool Initial>
     using Options = std::conditional_t<GDN_SM90_AUX_RING_CONFIG == 0,
         OriginalOptions<Gate, Initial>,
-        kda::sm90::kernel::add_option_t<kda::sm90::kernel::Tag::kStagesKK, cute::Int<KK>,
-            kda::sm90::kernel::add_option_t<kda::sm90::kernel::Tag::kStagesQK, cute::Int<QK>,
-                OriginalOptions<Gate, Initial>>>>;
+        decltype(std::tuple_cat(OriginalOptions<Gate, Initial>{}, std::tuple<
+            kda::sm90::kernel::Option<kda::sm90::kernel::Tag::kStagesQK, cute::Int<QK>>,
+            kda::sm90::kernel::Option<kda::sm90::kernel::Tag::kStagesKK, cute::Int<KK>>>{}))>;
 };
 } // namespace gdn::sm90
