@@ -183,7 +183,31 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             if constexpr (first) gemm_zero_acc(o2_mma,operand_delta,qk_desc(_,_,_,qkr.index()),acc_o);
             else gemm(o2_mma,operand_delta,qk_desc(_,_,_,qkr.index()),acc_o);
             warpgroup_commit_batch(); order.notify_next_blocked(wg);
-            warpgroup_wait<0>(); warpgroup_fence_operand(acc_o);
+
+            // Consume the inherited alpha-last pipeline even though the scalar
+            // prefix supplies the same value; do not change barrier counts.
+            alp.consumer_wait(alr);
+            float decay_h = smem.gate_factors[ar.index()*128+valid-1];
+            CUTE_UNROLL
+            for (int i=0; i<size(h); ++i) h(i) *= decay_h;
+            // O2 still owns the unscaled operand. A distinct buffer preserves
+            // that async lifetime while scalar work and KV can make progress.
+            auto operand_scaled = make_fragment_like<Element>(operand_delta);
+            CUTE_UNROLL
+            for (int i=0; i<size(operand_delta); ++i) {
+                auto [dv,t] = c_value(i);
+                float gain = smem.relative_gate[relative_gate_index(ar.index(),t)];
+                operand_scaled(i) = Element(float(operand_delta(i))*gain);
+            }
+            warpgroup_fence_operand(operand_scaled);
+            warpgroup_fence_operand(h);
+            order.ordered_or_wait(wg);
+            warpgroup_arrive();
+            gemm(kv_mma,operand_scaled,kt_desc(_,_,_,kr.index()),h);
+            warpgroup_commit_batch(); order.notify_next_blocked(wg);
+            warpgroup_wait<0>();
+            warpgroup_fence_operand(h);
+            warpgroup_fence_operand(acc_o);
             qkp.consumer_release(qkr); ++qkr;
             {
                 auto output = make_fragment_like<Element>(acc_o);
@@ -193,26 +217,6 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
                 cutlass::arch::fence_view_async_shared();
                 op.producer_commit(ow); ++ow;
             }
-
-            // Consume the inherited alpha-last pipeline even though the scalar
-            // prefix supplies the same value; do not change barrier counts.
-            alp.consumer_wait(alr);
-            float decay_h = smem.gate_factors[ar.index()*128+valid-1];
-            CUTE_UNROLL
-            for (int i=0; i<size(h); ++i) h(i) *= decay_h;
-            CUTE_UNROLL
-            for (int i=0; i<size(operand_delta); ++i) {
-                auto [dv,t] = c_value(i);
-                float gain = smem.relative_gate[relative_gate_index(ar.index(),t)];
-                operand_delta(i) = Element(float(operand_delta(i))*gain);
-            }
-            warpgroup_fence_operand(operand_delta);
-            warpgroup_fence_operand(h);
-            order.ordered_or_wait(wg);
-            warpgroup_arrive();
-            gemm(kv_mma,operand_delta,kt_desc(_,_,_,kr.index()),h);
-            warpgroup_commit_batch(); order.notify_next_blocked(wg);
-            warpgroup_wait<0>(); warpgroup_fence_operand(h);
             kp.consumer_release(kr); ++kr;
             ap.consumer_release(ar); ++ar;
             alp.consumer_release(alr); ++alr;
