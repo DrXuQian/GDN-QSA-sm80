@@ -208,5 +208,16 @@ Evidence:/workspace/gdn-sm90-local-inverse-prefix-20260927. Native instruction
 SHA791b29629877095185bfb1210729325f4e803c06687bded4a4dd001452149fd1.
 PPU3.6CUDA source-check PASS; nativePPU17 still SKIP.
 
+S67/3eb5d75 (kernel1fd8c41) tests a structural interaction rather than
+another synchronization tweak: whole V128 on one state WG, existing S42
+shared BF16 H, with O1 delayed until NewV's BF16 conversion. No duplicated
+QK/KK/inverse or additional public kernel. Source-only movement and bounded
+one-state progress pass, but all four CUDA bodies still emit C7512.
+Actual192/256HGMMA sites have192/256completion waits; stack568/704B exceeds
+the predeclared104B ceiling. Reject before GPU; no measured slowdown or
+numerical admission is claimed. Moving one source lifetime does not prove
+the compiler kept all other large fragments disjoint. Evidence:
+/workspace/gdn-sm90-single-state-late-output-20260927/native-rejection.json.
+
 Each has a pre-edit plan, fixed deadline and independent worktree under
 /workspace. GPU work is sequential and DeviceWatch-gated. H800 remains on.

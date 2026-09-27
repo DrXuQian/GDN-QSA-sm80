@@ -1,11 +1,20 @@
 # PPU original-structure port
 
-updated-at: 2026-09-27 04:18:49 UTC
-working-on: S63-S66 screens closed without a winner; compile-first S67 single-state shared-H + late-O1 lifetime interaction
+updated-at: 2026-09-27 04:27:42 UTC
+working-on: S67 compile-rejected; closing raw evidence and reviewing remaining high-head pipeline gap, no new winner
 blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: 9435fac main; S55 6317ea4; rings2bb8196; S66 1ac05a3; harnessbb08cc9
+last-commit: 1eed143 main; S55 6317ea4; rings2bb8196; S66 1ac05a3; S67 3eb5d75; harnessbb08cc9
 
 ## Current checkpoint
+
+2026-09-27 04:27:42 UTC: S67 local exact4body compile closed: source move/progress
+PASS, but all4C7512 and192/256HGMMA each retired separately; stack568/704B
+above104B ceiling. REJECTED BEFORE DEVICE; no performance/numeric claim.
+H800 remains ON and idle after S66 completion. Source experiments isolated;
+no production selector/SM80/reference/tolerance/clock changes. Remaining
+FI20W/8L, QLA25W/2U/1reference numericFAIL is unchanged composite evidence.
+Cleanup and PPU1.0 transfer plan exists; integrated fresh-matrix admission
+and final shipping cleanup are not complete. No justified total-finish ETA.
 
 2026-09-27 04:18:49 UTC: S66 six-screen completion4parent wins/2unresolved, all candidate
 medians slower; reject. Full14CPUparentRAW+2stress and repeated/captured
