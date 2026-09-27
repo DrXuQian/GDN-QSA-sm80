@@ -14,7 +14,7 @@ sys.path[:0]=[str(ROOT),str(ROOT/'benchmarks'),str(ROOT/'tests')]
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--candidate',choices=('s45','s49','s50','s51','s52','s53','s54','s55','s56','s57','s58'),default='s45')
+    parser.add_argument('--candidate',choices=('s45','s49','s50','s51','s52','s53','s54','s55','s56','s57','s58','s60'),default='s45')
     choice=parser.parse_args().candidate
     import torch
     from bench_sm90_hopper import DeviceWatch
@@ -29,7 +29,8 @@ def main():
                's55':'/workspace/gdn-sm90-v64-inverse-tail-20260927',
                's56':'/workspace/gdn-sm90-causal-sectors-20260927',
                's57':'/workspace/gdn-sm90-overlap-kk-first-20260927',
-               's58':'/workspace/gdn-sm90-paired-retire-20260927'}[choice])
+               's58':'/workspace/gdn-sm90-paired-retire-20260927',
+               's60':'/workspace/gdn-sm90-aux-exp2-index-20260927'}[choice])
     parent=Path('/workspace/gdn-sm90-win-20260926')
     build=root/(choice+'-build')
     binary=next(build.glob('_gdn_fused_sm90*.so'))
@@ -40,9 +41,10 @@ def main():
     result=dict(denominator=1,rows=[row],performance='NOT_RUN',routing='UNCHANGED')
     from sm90_process_family import admission_watch
     watch=admission_watch(DeviceWatch)(0)
-    def run(label,command):
+    def run(label,command,interpreter=True):
         with (out/(label+'.log')).open('x') as log:
-            p=subprocess.run([sys.executable,*map(str,command)],stdout=log,stderr=subprocess.STDOUT,timeout=300)
+            argv=([sys.executable] if interpreter else [])+list(map(str,command))
+            p=subprocess.run(argv,stdout=log,stderr=subprocess.STDOUT,timeout=300)
         if p.returncode:raise RuntimeError(f'{label} rc={p.returncode}, see {out}')
     try:
         for _ in range(3):watch.sample(idle=True);time.sleep(.2)
@@ -56,13 +58,17 @@ def main():
                 run('native-'+label,[root/'source/dev/backends'/checker,
                     '--candidate',build/'codegen/image.sass','--parent',Path(control)/'codegen/image.sass',
                     '--device-log',build/'device.log'])
-        elif choice in ('s54','s56','s57','s58'):
+        elif choice in ('s54','s56','s57','s58','s60'):
             checker={'s54':'check_sm90_independent_tail.py','s56':'check_sm90_causal_sectors.py',
-                     's57':'check_sm90_kk_overlap.py','s58':'check_sm90_paired_retire.py'}[choice]
+                     's57':'check_sm90_kk_overlap.py','s58':'check_sm90_paired_retire.py',
+                     's60':'check_sm90_exp2_index.py'}[choice]
             run('native-source',[root/'source/dev/backends'/checker,
                 '--candidate',build/'codegen/image.sass',
                 '--parent','/workspace/gdn-sm90-paired-tail-20260927/s50-build/codegen/image.sass',
                 '--device-log',build/'device.log'])
+            if choice=='s60':
+                run('source-range',[root/'source/tests/test_sm90_aux_range.py'])
+                run('exact-exp2-seam',[root/'exp2-probe'],interpreter=False)
         elif choice in ('s50','s51','s52','s55'):
             checker='check_sm90_inverse_local.py' if choice in ('s51','s55') else 'check_sm90_paired_tail.py'
             native_parent=(Path('/workspace/gdn-sm90-value-split-20260926/s38-build')
