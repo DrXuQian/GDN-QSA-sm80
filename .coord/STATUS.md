@@ -1,11 +1,24 @@
 # PPU original-structure port
 
-updated-at: 2026-09-27 03:04:25 UTC
-working-on: S59 rejected at native gate; S60 indexed EX2 passed native+exact seam, full numerical admission then high-head screens
+updated-at: 2026-09-27 03:24:46 UTC
+working-on: S60 rejected after six screens; S61 warp-local diagonal publication passed full admission, six high-head screens finishing
 blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: 53fb0d6 main; S55 6317ea4; S59 6ecd300; S60 37e7d13; harness 0996a4e
+last-commit: a75bfd6 main; S55 6317ea4; S60 37e7d13; S61 9f9c2e7; harness a505566
 
 ## Current checkpoint
+
+2026-09-27 03:24:46 UTC: S60 exact EX2 branch all numerical gates passed,
+but six high-head screens give four parent losses/two unresolved. Rejected;
+no reference speed claim. S61 changes first inverse-diagonal ownership only,
+actual4096-cell map/four negatives pass. Four native bodies preserve math,
+remove two CTA barriers; exact source-bound PTX warp fences retained, native
+compiler elides their explicit opcode at this straight-line seam. Local/
+remote/retained-PTX native streams match. Stack24/112B versus16/104B is an
+explicit cost. Fixed14CPUparentRAW+2stress admission PASS; first four screens
+UNRESOLVED versusS50, remainingtwo pending. PPU3.6CUDA sourcecheckPASS,
+nativePPU17SKIP. Full goal unmet, H800ON. Cleanup/PPU1.0-transfer plan in
+docs/SM90_CLEANUP_AND_PPU10_TRANSFER.md; integration/shutdown only after
+complete matrix admission and durable evidence, no production changes yet.
 
 2026-09-27 03:04:25 UTC: S59 full-chunk branch stillifconverted ->nativeFAIL,
 noGPUtiming. S60 indexeddispatch retained8actual EX2tables/body, full/tail
