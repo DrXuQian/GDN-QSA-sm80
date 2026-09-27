@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+from check_sm90_binary import inspect
 
 ROOT = Path(__file__).resolve().parents[2]
 FILE = 'csrc/backends/sm90/scalar_gdn_aux.cuh'
@@ -109,9 +110,47 @@ def progress(chunks, k_capacity=2, omit_last=False):
     return len(seen)
 
 
+def native(candidate, parent, log):
+    if 'C7512' in log or 'C7510' in log:
+        raise ValueError('WGMMA serialized')
+    cm, pm = inspect(candidate), inspect(parent)
+    if cm.keys() != pm.keys():
+        raise ValueError('specialization denominator changed')
+    pieces = re.split(r'Function\s*:\s*(\S+)', candidate)
+    bodies = dict(zip(pieces[1::2], pieces[2::2])); result = {}
+    for name, body in bodies.items():
+        for op in ('HGMMA','HMMA','UTMALDG','UTMASTG','STG','state_stores','tail_stores'):
+            if cm[name][op] != pm[name][op]:
+                raise ValueError('matrix/data work changed: '+op)
+        rows = re.findall(r'/\*([0-9a-f]+)\*/\s*(.*?)\s*;\s*/\*',body)
+        lookahead = []
+        for i,(pc,line) in enumerate(rows):
+            if not line.startswith('HGMMA') or 'gsb0' not in line:
+                continue
+            following = next((j for j in range(i+1,len(rows))
+                if rows[j][1].startswith(('WARPGROUP.DEPBAR','HGMMA'))),len(rows))
+            between = rows[i+1:following]
+            if not any(re.search(r'\bHMMA\.', r) for _,r in between):
+                continue
+            dest = int(re.match(r'HGMMA\S* R(\d+)',line)[1])
+            protected = set(range(dest,dest+32))
+            if any(protected & {int(x) for x in re.findall(r'\bR(\d+)\b',r)} for _,r in between):
+                raise ValueError('inverse touches live KK accumulator')
+            lookahead.append(dict(issue_pc=pc, next_group_pc=rows[following][0],
+                                  protected_registers=[dest,dest+31],
+                                  inverse_hmma_sites=sum(bool(re.search(r'\bHMMA\.',r)) for _,r in between)))
+        if len(lookahead) != 1:
+            raise ValueError('expected exactly one full-chunk future KK/inverse overlap')
+        result[name] = dict(overlap=lookahead[0],counts=cm[name])
+    return result
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--out', type=Path)
+    p.add_argument('--candidate', type=Path)
+    p.add_argument('--parent', type=Path)
+    p.add_argument('--device-log', type=Path)
     args = p.parse_args()
     old = subprocess.check_output(['git','show',f'170f34f:{FILE}'],cwd=ROOT,text=True)
     new = (ROOT/FILE).read_text()
@@ -132,6 +171,17 @@ def main():
         except ValueError: pass
         else: raise AssertionError('deadlock negative escaped')
     result['negatives'] = 5
+    if args.candidate:
+        cand, parent, log = args.candidate.read_text(), args.parent.read_text(), args.device_log.read_text()
+        result['native'] = native(cand,parent,log)
+        early_wait = cand.replace('BAR.SYNC.DEFER_BLOCKING 0xd, 0x80', 'WARPGROUP.DEPBAR.LE gsb0, 0x0',1)
+        overlap = re.sub(r'HMMA\.1688\.F32 R\d+,', 'HMMA.1688.F32 R56,', cand, count=1)
+        for plant, planted_log in [(parent,log),(cand,log+' C7512'),(early_wait,log),
+                                   (overlap,log),(cand.replace('HGMMA.64x64','REMOVED.64x64',1),log)]:
+            try: native(plant,parent,planted_log)
+            except ValueError: pass
+            else: raise AssertionError('native negative escaped')
+        result['native_negatives'] = 5
     text = json.dumps(result,indent=2)+'\n'
     if args.out: args.out.write_text(text)
     print(text,end='')
