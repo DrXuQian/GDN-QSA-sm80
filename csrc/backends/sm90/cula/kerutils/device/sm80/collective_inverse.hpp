@@ -35,6 +35,7 @@
 #include <cutlass/arch/barrier.h>
 
 #include "kerutils/common/cute_ext.hpp"
+#include "inverse_prefix_owner.cuh"
 
 namespace kerutils {
 
@@ -763,20 +764,19 @@ struct CollectiveInverse {
     int thread_idx = threadIdx.x % cutlass::NumThreadsPerWarpGroup;
 
     auto t8X8sT = flat_divide(sT, Shape<_8, _8>{});
-    if (thread_idx < 64) {  // compute 8x8 inverse on diagnal directly
+    if (thread_idx < 64) {
+      // Original four8x8 diagonals per warp. Their two16x16 parents and
+      // one32x32 parent keep that same warp; no cross-warp reader yet.
       compute_diagonal_inverse_NxN<8>(t8X8sT(_, _, thread_idx / 8, thread_idx / 8), thread_idx % 8);
-    }
-
-    cutlass::arch::NamedBarrier::arrive_and_wait(cutlass::NumThreadsPerWarpGroup, wg_sync_named_barrier_id_);
-
-    auto t16X16sT = flat_divide(sT, Shape<_16, _16>{});
-    // four warps for 8x8 -> 16x16
-    blockwise_diagonal_inversed_8x8_to_16x16(t16X16sT(_, _, thread_idx / 32, thread_idx / 32));
-
-    cutlass::arch::NamedBarrier::arrive_and_wait(cutlass::NumThreadsPerWarpGroup, wg_sync_named_barrier_id_);
-
-    auto t32X32sT = flat_divide(sT, Shape<_32, _32>{});
-    if (thread_idx < 64) { // two warps for 16x16 -> 32x32
+      __syncwarp();
+      auto t16X16sT = flat_divide(sT, Shape<_16, _16>{});
+      CUTE_UNROLL
+      for (int half=0; half<2; ++half) {
+        int tile=gdn::sm90::inverse_prefix_tile16(thread_idx / 32, half);
+        blockwise_diagonal_inversed_8x8_to_16x16(t16X16sT(_, _, tile, tile));
+      }
+      __syncwarp();
+      auto t32X32sT = flat_divide(sT, Shape<_32, _32>{});
       blockwise_diagonal_inversed_16x16_to_32x32(t32X32sT(_, _, thread_idx / 32, thread_idx /32));
     }
     cutlass::arch::NamedBarrier::arrive_and_wait(cutlass::NumThreadsPerWarpGroup, wg_sync_named_barrier_id_);
