@@ -1,11 +1,25 @@
 # PPU original-structure port
 
-updated-at: 2026-09-27 01:22:27 UTC
-working-on: S50 B2 nsys improvement confirmed but FI gap remains; S51 inverse local-reduction numerics running; S52 V64 overlap native gates PASS
+updated-at: 2026-09-27 01:33:29 UTC
+working-on: S52 eight nsys confirmations running after V64 screen wins; S53 inverse/overlap composition native PASS and remote CPU build
 blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: 5079825 main; S50 170f34f; S51 36c007d; S52 kernel 549ee4c (V64 tests not yet committed); harness 4f50f13
+last-commit: eec45c5 main; S50 170f34f; S51 36c007d; S52 2d5e78d; S53 8e89c8a; harness 7cfadea
 
 ## Current checkpoint
+
+2026-09-27 01:33:29 UTC: S51 8/8 screens complete:3 narrow parent wins/5unresolved;
+all14CPUparentraw/2stress/8repeats/every graph output PASS. No reference
+speed admission and no default change. S52 all14CPUparentraw/2stress PASS;
+actual V64 ownership16384state/8192output,96shape maps and4negatives PASS.
+Eight screens:7parentwins/1unresolved. T8192 357->346.4..346.6us graph,
+Hv16 89.7..90.7->87.4..88.3us graph. B2 remains slower than retained V128.
+Eight full-forward nsys confirmations now running session15562, first
+T8192/FIweak capture complete; speed results not yet read. CPU harness51
+unittests PASS withCUDAhidden; pytest is absent, no package installed.
+S53 pre-edit composition plan registered, four native bodies retain both
+S51 inverse and S50 paired-tail mechanisms; both real hostmaps PASS.
+Remote CPU buildsession70572; GPU admission queued behindS52.
+H800 ON, expanded goalNOTMET, nativePPU17SKIP. No settings/reference changes.
 
 2026-09-27 01:22:27 UTC: S50 four B2 nsys captures/264 full forwards complete;
 all SQLite results locally re-extracted byte-identically. FI weak/strong:
