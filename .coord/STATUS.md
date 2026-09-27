@@ -1,11 +1,18 @@
 # PPU original-structure port
 
-updated-at: 2026-09-27 09:05:19 UTC
-working-on: Local SM90 cleanup and first opt-in PPU1.0 transfer complete; sealing explicit-path commit and push
+updated-at: 2026-09-27 09:06:38 UTC
+working-on: Local cleanup and first PPU1.0 transfer complete; handoff gate-cache paired box ACU command, no default-route promotion
 blocked-on: PPU1.0 device A/B pending; local PPU import SKIP(GLIBC_2.38); native PPU1.7 SDK/model unavailable
-last-commit: 822fbc6 (PPU1.0 transfer and metadata gate, pushed)
+last-commit: d21af01 (latest code/evidence commit; subsequent STATUS-only commits excluded)
 
 ## Current checkpoint
+
+2026-09-27 09:06:38 UTC: d21af01 commits the clean named SM90 builds and
+final evidence. PPU1.0 transfer was committed f7bbd6a/822fbc6. Worktrees
+contain no remaining implementation edits; explicit ff/push follows this
+status checkpoint. Local checks closed; PPU device A/B pending, not claimed.
+Run CANDIDATE=residual-gate-cache GATE=-1.0 (then -0.1) with site ACU via
+tools/run_ppu_residual_delivery_acu_box.sh. H800 remains shut down.
 
 2026-09-27 09:05:19 UTC: all four final CUDA configurations compile/link/
 importPASS. All16 complete native bodies/resources strictlyIDENTICAL to
