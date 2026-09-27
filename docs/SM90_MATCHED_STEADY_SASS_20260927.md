@@ -61,7 +61,22 @@ on S50, reusing the existing RNE array converter. S35 previously combined
 this with different chunk clones on S24 and was unresolved, so it is not
 an already-admitted win. S69 must retain O2/KV's disjoint live operands and
 their common wait0; its initial native gate removes128whole-body scalar
-sites without changing matrix groups, stack16/104B or TMA work. Timing pending.
+sites without changing matrix groups, stack16/104B or TMA work. Four B2 nsys
+captures now close the test: S69 weak/strong118.897/119.569us versus fastest
+FI114.129/114.913us. All parent-paired S50 ranges overlap despite lower S69
+medians, so no formal parent speed promotion; FI still wins, QLA still loses.
+Evidence: `/workspace/gdn-sm90-packed-newv-20260927/s69-nsys` (264complete
+forwards, exact local SQLite re-extraction).
+
+On2026-09-27 the user explicitly authorizes an exp2-only fastmath macro,
+matching FI's arithmetic choice. S74 is an arithmetic variant, not a claim
+that standard and fast exp2 are generally raw-equivalent. Its default stays
+standard; the independent2% output/state gate remains unchanged. The generated
+fast bodies remove64 underflow comparisons and128 conditional multiplies
+per actual type while preserving all64EX2sites and matrix/pipeline counts.
+Full-body positions fall6440->6240(noinitial),7224->7024(initial). Normal14
+CPU cases and two extreme diagnostics pass; performance is still in progress.
+Keep this experiment distinct from the prior exact range-proof attempts.
 
 S67 and S68 are separate evidence, **not the diagnosis of S50**: S67 one-WG
 state emitted C7512 and one wait per MMA; S68 exact FP32 shared parking
