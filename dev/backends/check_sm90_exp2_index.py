@@ -41,8 +41,13 @@ def native(candidate,parent,table):
             if not branch or int(branch[2],16)!=pc+16:
                 raise ValueError('BRX does not resolve to table-relative absolute PCs')
             reg=branch[1];offset='' if slot==0 else r'\+0x'+format(8*slot,'x')
-            if not any(re.fullmatch(r'LDC '+reg+r', c\[0x2\]\['+reg+offset+r'\]',r)
-                       for _,r in rows[max(0,i-7):i]):
+            # ptxas hoists later constant-table loads across the preceding
+            # tuple's common arithmetic. Follow the actual last definition;
+            # requiring adjacency would incorrectly reject this native CFG.
+            definitions=[(p,r) for p,r in rows[:i]
+                if re.match(r'^(?:@!?\w+\s+)?[\w.]+ '+reg+r'(?:,| )',r)]
+            if not definitions or not re.fullmatch(
+                    r'LDC '+reg+r', c\[0x2\]\[R\d+'+offset+r'\]',definitions[-1][1]):
                 raise ValueError('wrong table offset or index delivery')
             j=index[fast_pc]
             merge=re.fullmatch(r'BRA (0x[0-9a-f]+)',rows[j-1][1])
@@ -84,12 +89,19 @@ def main():
     got=native(c,b,t)
     swapped={k:list(v) for k,v in t.items()};key=next(iter(swapped))
     swapped[key][0],swapped[key][1]=swapped[key][1],swapped[key][0]
-    for bad,tab in ((b,t),(c.replace('MUFU.EX2','REMOVED.EX2',1),t),(c,swapped)):
+    fast=got[key][0]['fast'][2:]
+    missing_fast,n=re.subn(r'(/\*0*'+fast+r'\*/\s*)MUFU.EX2',r'\1REMOVED.EX2',c,count=1)
+    if n!=1:raise AssertionError('fast-path negative not planted')
+    bad_offset=c.replace('c[0x2][R20+0x8]','c[0x2][R20+0x10]',1)
+    if bad_offset==c:raise AssertionError('table offset negative not planted')
+    for bad,tab in ((b,t),(c.replace('MUFU.EX2','REMOVED.EX2',1),t),
+                    (missing_fast,t),(c,swapped),(bad_offset,t)):
         try:native(bad,b,tab)
         except ValueError:continue
         raise AssertionError('native negative escaped')
     print(json.dumps(dict(status='PASS',scope='CUDA_NATIVE_NOT_SPEED',
-        negatives=['old body','missing exponent','swapped branch targets'],bodies=got),indent=2))
+        negatives=['old body','missing fallback exponent','missing fast exponent',
+                   'swapped branch targets','wrong table offset'],bodies=got),indent=2))
 
 
 if __name__=='__main__':main()
