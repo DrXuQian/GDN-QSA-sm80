@@ -1,11 +1,23 @@
 # PPU original-structure port
 
-updated-at: 2026-09-27 04:27:42 UTC
-working-on: S67 compile-rejected; closing raw evidence and reviewing remaining high-head pipeline gap, no new winner
+updated-at: 2026-09-27 04:56:38 UTC
+working-on: S68 exact FP32 state parking passed local maps/lifetime/native gates; remote CPU build, then fixed correctness and high-head screen; matched S50/FlashInfer SASS audit
 blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: 1eed143 main; S55 6317ea4; rings2bb8196; S66 1ac05a3; S67 3eb5d75; harnessbb08cc9
+last-commit: 0544b24 main; S55 6317ea4; S68 f84e0d6; S67 3eb5d75; harnessbb08cc9 (S68 wiring pending)
 
 ## Current checkpoint
+
+2026-09-27 04:56:38 UTC: S68 parks exact FP32 state outside update, unlike
+S67's ineffective O1 move. Four actual types:384threads, roles24/232/248,
+shared227328B+1024static,16384BF16-H and16384FP32-park cells exact-once;
+6map negatives,7source/progress/native negativesPASS. All1..8chunk data rings
+include single-stageKK and independent O drainer. Actual4body CUDA12.8 SASS
+has192/256HGMMA but18/22waits, noC7512, stack0/40B; no-initial spills0.
+Additional shared traffic is explicit, not free. Sourcef84e0d6 pushed;
+remote build is CPU-only, no numeric/performance admission yet. H800 checked
+exclusive idle; ON. Fixed remaining FI8losses/QLA2unresolved unchanged.
+Exact S50/FI B2 native images match their measured binary receipts; inspect
+equivalent steady aux/state loops, not four C++ bodies versus one DSL body.
 
 2026-09-27 04:27:42 UTC: S67 local exact4body compile closed: source move/progress
 PASS, but all4C7512 and192/256HGMMA each retired separately; stack568/704B
