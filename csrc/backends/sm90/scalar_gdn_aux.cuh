@@ -6,6 +6,7 @@
 #include "ordered_pair.cuh"
 #include "aux_chunk_loop.cuh"
 #include "relative_gate_layout.cuh"
+#include "pair_decay.cuh"
 
 namespace gdn::sm90 {
 
@@ -27,6 +28,7 @@ struct ScalarGdnAux : Base {
         // [alpha stage][exp / scaled-exp][token], protected by alpha_pipeline.
         cute::array_aligned<float, 128 * Base::StagesAlpha::value> gate_factors;
         cute::array_aligned<float, 64 * Base::StagesAlpha::value> relative_gate;
+        cute::array_aligned<float, 4096 * Base::StagesAlpha::value> pair_decay;
     };
     using QPipeline = typename Base::MainloopQPipeline;
     using KPipeline = typename Base::MainloopKPipeline;
@@ -93,6 +95,7 @@ struct ScalarGdnAux : Base {
             float rhi = lane+32 < valid ? exp2f(__fsub_rn(last_prefix,hi)) : 0.f;
             smem.relative_gate[relative_gate_index(stage,lane)] = rlo;
             smem.relative_gate[relative_gate_index(stage,lane+32)] = rhi;
+            publish_pair_decay(lo,hi,stage,smem.pair_decay.data());
         };
         CUTE_NO_UNROLL
         for (int block=0; block<ceil_div(work.seq_len,64); ++block) {
@@ -181,10 +184,8 @@ struct ScalarGdnAux : Base {
                 // Inactive intermediates may overflow; the final live selects
                 // below must discard them before either product is published.
                 // Keep standard exp2f, not an approximate/FTZ substitute.
-                float row_log = alpha(row,0,ar.index());
-                float col_log = alpha(col,0,ar.index());
                 float row_beta = beta(row,br.index());
-                float decay = exp2f(row_log-col_log);
+                float decay = smem.pair_decay[pair_decay_index(ar.index(),row,col)];
                 out_qk(i) = Element(live ? acc_qk(i) * decay * params.scale : 0.f);
                 // Inverse expects positive lower input, garbage diagonal and
                 // zero upper triangle, then applies beta along its columns.
