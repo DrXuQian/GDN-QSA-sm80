@@ -43,6 +43,7 @@ def main():
     p.add_argument("--extension", type=Path, required=True)
     p.add_argument("--backend", choices=("cuda_sm90", "ppu17"), required=True)
     p.add_argument("--source-check", action="store_true")
+    p.add_argument("--configuration", choices=("control","value64","value64-local-inverse","value128-paired"), default="control")
     p.add_argument("--out", type=Path, required=True)
     args = p.parse_args()
     validate_cases(CASES)
@@ -52,6 +53,7 @@ def main():
         directory = args.out / name
         cmd = [sys.executable, str(ROOT / "tools/run_sm90_gdn.py"),
             "--extension", str(args.extension.resolve()), "--backend", args.backend,
+            "--configuration", args.configuration,
             "--out", str(directory.resolve()), "--batch", str(b), "--length", str(t),
             "--q-heads", str(h), "--v-heads", str(hv), "--gate", str(g), *extra]
         if args.source_check:

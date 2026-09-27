@@ -19,6 +19,7 @@
 #include <cutlass/cutlass.h>
 #include <cutlass/pipeline/pipeline.hpp>
 
+#include "configuration.cuh"
 #include "kda/sm90/kernel/options.hpp"
 #include "kda/sm90/utils/common.hpp"
 #include "kda/sm90/utils/unused.hpp"
@@ -46,8 +47,10 @@ get_register_requirements(
 #else
     uint32_t load_registers = 40;
 #endif
-    // TODO: better tuning
-    uint32_t total_aux_load_budget = 176;
+    // The original control retains LD/ST24 + auxiliary152 + two state168
+    // groups. Only tuned configurations redistribute this budget: changing
+    // the control here silently changes its spills and WGMMA retirement.
+    uint32_t total_aux_load_budget = gdn::sm90::ConfigurationTraits::AuxLoadBudget;
     uint32_t aux_registers = total_aux_load_budget - load_registers;  // (24 + X) or (40 + X)
 
     uint32_t total_registers =
@@ -198,8 +201,21 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
     static constexpr auto RegisterRequirements =
         get_register_requirements(MaxThreadsPerBlock, MinBlocksPerMultiprocessor, NumStateMmaWarpGroups);
     static constexpr uint32_t LdStRegisterRequirement = get<0>(RegisterRequirements);
-    static constexpr uint32_t StateMmaRegisterRequirement = get<1>(RegisterRequirements);
-    static constexpr uint32_t AuxMmaRegisterRequirement = get<2>(RegisterRequirements);
+    static constexpr uint32_t StateMmaRegisterRequirement =
+        NumStateMmaWarpGroups == 1 ? 192 : get<1>(RegisterRequirements);
+    static constexpr int DefaultAuxMmaRegisterRequirement = get<2>(RegisterRequirements);
+    static constexpr uint32_t AuxMmaRegisterRequirement =
+        find_option_t<Tag::kAuxRegisters, Int<DefaultAuxMmaRegisterRequirement>, Options>::value;
+    static_assert((LdStRegisterRequirement + AuxMmaRegisterRequirement +
+                   NumStateMmaWarpGroups*StateMmaRegisterRequirement)*128 <= 65536);
+
+    // Actual constructor counts, shared with the compiled host proof. A V64
+    // CTA must not retain phantom arrivals from the removed second state WG.
+    static constexpr int StateThreads = 128*NumStateMmaWarpGroups;
+    static constexpr int AuxThreads = 128*NumAuxMmaWarpGroups;
+    static constexpr int QKInputConsumers = StateThreads+AuxThreads;
+    static constexpr int AlphaConsumers = StateThreads+AuxThreads+32;
+    static constexpr int BetaConsumers = StateThreads+AuxThreads;
 
     static size_t
     get_workspace_size(Arguments const& args) {
@@ -240,8 +256,8 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
         enum class WarpGroupRole {
             LdSt = 0,
             Math0 = 1,
-            Math1 = 2,
-            MathA = 3,  // auxiliary math WG
+            Math1 = NumStateMmaWarpGroups == 2 ? 2 : -1,
+            MathA = NumStateMmaWarpGroups+1,  // after the actual state WGs
         };
 
         // NOTE: CollectiveInverse will have more utilization on warp 0&1
@@ -273,18 +289,18 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
             CollectiveMainloop::prefetch_tma_descriptors(params.mainloop);
         }
 
-        constexpr int NumStateMathThreads = NumStateMmaWarpGroups * cutlass::NumThreadsPerWarpGroup;
-        constexpr int NumAuxMathThreads = NumAuxMmaWarpGroups * cutlass::NumThreadsPerWarpGroup;
+        constexpr int NumStateMathThreads = StateThreads;
+        constexpr int NumAuxMathThreads = AuxThreads;
 
         QPipelineParams q_pipeline_params;
         q_pipeline_params.transaction_bytes = CollectiveMainloop::LoadQBytes;
         q_pipeline_params.is_leader = lane_predicate && (ldst_warp_role == LdStWarpRole::LoadQKV);
-        q_pipeline_params.num_consumers = NumStateMathThreads + NumAuxMathThreads;
+        q_pipeline_params.num_consumers = QKInputConsumers;
 
         KPipelineParams k_pipeline_params;
         k_pipeline_params.transaction_bytes = CollectiveMainloop::LoadKBytes;
         k_pipeline_params.is_leader = lane_predicate && (ldst_warp_role == LdStWarpRole::LoadQKV);
-        k_pipeline_params.num_consumers = NumStateMathThreads + NumAuxMathThreads;
+        k_pipeline_params.num_consumers = QKInputConsumers;
 
         VPipelineParams v_pipeline_params;
         v_pipeline_params.transaction_bytes = CollectiveMainloop::LoadVBytes;
@@ -294,7 +310,7 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
         AlphaPipelineParams alpha_pipeline_params;
         if constexpr (NeedsAlpha) {
             alpha_pipeline_params.producer_arv_count = cutlass::NumThreadsPerWarp;
-            alpha_pipeline_params.consumer_arv_count = NumStateMathThreads + NumAuxMathThreads + cutlass::NumThreadsPerWarp;
+            alpha_pipeline_params.consumer_arv_count = AlphaConsumers;
         }
 
         OPipelineParams o_pipeline_params;
@@ -318,7 +334,7 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
         BetaPipelineParams beta_pipeline_params;
         if constexpr (NeedsBeta) {
             beta_pipeline_params.producer_arv_count = cutlass::NumThreadsPerWarp;
-            beta_pipeline_params.consumer_arv_count = NumAuxMathThreads + NumStateMathThreads;
+            beta_pipeline_params.consumer_arv_count = BetaConsumers;
         }
 
         OrderedMathBarriers math_barriers;
@@ -328,7 +344,7 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
             q_pipeline_params.role = MainloopQPipeline::ThreadCategory::Producer;
             k_pipeline_params.role = MainloopKPipeline::ThreadCategory::Producer;
             v_pipeline_params.role = MainloopVPipeline::ThreadCategory::Producer;
-            if constexpr (NeedsAlpha) {
+            if constexpr (NeedsAlpha && !CollectiveMainloop::SeparateScalarGateProducer) {
                 alpha_pipeline_params.role = MainloopAlphaPipeline::ThreadCategory::Producer;
             }
         }
@@ -344,7 +360,10 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
         if (warp_group_role == WarpGroupRole::LdSt && ldst_warp_role == LdStWarpRole::LoadAlpha) {
             // LoadAlpha warp consumes alpha_pipeline (reads last row) and produces alpha_last_pipeline
             if constexpr (NeedsAlpha) {
-                alpha_pipeline_params.role = MainloopAlphaPipeline::ThreadCategory::Consumer;
+                if constexpr (CollectiveMainloop::SeparateScalarGateProducer)
+                    alpha_pipeline_params.role = MainloopAlphaPipeline::ThreadCategory::ProducerConsumer;
+                else
+                    alpha_pipeline_params.role = MainloopAlphaPipeline::ThreadCategory::Consumer;
             }
             alpha_last_pipeline_params.role = MainloopAlphaLastPipeline::ThreadCategory::Producer;
         }
@@ -515,6 +534,13 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
                             work_desc.o_head_idx(),
                             work_desc.seq_len);
                         auto tile_shape = typename CollectiveMainloop::TileShape{};
+                        if constexpr (CollectiveMainloop::SeparateScalarGateProducer) {
+                            collective_mainloop.load_alpha_and_last(
+                                params.mainloop, params.problem_size, tile_shape, work_desc,
+                                alpha_pipeline, alpha_smem_pipe_write, alpha_smem_pipe_read,
+                                alpha_last_pipeline, alpha_last_smem_pipe_write,
+                                storage.tensors.mainloop);
+                        } else {
                         collective_mainloop.extract_alpha_last(
                             params.mainloop,
                             params.problem_size,
@@ -525,6 +551,7 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
                             alpha_last_pipeline,
                             alpha_last_smem_pipe_write,
                             storage.tensors.mainloop);
+                        }
                     }
                 }
             } else if (ldst_warp_role == LdStWarpRole::StoreO) {
@@ -591,7 +618,10 @@ struct FlatKernelTmaWarpSpecializedKdaFwd {
         } else if (warp_group_role == WarpGroupRole::MathA) {
             DPRINTF0_WG(
                 "Compute[aux]: warp_group_idx:%d, RegisterRequirement:%d\n", warp_group_idx, AuxMmaRegisterRequirement);
-            cutlass::arch::warpgroup_reg_alloc<AuxMmaRegisterRequirement>();
+            if constexpr (AuxMmaRegisterRequirement > 128)
+                cutlass::arch::warpgroup_reg_alloc<AuxMmaRegisterRequirement>();
+            else
+                cutlass::arch::warpgroup_reg_dealloc<AuxMmaRegisterRequirement>();
             auto work_desc = scheduler.get_next_work(params.scheduler, params.problem_size);
             CUTE_NO_UNROLL
             for (; work_desc.is_valid(params.scheduler);

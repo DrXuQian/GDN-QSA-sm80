@@ -3,6 +3,8 @@
 #include <cute/tensor.hpp>
 #include "kda/sm90/device/device_universal.hpp"
 #include "kda/sm90/kernel/builder_kda_fwd.hpp"
+#include "value_types.cuh"
+#include "configuration.cuh"
 #include <climits>
 #include <stdexcept>
 
@@ -13,13 +15,10 @@ using BF16 = cutlass::bfloat16_t;
 
 template <class Gate, bool Initial>
 void run(Arguments const& a, cudaStream_t stream) {
-    using Options = std::tuple<Option<Tag::kElementGateGmem, Gate>,
-        Option<Tag::kElementBetaGmem, BF16>,
-        Option<Tag::kInitStateFromInput, cute::bool_constant<Initial>>>;
-    using Stride = cute::tuple<int64_t, _1, int32_t>;
-    using Kernel = typename FlatBuilderKdaFwd<BF16, float, float, Shape<_64,_64,_128>,
-        Stride, Stride, Stride, Stride,
-        cutlass::gemm::KernelTmaWarpSpecializedCooperative, Options>::Kernel;
+    using Types = ValueKernelTypes<Gate,Initial,ConfigurationTraits::ValueTile,
+                                  ConfigurationTraits::AuxRegisters>;
+    using Kernel = std::conditional_t<ConfigurationTraits::Tuned,
+        typename Types::Kernel, typename Types::Builder::Kernel>;
     using Operation = cutlass::device::Universal<Kernel>;
     typename Operation::Arguments args{};
     args.problem_size.total_seqlen = int64_t(a.batch) * a.length;

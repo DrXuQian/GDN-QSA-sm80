@@ -1,11 +1,37 @@
 # PPU original-structure port
 
-updated-at: 2026-09-27 08:45:22 UTC
-working-on: PPU1.0 gate-cache pushed f7bbd6a; SM90 named configurations in final local native-preservation/link/source-check rebuild
-blocked-on: native PPU1.7 SDK/model unavailable; pinned weak-GVA1 QLA fails original 2% numerical gate and is excluded from speed, not counted as a win
-last-commit: f7bbd6a (PPU1.0 gate-cache, pushed)
+updated-at: 2026-09-27 09:05:19 UTC
+working-on: Local SM90 cleanup and first opt-in PPU1.0 transfer complete; sealing explicit-path commit and push
+blocked-on: PPU1.0 device A/B pending; local PPU import SKIP(GLIBC_2.38); native PPU1.7 SDK/model unavailable
+last-commit: 822fbc6 (PPU1.0 transfer and metadata gate, pushed)
 
 ## Current checkpoint
+
+2026-09-27 09:05:19 UTC: all four final CUDA configurations compile/link/
+importPASS. All16 complete native bodies/resources strictlyIDENTICAL to
+their retained originals;16planted defects rejected. Original control176
+register budget restored and proved. Three PPU3.6 source-checksPASS; native
+PPU17SKIP. Final171/171Python,24/24PPUhostCTest,4CuTe host mapsPASS.
+PPU1.0gate-cache compile/linkPASS,36/36old native bodies unchanged;
+new124regs/0stack/46080Bshared, no added barrier, default route unchanged.
+Local PPU importSKIP(GLIBC_2.38), device numerical/perfNOT_RUN. Evidence in
+dev/backends/backend_cleanup_20260927.json. H800 still shut down; no GPU use.
+
+2026-09-27 09:00:41 UTC: final three CUDA tuned builds compile/link/import
+PASS; strict whole-body and resource equality12/12, all12negative plantsPASS.
+All three PPU3.6 CUDA source-checksPASS, not nativePPU17 admission. Four actual
+CuTe host mapsPASS. Added CMake configuration/dependency forwarding test
+(all four names, no actlize graph)PASS. Full171-test Python rerun active.
+Only remaining compiler process is original control, restored176 budget.
+PPU1.0 code already pushed822fbc6; box A/B and runtime import remain pending.
+H800 remains shut down, no GPU job or new performance claim.
+
+2026-09-27 08:53:39 UTC: all three tuned configurations now match every
+measured instruction/operand/resource across their four device bodies.
+Original control gate caught an accidental register-budget transfer from
+the tuned base (176->128); restore original176 before final rebuild.
+Do not weaken the equality gate. PPU1.0 delivery unchanged, no device timing.
+H800 remains shut down. Final SM90 source/evidence commit still pending.
 
 2026-09-27 08:45:22 UTC: SM90 two V64 profiles compile/link/import and match measured
 SASS/resources. V128 integration exposed C<128>->int load extent promotion;

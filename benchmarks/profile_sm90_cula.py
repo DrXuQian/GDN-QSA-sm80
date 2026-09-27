@@ -111,7 +111,9 @@ def main():
 
         def ours(path, backend, source_check):
             os.environ["GDN_QSA_SM90_EXTENSION"] = str(path.resolve())
-            return gdn_chunk_sm90(*tensors, backend=backend, source_check=source_check)
+            role = "ours-ppu-source-check" if source_check else "ours-cuda"
+            return gdn_chunk_sm90(*tensors, backend=backend, source_check=source_check,
+                                 configuration=receipts[role].get("configuration"))
 
         def cula():
             return cula_kda_prefill(

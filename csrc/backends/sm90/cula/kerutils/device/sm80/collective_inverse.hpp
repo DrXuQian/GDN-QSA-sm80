@@ -35,6 +35,8 @@
 #include <cutlass/arch/barrier.h>
 
 #include "kerutils/common/cute_ext.hpp"
+#include "configuration.cuh"
+#include "inverse_local_reduction.cuh"
 
 namespace kerutils {
 
@@ -782,7 +784,14 @@ struct CollectiveInverse {
     cutlass::arch::NamedBarrier::arrive_and_wait(cutlass::NumThreadsPerWarpGroup, wg_sync_named_barrier_id_);
 
     // one warpgroup for 32x32 -> 64x64
-    blockwise_diagonal_inversed_32x32_to_64x64(sT);
+    if constexpr (gdn::sm90::ConfigurationTraits::LocalInverse) {
+      gdn::sm90::inverse64_local_reduction<Element>(sT,wg_sync_named_barrier_id_,
+          [](auto const& acc,auto const& mma) __attribute__((always_inline)) {
+            return detail::SM80::make_acc_into_op<Element>(acc,mma);
+          });
+    } else {
+      blockwise_diagonal_inversed_32x32_to_64x64(sT);
+    }
   }
 
 private:

@@ -25,6 +25,7 @@ def main():
     p.add_argument("--extension",type=Path,required=True)
     p.add_argument("--backend",choices=("cuda_sm90","ppu17"),required=True)
     p.add_argument("--source-check",action="store_true")
+    p.add_argument("--configuration",choices=("control","value64","value64-local-inverse","value128-paired"),default="control")
     p.add_argument("--out",type=Path,required=True)
     p.add_argument("--batch",type=int,default=1)
     p.add_argument("--length",type=int,default=65)
@@ -47,6 +48,8 @@ def main():
     expected_mode="source-check" if args.source_check else "native"
     if manifest.get("target")!=args.backend or manifest.get("mode")!=expected_mode:
         p.error("requested execution target does not match build receipt")
+    if manifest.get("configuration")!=args.configuration:
+        p.error("requested configuration does not match build receipt")
     if not (-1. <= args.gate <= 0.): p.error("initial admission range is natural-log g in [-1,0]")
     args.out.mkdir(parents=True,exist_ok=True)
     torch.set_num_threads(1)
@@ -71,7 +74,7 @@ def main():
     print(f"[SM90 subject] backend={args.backend} source_check={args.source_check} "
           "public_calls=1 warmup=0 device_reference=0 performance=NOT_MEASURED",flush=True)
     got=gdn_chunk_sm90(*inputs,initial_state=initial,output_final_state=not args.output_only,
-                      backend=args.backend,source_check=args.source_check)
+                      backend=args.backend,source_check=args.source_check,configuration=args.configuration)
     torch.cuda.synchronize()
     actual=tuple(x.detach().cpu() for x in got if x is not None)
     expected=tuple(x for x in want if x is not None)
@@ -86,7 +89,7 @@ def main():
     if digest(tuple(t.cpu() for t in inputs))!=digest(cpu): raise AssertionError("input mutation")
     if state is not None and not torch.equal(initial.cpu(),state): raise AssertionError("initial state mutation")
     props=torch.cuda.get_device_properties(args.device)
-    result=dict(backend=args.backend,source_check=args.source_check,device=props.name,
+    result=dict(backend=args.backend,configuration=args.configuration,source_check=args.source_check,device=props.name,
         shape=[args.batch,args.length,args.q_heads,args.v_heads,128],gate=args.gate,
         gate_pattern="token-head-distinct" if args.vary_gate else "constant",
         harness_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),

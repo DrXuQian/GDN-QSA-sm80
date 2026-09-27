@@ -17,6 +17,7 @@
 #include <cutlass/cutlass.h>
 #include <cutlass/fast_math.h>
 #include <cutlass/kernel_hardware_info.h>
+#include "configuration.cuh"
 
 namespace kda::sm90::kernel {
 
@@ -34,6 +35,11 @@ struct WorkDesc {
 
     // update by mainloop
     int32_t tile_idx = 0;  // current tile index (mutated by the mainloop)
+#if GDN_SM90_CONFIGURATION == 1 || GDN_SM90_CONFIGURATION == 2
+    // V64-only descriptor: do not impose the sliced work ABI on V128/control.
+    // Retain the measured V64 layout and the original nonsliced layout.
+    int32_t value_offset = 0;
+#endif
 
     template <typename Params>
     CUTE_DEVICE bool

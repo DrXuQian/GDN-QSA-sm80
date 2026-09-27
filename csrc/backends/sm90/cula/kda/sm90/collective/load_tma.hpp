@@ -29,6 +29,7 @@
  */
 
 #pragma once
+#include "configuration.cuh"
 
 #include <cute/tensor.hpp>
 #include <cutlass/cutlass.h>
@@ -140,12 +141,22 @@ struct CollectiveLoadTma {
                     problem_size.total_seqlen,
                     num_kv_heads));                               // global view to the packed varlen sequence
                 Tensor m_varlen = m_varlen_head(_, _, head_idx);  // slice into current head_idx
+                constexpr int ValueRows = size<0>(SmemLayout{});
+                auto value_offset = [&] {
+                    if constexpr (!kIsK && ValueRows != HeadSize) return work_desc.value_offset;
+                    else return _0{};
+                }();
                 Tensor m_offset = domain_offset(
-                    make_coord(_0{}, work_desc.tok_offset),
+                    make_coord(value_offset, work_desc.tok_offset),
                     m_varlen);  // offset to start of the current sequence
-                Tensor g_full =
-                    local_tile(m_offset, make_tile(HeadSize, BlkSeqKV), make_coord(_0{}, _));  // (d, blk, iter_blk)
-                return g_full;
+                if constexpr (gdn::sm90::ConfigurationTraits::ValueTile == 128) {
+                    // Preserve the nonsliced reader's static CuTe extent.
+                    // The ternary below promotes HeadSize's C<128> to int.
+                    return local_tile(m_offset, make_tile(HeadSize, BlkSeqKV), make_coord(_0{}, _));
+                } else {
+                    // Keep the measured V64 reader's type/codegen unchanged.
+                    return local_tile(m_offset, make_tile(kIsK ? HeadSize : ValueRows, BlkSeqKV), make_coord(_0{}, _));
+                }
             }
         }();
         Tensor s = make_tensor(make_smem_ptr(storage.data()), SmemLayout{});

@@ -121,7 +121,7 @@ def main():
 
         def call():
             return gdn_chunk_sm90(*tensors, backend=args.backend,
-                                  source_check=args.source_check)
+                                  source_check=args.source_check, configuration=manifest.get("configuration"))
 
         anchor = call()
         torch.cuda.synchronize()

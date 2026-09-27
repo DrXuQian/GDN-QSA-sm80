@@ -18,19 +18,25 @@ import sysconfig
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "csrc/backends/sm90"
+CONFIGURATIONS = ("control", "value64", "value64-local-inverse", "value128-paired")
 
 
 def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def flags(target, mode):
+def flags(target, mode, configuration="control"):
+    if configuration not in CONFIGURATIONS:
+        raise ValueError(f"unknown configuration: {configuration}")
     result = ["-std=c++17", "-O3", "--expt-relaxed-constexpr", "--extended-lambda",
               "-gencode=arch=compute_90a,code=sm_90a", "-lineinfo", "-Xcompiler=-fPIC"]
     if target == "ppu17":
         result += ["-DGDN_SM90_PPU17=1", "-DACOMPUTE_VERSION=10700"]
         if mode == "source-check":
             result += ["-DGDN_SM90_SOURCE_CHECK=1"]
+    result += [f"-DGDN_SM90_CONFIGURATION={CONFIGURATIONS.index(configuration)}"]
+    if configuration != "control":
+        result += ["-DNDEBUG"]
     return result
 
 
@@ -49,9 +55,46 @@ def dependency(target, supplied):
     return root
 
 
+def dependency_identity(root):
+    """Bind actual headers, including untracked files and archive snapshots.
+
+    Git searches parent directories. Its HEAD is the dependency's own revision
+    only when the discovered top-level is exactly this dependency directory.
+    """
+    root = Path(root).resolve()
+    files = {}
+    for path in sorted((root / "include").rglob("*")):
+        if path.is_symlink() and path.is_dir():
+            raise ValueError(f"dependency include directory symlink requires a canonical snapshot: {path}")
+        if path.is_file():
+            files[path.relative_to(root).as_posix()] = sha(path)
+    if not files:
+        raise ValueError(f"empty dependency include tree: {root}")
+    encoded = json.dumps(files, sort_keys=True, separators=(",", ":")).encode()
+    probe = subprocess.run(["git", "-C", str(root), "rev-parse", "--show-toplevel"],
+                           capture_output=True, text=True)
+    revision = None
+    containing = None
+    if probe.returncode == 0:
+        top = Path(probe.stdout.strip()).resolve()
+        head = subprocess.check_output(["git", "-C", str(top), "rev-parse", "HEAD"],
+                                       text=True).strip()
+        if top == root:
+            revision = head
+        else:
+            containing = dict(root=str(top), revision=head,
+                              subtree=root.relative_to(top).as_posix())
+    return dict(dependency_revision=revision,
+                dependency_containing_repository=containing,
+                dependency_tree_sha256=hashlib.sha256(encoded).hexdigest(),
+                dependency_headers_sha256=files)
+
+
 def admit_reuse(prior,current,obj):
-    keys=("target","mode","compiler","compiler_sha256","dependency","flags","include",
-          "source_sha256","dependency_version_sha256","dependency_revision","dependency_include_diff_sha256")
+    keys=("target","mode","configuration","compiler","compiler_sha256","dependency","flags","include",
+          "source_sha256","dependency_version_sha256","dependency_tree_sha256")
+    if not prior.get("dependency_tree_sha256") or not current.get("dependency_tree_sha256"):
+        raise ValueError("device reuse dependency identity changed or lacks a complete header hash; rebuild")
     if any(prior.get(k)!=current.get(k) for k in keys):
         raise ValueError("device reuse identity/source/dependency changed; rebuild in a new directory")
     if not obj.is_file() or prior.get("device_object_sha256")!=sha(obj):
@@ -62,6 +105,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--target",choices=("cuda_sm90","ppu17"),required=True)
     p.add_argument("--mode",choices=("native","source-check"),default="native")
+    p.add_argument("--configuration", choices=CONFIGURATIONS, default="control")
     p.add_argument("--out",type=Path,required=True)
     p.add_argument("--compiler",type=Path)
     p.add_argument("--cutlass-root",default=os.getenv("PPU_CUTLASS_ROOT"))
@@ -83,14 +127,13 @@ def main():
     if not compiler.is_file(): raise ValueError(f"compiler missing: {compiler}")
     # Keep wrapper path: SDK nvcc wrappers may locate their runtime relative to it.
     include=[f"-I{SOURCE}",f"-I{SOURCE/'cula'}",f"-I{dep/'include'}"]
-    options=flags(args.target,args.mode)
-    identity=dict(target=args.target,mode=args.mode,compiler=str(compiler),compiler_sha256=sha(compiler),
+    options=flags(args.target,args.mode,args.configuration)
+    identity=dict(target=args.target,mode=args.mode,configuration=args.configuration,compiler=str(compiler),compiler_sha256=sha(compiler),
                   dependency=str(dep),flags=options,include=include,device_admission="NOT_RUN")
     identity["dependency_version_sha256"]=sha(dep/"include/cutlass/version.h")
-    for name,directory in (("repository",ROOT),("dependency",dep)):
-        identity[name+"_revision"]=subprocess.check_output(["git","-C",str(directory),"rev-parse","HEAD"],text=True).strip()
-        diff=subprocess.check_output(["git","-C",str(directory),"diff","HEAD","--","include"])
-        identity[name+"_include_diff_sha256"]=hashlib.sha256(diff).hexdigest()
+    identity["repository_revision"]=subprocess.check_output(
+        ["git","-C",str(ROOT),"rev-parse","HEAD"],text=True).strip()
+    identity.update(dependency_identity(dep))
     identity["source_sha256"]={str(x.relative_to(ROOT)):sha(x) for x in sorted(SOURCE.rglob("*")) if x.is_file()}
     identity_file=out/"build.json"
     prior={}
@@ -142,11 +185,14 @@ def main():
             f"s=importlib.util.spec_from_file_location('_gdn_fused_sm90',{str(extension)!r}); "
             "m=importlib.util.module_from_spec(s); s.loader.exec_module(m); "
             f"assert m.target=={target_name!r}; "
+            f"assert m.configuration=={args.configuration!r}; "
             "assert m.math_contract=='cula-scalar-gdn-fused-bf16-v1'; "
             "print('IMPORT/PASS; no device queried/launched')"])
         print(f"[GDN SM90 build] extension={extension}",flush=True)
     after={str(x.relative_to(ROOT)):sha(x) for x in sorted(SOURCE.rglob("*")) if x.is_file()}
     if after!=identity["source_sha256"]: raise RuntimeError("source changed during build; do not use this binary")
+    if dependency_identity(dep)["dependency_tree_sha256"] != identity["dependency_tree_sha256"]:
+        raise RuntimeError("dependency headers changed during build; do not use this binary")
     identity["complete"]=True
     identity_file.write_text(json.dumps(identity,indent=2)+"\n")
     print(f"[GDN SM90 build] PASS scope=COMPILE_LINK_ONLY target={args.target} mode={args.mode} device=NOT_RUN")

@@ -25,6 +25,14 @@ the superseded simplified PPU port or the older
 one-CTA-per-head serial recurrence.  Its deliberately narrow v1 contract and
 admission evidence are documented in [`docs/PPU_BACKEND.md`](docs/PPU_BACKEND.md).
 
+The independent forward **SM90 scalar-GDN backend** now has named opt-in
+`value64`, `value64-local-inverse`, and `value128-paired` builds alongside
+the unchanged default control. See
+[backend organization and transfer boundaries](docs/SM90_CONFIGURATION_AND_PPU_TRANSFER.md).
+The first controlled PPU1.0 transfer, exact gate-coefficient reuse, has its
+[local evidence and ACU A/B command](docs/PPU10_GATE_COEFFICIENT_REUSE.md);
+its device performance is not yet measured and default routing is unchanged.
+
 > **Status**: all four operators shipped — `gdn_chunk` (M1), `qsa_indexer` + `output_gate` (M2), `qsa_core` (M3).
 >
 > **Validation**: clean-A800 build / test / benchmark record in [`docs/VALIDATION_LOG.md`](docs/VALIDATION_LOG.md) (37/37 tests PASS).

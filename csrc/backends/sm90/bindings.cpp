@@ -59,9 +59,14 @@ std::vector<torch::Tensor> forward(torch::Tensor q, torch::Tensor k, torch::Tens
 }
 } // namespace
 
+#include "configuration.cuh"
 PYBIND11_MODULE(TORCH_EXTENSION_NAME,m) {
     m.def("forward",&forward);
     m.attr("target")=GDN_SM90_TARGET_NAME;
     m.attr("math_contract")="cula-scalar-gdn-fused-bf16-v1";
+    m.attr("numeric_schedule")=gdn::sm90::ConfigurationTraits::Tuned
+        ? "scalar-GDN-BF16-WGMMA; FP16 inverse precomputed by auxiliary warpgroup"
+        : "original control; TF32 conditioning and FP16 inverse";
     m.attr("device_admission")="UNVERIFIED";
+    m.attr("configuration")=gdn::sm90::ConfigurationTraits::Name;
 }

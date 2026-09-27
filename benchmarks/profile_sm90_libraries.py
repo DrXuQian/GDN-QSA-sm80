@@ -162,7 +162,9 @@ def main():
 
         def ours(path, backend, source_check):
             os.environ["GDN_QSA_SM90_EXTENSION"] = str(path.resolve())
-            return gdn_chunk_sm90(*tensors, backend=backend, source_check=source_check)
+            role = "ours-ppu-source-check" if source_check else "ours-cuda"
+            return gdn_chunk_sm90(*tensors, backend=backend, source_check=source_check,
+                                 configuration=builds[role].get("configuration"))
 
         calls = {"ours-cuda": lambda: ours(args.cuda_extension, "cuda_sm90", False),
                  "ours-ppu-source-check": lambda: ours(args.ppu_source_extension, "ppu17", True)}

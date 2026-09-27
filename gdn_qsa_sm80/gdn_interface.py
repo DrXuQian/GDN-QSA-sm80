@@ -11,7 +11,7 @@ from .backends.registry import require_implementation
 
 
 def gdn_forward(q, k, v, g, beta, initial_state=None, output_final_state=True,
-                *, algorithm="original", backend=None, delivery=None):
+                *, algorithm="original", backend=None, delivery=None, configuration=None):
     """Execute one complete implementation with its existing numerical gate.
 
     backend names identify compiled execution targets, not a measured device.
@@ -22,6 +22,8 @@ def gdn_forward(q, k, v, g, beta, initial_state=None, output_final_state=True,
     implementation; this wrapper performs no hidden conversions.
     """
     legacy_ppu = "GDN_QSA_PPU_EXTENSION" in os.environ
+    if configuration is not None and algorithm != "fused_sm90":
+        raise ValueError("named SM90 configurations do not apply to another backend")
     if algorithm == "fused_sm90" and backend is None:
         raise ValueError("fused_sm90 requires an explicit cuda_sm90 or ppu17 backend")
     if backend is None:
@@ -43,7 +45,8 @@ def gdn_forward(q, k, v, g, beta, initial_state=None, output_final_state=True,
         if delivery is not None:
             raise ValueError("fused_sm90 owns its pipeline; legacy delivery selectors do not apply")
         return call(q,k,v,g,beta,initial_state=initial_state,
-                    output_final_state=output_final_state,backend=backend)
+                    output_final_state=output_final_state,backend=backend,
+                    **({"configuration": configuration} if configuration is not None else {}))
     if algorithm == "original":
         return call(q, k, v, g, beta, output_final_state=output_final_state)
     return call(q, k, v, g, beta, initial_state=initial_state,

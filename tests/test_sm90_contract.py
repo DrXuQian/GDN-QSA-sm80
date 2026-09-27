@@ -33,7 +33,7 @@ class Contracts(unittest.TestCase):
             module.forward.assert_not_called()
 
     def test_output_only_is_not_a_different_math_implementation(self):
-        module=SimpleNamespace(target="cuda_sm90",math_contract=MATH_CONTRACT,forward=Mock(return_value=("O",None)))
+        module=SimpleNamespace(target="cuda_sm90",math_contract=MATH_CONTRACT,configuration="control",forward=Mock(return_value=("O",None)))
         with patch("gdn_qsa_sm80.gdn_sm90_interface._explicit_path",return_value="binary.so"),patch(
             "gdn_qsa_sm80.gdn_sm90_interface._load",return_value=module):
             self.assertEqual(gdn_chunk_sm90(1,2,3,4,5,initial_state=6,backend="cuda_sm90",output_final_state=False),("O",None))
@@ -61,7 +61,7 @@ class Contracts(unittest.TestCase):
         directory=Path("/workspace")/f"gdn-sm90-reuse-{uuid4().hex}"
         directory.mkdir()
         obj=directory/"object.o";obj.write_bytes(b"synthetic-test-object")
-        identity=dict(target="cuda_sm90",source_sha256={"a":"a"})
+        identity=dict(target="cuda_sm90",source_sha256={"a":"a"},dependency_tree_sha256="header-tree")
         prior=identity|{"device_object_sha256":module.sha(obj)}
         module.admit_reuse(prior,identity,obj)
         for plant in (identity|{"target":"ppu17"},identity|{"source_sha256":{"a":"b"}}):
@@ -83,7 +83,10 @@ class Contracts(unittest.TestCase):
     def test_scalar_gate_is_not_tma_byte_counted(self):
         src=(ROOT/"csrc/backends/sm90/cula/kda/sm90/kernel/kernel_kda_fwd.hpp").read_text()
         self.assertIn("alpha_pipeline_params.producer_arv_count = cutlass::NumThreadsPerWarp",src)
-        self.assertIn("alpha_pipeline_params.consumer_arv_count = NumStateMathThreads + NumAuxMathThreads + cutlass::NumThreadsPerWarp",src)
+        self.assertIn("static constexpr int AlphaConsumers = StateThreads+AuxThreads+32;",src)
+        self.assertIn("alpha_pipeline_params.consumer_arv_count = AlphaConsumers;",src)
+        self.assertIn("static constexpr int StateThreads = 128*NumStateMmaWarpGroups;",src)
+        self.assertIn("static constexpr int AuxThreads = 128*NumAuxMmaWarpGroups;",src)
         self.assertNotIn("alpha_pipeline_params.transaction_bytes",src)
 
     def test_new_build_graph_and_single_launch_runner(self):
