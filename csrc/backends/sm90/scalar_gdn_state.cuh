@@ -111,16 +111,26 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             int valid = last ? int(work.seq_len-chunk*64) : 64;
             ap.consumer_wait(ar);
             qp.consumer_wait(qr);
+            kp.consumer_wait(kr);
             auto acc_o = partition_fragment_C(o1_thread,Shape<_128,_64>{});
+            auto acc_sk = partition_fragment_C(sk_thread,Shape<_128,_64>{});
             if constexpr (!first) {
+                // Same rounded H, disjoint O1/SK accumulators. Both products
+                // retire before H conversion storage or Q can be reused.
+                static_assert(std::is_same_v<typename Base::TiledMmaO1::LayoutA_TV,
+                                             typename Base::TiledMmaSK::LayoutA_TV>);
                 auto operand_h = kda::sm90::collective::make_acc_into_op<Element>(h,typename Base::TiledMmaO1::LayoutA_TV{});
                 warpgroup_fence_operand(operand_h);
                 warpgroup_fence_operand(acc_o);
+                warpgroup_fence_operand(acc_sk);
                 order.ordered_or_wait(wg);
                 warpgroup_arrive();
                 gemm_zero_acc(o1_mma,operand_h,q_desc(_,_,_,qr.index()),acc_o);
+                gemm_zero_acc(sk_mma,operand_h,k_desc(_,_,_,kr.index()),acc_sk);
                 warpgroup_commit_batch(); order.notify_next_blocked(wg);
-                warpgroup_wait<0>(); warpgroup_fence_operand(acc_o);
+                warpgroup_wait<0>();
+                warpgroup_fence_operand(acc_o);
+                warpgroup_fence_operand(acc_sk);
                 CUTE_UNROLL
                 for (int i=0; i<size(acc_o); ++i) {
                     auto [dv,t] = c_output(i);
@@ -129,18 +139,6 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             }
             qp.consumer_release(qr); ++qr;
 
-            kp.consumer_wait(kr);
-            auto acc_sk = partition_fragment_C(sk_thread,Shape<_128,_64>{});
-            if constexpr (!first) {
-                auto operand_h = kda::sm90::collective::make_acc_into_op<Element>(h,typename Base::TiledMmaSK::LayoutA_TV{});
-                warpgroup_fence_operand(operand_h);
-                warpgroup_fence_operand(acc_sk);
-                order.ordered_or_wait(wg);
-                warpgroup_arrive();
-                gemm_zero_acc(sk_mma,operand_h,k_desc(_,_,_,kr.index()),acc_sk);
-                warpgroup_commit_batch(); order.notify_next_blocked(wg);
-                warpgroup_wait<0>(); warpgroup_fence_operand(acc_sk);
-            }
             vp.consumer_wait(vr);
             auto residual = make_fragment_like<Element>(acc_sk);
             copy(load_v,lv.partition_S(v)(_,_,_,vr.index()),lv.retile_D(residual));
