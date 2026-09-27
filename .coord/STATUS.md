@@ -1,11 +1,24 @@
 # PPU original-structure port
 
-updated-at: 2026-09-27 05:54:05 UTC
-working-on: user-authorized exp2-only fastmath S74 compiling; audit relaxed majority-win / remaining <=5% goal; root migration complete, no route changes
+updated-at: 2026-09-27 06:10:29 UTC
+working-on: S74 native/numeric/8-screen closed; 16 high-head nsys captures running for standard/fastmath and relaxed <=5% closure audit
 blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: abf5ed8 main; S74 0e0ba0a; S73 31289c6; harness12e63bb
+last-commit: a76ce3b main; S74 86c3ef6; S73 31289c6; harnessd859d80
 
 ## Current checkpoint
+
+2026-09-27 06:10:29 UTC: S74 initial compile error was our nonexistent CUDA
+__exp2f intrinsic, not an environment failure. Repaired to native
+ex2.approx.ftz.f32 after two-mode tiny compile. Full4body fast code removes
+64underflow compares/128FMUL/200sites with unchanged64EX2/matrix/TMA/barriers,
+stack16/104. Fresh default native stream identicalS69;5negativesPASS. Local/
+remote native match.14CPUcases+2stress unchanged2%PASS; ordinary14rawsame,
+which is not a universal math-equivalence claim. All8high-head graph screens
+UNRESOLVED; no speedpromotion. Sixteen nsys captures nowexclusive62990,
+first2 B2captures pass: standard121.008/120.544,fast121.024/121.664,
+fastestFI116.641/116.769us. Bothwithin5% there; remainingcellsnotyetclosed.
+PPU3.6CUDA sourcecheckPASS/nativePPU17SKIP. H800ON. Vendor shutdown wrapper
+read-only inspected; no power action. Codecleanup/PPU1.0port after goal.
 
 2026-09-27 05:54:05 UTC: user explicitly authorizes fast exp2 macro to match
 FlashInfer fastmath and relaxes final speed target: majority of fixed cases
