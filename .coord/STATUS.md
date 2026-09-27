@@ -1,11 +1,24 @@
 # PPU original-structure port
 
-updated-at: 2026-09-27 06:32:02 UTC
-working-on: revised performance condition MET; save and verify all remote evidence before authorized H800 shutdown, then local source cleanup and PPU1.0 transfer
+updated-at: 2026-09-27 06:39:04 UTC
+working-on: performance campaign CLOSED; authorized H800 shutdown invoked after sealed evidence; next is local SM90 cleanup and controlled PPU1.0 transfer
 blocked-on: native PPU1.7 SDK/model unavailable; pinned weak-GVA1 QLA fails original 2% numerical gate and is excluded from speed, not counted as a win
-last-commit: a73e4b8 main; S74 86c3ef6; S73 31289c6; harness d859d80
+last-commit: 0a0d6eb main; S74 86c3ef6; S73 31289c6; harness d859d80
 
 ## Current checkpoint
+
+2026-09-27 06:39:04 UTC: H800 vendor shutdown invoked06:38:39 after exact
+host/GPU/idle/supervisor/wrapper validation. Fresh SSH now connection-refused;
+provider billing API not separately queried. All51,282 archive files (4.54GB)
+sealed and independently SHA-256 rechecked, four actual binaries and source
+hashes match. Source Git bundles and exact measured dependency tree saved.
+Final docs/results pushed0a0d6eb. No user data deleted or active GPU job killed.
+Composite condition remainsMET: FI20W/8L<=4.8565%, QLA25W/2U/1numeric-invalid.
+S74 no consistent speed gain, defaultstandard retained. SM90 integration and
+PPU1.0 transfer NOT completed; do locally next. Do not reconnect/start another
+H800 experiment. Old dependency_revision33b6b9c was the enclosing GDN Git root,
+not a CUTLASS SHA; archive actual4.3.2 headers as byte authority. Native PPU17
+stillSKIP, separate PPU3.6CUDA sourcecheckPASS. No new production route.
 
 2026-09-27 06:32:02 UTC: final16 high-head captures / 1,056 complete forwards
 locally re-extracted EXACT. Fixed14x2x2 composite ledger: FI20W/8L (largest
