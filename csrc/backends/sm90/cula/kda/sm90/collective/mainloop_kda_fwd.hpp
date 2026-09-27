@@ -128,8 +128,8 @@ struct FlatMainloopTmaWarpSpecializedKdaFwd {
     using StagesO = cutlass::gemm::collective::StageCount<1>;
     using ClusterShape = Shape<_1, _1, _1>;
 
-    using StagesQK = cutlass::gemm::collective::StageCount<2>;
-    using StagesKK = cutlass::gemm::collective::StageCount<2>;
+    using StagesQK = cutlass::gemm::collective::StageCount<find_option_t<Tag::kStagesQK, Int<2>, Options>::value>;
+    using StagesKK = cutlass::gemm::collective::StageCount<find_option_t<Tag::kStagesKK, Int<2>, Options>::value>;
 
     using StagesAlpha = cutlass::gemm::collective::StageCount<2>;
     using StagesBeta = cutlass::gemm::collective::StageCount<2>;
@@ -318,7 +318,7 @@ struct FlatMainloopTmaWarpSpecializedKdaFwd {
 
     using SmemLayoutKK = decltype(tile_to_shape(
         GMMA::Layout_K_INTER_Atom<Element>{},
-        flatten(make_shape(select<0, 1>(TileShapeQK{}), Int<StagesQK::value>{})),
+        flatten(make_shape(select<0, 1>(TileShapeQK{}), Int<StagesKK::value>{})),
         Step<_1, _2, _3>{}));
 
     using InverseType = cutlass::half_t;
