@@ -1,11 +1,24 @@
 # PPU original-structure port
 
-updated-at: 2026-09-27 04:56:38 UTC
-working-on: S68 exact FP32 state parking passed local maps/lifetime/native gates; remote CPU build, then fixed correctness and high-head screen; matched S50/FlashInfer SASS audit
+updated-at: 2026-09-27 05:09:30 UTC
+working-on: S68 rejected all6screens; matched S50/FI SASS audit closed; S69 pure packed-NewV conversion nativePASS, numeric admission restart after checker bundle-dependency failure
 blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: 0544b24 main; S55 6317ea4; S68 f84e0d6; S67 3eb5d75; harnessbb08cc9 (S68 wiring pending)
+last-commit: c324e21 main; S55 6317ea4; S68 f84e0d6; S69 0d3fc4b; harness e42643d
 
 ## Current checkpoint
+
+2026-09-27 05:09:30 UTC: matched measured B2S50/FI auxiliary1064/920sites,
+state665/642. Matrix counts equal. FI explicitlyfastmathEX2; standardexp2f
+boundary handling is an arithmetic contract, not gratuitous address work.
+Of aux IMAD48/13,23/2areMOV, so do not label entire family address multiplies.
+Three auxiliary spills are loop-invariant coordinates, not state matrix.
+S68 full14CPUparentRAW+2stress/repeatsPASS but all6graphscreenslose28–34%;
+reject. S69 only packs NewV conversion before retile onS50; fourbody128scalar
+converts->0, same matrix/retirement/stack16/104. Native/source5negativesPASS;
+first remote admission stopped BEFORE GPU because checker referenced S35git
+object outside transferred ancestry. Bind exact helperbytes instead; retain
+failure directory and rerun fresh. No kernel change from this check repair.
+Full performance goal unchanged/unmet; H800ON, no route/reference edits.
 
 2026-09-27 04:56:38 UTC: S68 parks exact FP32 state outside update, unlike
 S67's ineffective O1 move. Four actual types:384threads, roles24/232/248,
