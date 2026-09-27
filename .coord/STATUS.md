@@ -1,11 +1,24 @@
 # PPU original-structure port
 
-updated-at: 2026-09-27 06:10:29 UTC
-working-on: S74 native/numeric/8-screen closed; 16 high-head nsys captures running for standard/fastmath and relaxed <=5% closure audit
-blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: a76ce3b main; S74 86c3ef6; S73 31289c6; harnessd859d80
+updated-at: 2026-09-27 06:25:50 UTC
+working-on: 13/16 high-head nsys captures complete; audit relaxed majority-win/remaining-loss<=5% target, then seal evidence before authorized H800 shutdown
+blocked-on: native PPU1.7 SDK/model unavailable; pinned weak-GVA1 QLA fails original 2% numerical gate and is excluded from speed, not counted as a win
+last-commit: 75ea0ac main; S74 86c3ef6; S73 31289c6; harness d859d80
 
 ## Current checkpoint
+
+2026-09-27 06:25:50 UTC: all8 FI captures completed. Standard S69 median
+losses are 3.23--4.86%, within the user's newly authorized 5% closure limit;
+this does not relabel losses as wins. Five QLA captures complete, three
+pending. Fast S74 has no consistent speed advantage; default remains
+standard. H800 still ON; no overlapping GPU job or shutdown yet. Recent
+avoidable command defects are ours: nonexistent device __exp2f, relying on
+bare remote python PATH, and assuming every numeric case has a state-error
+element. Distinguish those from intentional resource/native candidate
+rejections (C7512 serialization or excess spills), and from environmental
+SKIP. S74 repaired with a tiny two-mode compile before full build/link/import;
+native, independent numerics and eight screens now pass. The active profiler
+pipeline is healthy, not stuck at an error.
 
 2026-09-27 06:10:29 UTC: S74 initial compile error was our nonexistent CUDA
 __exp2f intrinsic, not an environment failure. Repaired to native
