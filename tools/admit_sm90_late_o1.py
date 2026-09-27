@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """S45 only: reuse the fixed14-case oracle and two exact overflow stresses."""
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -12,16 +13,20 @@ sys.path[:0]=[str(ROOT),str(ROOT/'benchmarks'),str(ROOT/'tests')]
 
 
 def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--candidate',choices=('s45','s49'),default='s45')
+    choice=parser.parse_args().candidate
     import torch
     from bench_sm90_hopper import DeviceWatch
     from profile_sm90_libraries import build_receipt
-    root=Path('/workspace/gdn-sm90-late-o1-20260926')
+    root=Path('/workspace/gdn-sm90-late-o1-20260926' if choice=='s45' else
+              '/workspace/gdn-sm90-paired-state-20260926')
     parent=Path('/workspace/gdn-sm90-win-20260926')
-    build=root/'s45-build'
+    build=root/(choice+'-build')
     binary=next(build.glob('_gdn_fused_sm90*.so'))
     identity=build_receipt(binary,'cuda_sm90','native')
-    out=root/'s45-admission-r2';out.mkdir()
-    row=dict(id='s45',root=str(root),build=str(build),status='RUNNING',
+    out=root/('s45-admission-r2' if choice=='s45' else 's49-admission');out.mkdir()
+    row=dict(id=choice,root=str(root),build=str(build),status='RUNNING',
              binary_sha256=identity['extension_sha256'])
     result=dict(denominator=1,rows=[row],performance='NOT_RUN',routing='UNCHANGED')
     from sm90_process_family import admission_watch
@@ -35,9 +40,11 @@ def main():
         if any(r['telemetry'].split(',')[0]!='GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c' for r in watch.records):
             raise RuntimeError('unexpected device identity')
         watch.thread.start()
-        run('native',[root/'source/dev/backends/check_sm90_late_o1_native.py',build/'codegen/image.sass',
+        native='check_sm90_late_o1_native.py' if choice=='s45' else 'check_sm90_paired_state_native.py'
+        progress='check_sm90_late_o1.py' if choice=='s45' else 'check_sm90_paired_state.py'
+        run('native',[root/'source/dev/backends'/native,build/'codegen/image.sass',
             parent/'relative-build/codegen/image.sass','--device-log',build/'device.log'])
-        run('progress',[root/'source/dev/backends/check_sm90_late_o1.py'])
+        run('progress',[root/'source/dev/backends'/progress])
         run('cases',[ROOT/'tests/run_sm90_hopper_cases.py','--extension',binary,'--backend','cuda_sm90','--out',out/'cases'])
         expected=json.loads((parent/'relative-cases/cases.json').read_text())
         actual=json.loads((out/'cases/cases.json').read_text())
@@ -63,7 +70,7 @@ def main():
             harness_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest())
         (out/'admission.json').write_text(json.dumps(result,indent=2)+'\n')
     if row['status']!='PASS':raise RuntimeError(row)
-    print('[S45 admission] PASS; performance NOT_RUN',flush=True)
+    print(f'[{choice.upper()} admission] PASS; performance NOT_RUN',flush=True)
 
 
 if __name__=='__main__':main()
