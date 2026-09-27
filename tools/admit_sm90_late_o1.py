@@ -14,7 +14,7 @@ sys.path[:0]=[str(ROOT),str(ROOT/'benchmarks'),str(ROOT/'tests')]
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--candidate',choices=('s45','s49','s50','s51','s52','s53','s54','s55','s56','s57','s58','s60','s61','s62','s63','s64','s65','s66'),default='s45')
+    parser.add_argument('--candidate',choices=('s45','s49','s50','s51','s52','s53','s54','s55','s56','s57','s58','s60','s61','s62','s63','s64','s65','s66','s68'),default='s45')
     choice=parser.parse_args().candidate
     import torch
     from bench_sm90_hopper import DeviceWatch
@@ -36,7 +36,8 @@ def main():
                's63':'/workspace/gdn-sm90-aux-ring-sweep-20260927',
                's64':'/workspace/gdn-sm90-aux-ring-sweep-20260927',
                's65':'/workspace/gdn-sm90-aux-ring-sweep-20260927',
-               's66':'/workspace/gdn-sm90-local-inverse-prefix-20260927'}[choice])
+               's66':'/workspace/gdn-sm90-local-inverse-prefix-20260927',
+               's68':'/workspace/gdn-sm90-state-park-20260927'}[choice])
     parent=Path('/workspace/gdn-sm90-win-20260926')
     build=root/(choice+'-build')
     binary=next(build.glob('_gdn_fused_sm90*.so'))
@@ -57,7 +58,12 @@ def main():
         if any(r['telemetry'].split(',')[0]!='GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c' for r in watch.records):
             raise RuntimeError('unexpected device identity')
         watch.thread.start()
-        if choice=='s53':
+        if choice=='s68':
+            if '-DGDN_SM90_SHARED_STATE=1' not in identity['flags']:
+                raise ValueError('S68 must select the registered one-state shared-H body')
+            run('source-lifetime-native',[root/'source/dev/backends/check_sm90_state_park.py',
+                '--candidate',build/'codegen/image.sass','--device-log',build/'device.log'])
+        elif choice=='s53':
             for label,checker,control in (
                 ('inverse','check_sm90_inverse_local.py','/workspace/gdn-sm90-paired-tail-20260927/s50-build'),
                 ('overlap','check_sm90_paired_tail.py','/workspace/gdn-sm90-local-inverse-20260927/s51-build')):

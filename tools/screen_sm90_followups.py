@@ -29,7 +29,7 @@ def main():
     a = p.parse_args()
     admission = json.loads(a.admission.read_text())
     inventory = [r["id"] for r in admission["rows"]]
-    if (inventory not in (["s39", "s40", "s41"], ["s45"], ["s47"], ["s48"], ["s49"], ["s50"], ["s51"], ["s52"], ["s53"], ["s54"], ["s55"], ["s56"], ["s57"], ["s58"], ["s60"], ["s61"], ["s62"], ["s63"], ["s64"], ["s65"], ["s66"])
+    if (inventory not in (["s39", "s40", "s41"], ["s45"], ["s47"], ["s48"], ["s49"], ["s50"], ["s51"], ["s52"], ["s53"], ["s54"], ["s55"], ["s56"], ["s57"], ["s58"], ["s60"], ["s61"], ["s62"], ["s63"], ["s64"], ["s65"], ["s66"], ["s68"])
             or admission["denominator"] != len(inventory)
             or any(row["status"] != "PASS" for row in admission["rows"])):
         raise ValueError("every candidate in the registered inventory must first pass numerical admission")
@@ -48,7 +48,7 @@ def main():
         raise ValueError("require the unremapped single H800 host")
     watch = DeviceWatch(0)
     rows = []
-    denominator = (6 if inventory in (['s53'],['s54'],['s56'],['s57'],['s58'],['s60'],['s61'],['s62'],['s63'],['s64'],['s65'],['s66']) else 8 if inventory in
+    denominator = (6 if inventory in (['s53'],['s54'],['s56'],['s57'],['s58'],['s60'],['s61'],['s62'],['s63'],['s64'],['s65'],['s66'],['s68']) else 8 if inventory in
                    (['s49'],['s50'],['s51'],['s52']) else 4 * len(inventory))
     result = dict(scope="H800_GRAPH_SCREEN_NOT_NSYS_ADMISSION", denominator=denominator,
                   admission_sha256=sha(a.admission), harness_sha256=sha(__file__),
@@ -68,7 +68,7 @@ def main():
         for candidate in admission["rows"]:
             control = (Path("/workspace/gdn-sm90-value-split-20260926/s38-build") if candidate["id"] in ("s41","s52")
                        else Path("/workspace/gdn-sm90-win-20260926/relative-build"))
-            if candidate['id'] in ('s53','s54','s56','s57','s58','s60','s61','s62','s63','s64','s65','s66'):
+            if candidate['id'] in ('s53','s54','s56','s57','s58','s60','s61','s62','s63','s64','s65','s66','s68'):
                 control=Path('/workspace/gdn-sm90-paired-tail-20260927/s50-build')
             elif candidate['id']=='s55':
                 control=Path('/workspace/gdn-sm90-v64-paired-tail-20260927/s52-build')
@@ -84,7 +84,7 @@ def main():
             elif candidate['id']=='s53':
                 paths['original-v128']=next(Path('/workspace/gdn-sm90-win-20260926/relative-build').glob('_gdn_fused_sm90*.so'))
                 paths['inverse-only']=next(Path('/workspace/gdn-sm90-local-inverse-20260927/s51-build').glob('_gdn_fused_sm90*.so'))
-            elif candidate['id'] in ('s54','s56','s57','s58','s60','s61','s62','s63','s64','s65','s66'):
+            elif candidate['id'] in ('s54','s56','s57','s58','s60','s61','s62','s63','s64','s65','s66','s68'):
                 paths['original-v128']=next(Path('/workspace/gdn-sm90-win-20260926/relative-build').glob('_gdn_fused_sm90*.so'))
             elif candidate['id']=='s55':
                 paths['original-v64']=next(Path('/workspace/gdn-sm90-value-split-20260926/s38-build').glob('_gdn_fused_sm90*.so'))
@@ -94,7 +94,7 @@ def main():
             workloads = ("seq2048", "seq8192") if candidate["id"] == "s41" else ("seq2048", "batch2")
             if candidate['id'] in ('s49','s50','s51','s52'):
                 workloads=('seq2048','batch2','seq8192','heads16')
-            elif candidate['id'] in ('s53','s54','s56','s57','s58','s60','s61','s62','s63','s64','s65','s66'):
+            elif candidate['id'] in ('s53','s54','s56','s57','s58','s60','s61','s62','s63','s64','s65','s66','s68'):
                 workloads=('batch2','batch4','heads64-gva4')
             elif candidate['id']=='s55':
                 workloads=('seq8192','heads16')
@@ -153,7 +153,7 @@ def main():
                                binaries=identities, input_sha256=digest(cpu), errors=errors,
                                fingerprint=fingerprints["candidate"], replay=f"8_DIRECT+{len(paths)*16}_GRAPH_RESULTS",
                                summary_us=summary, verdict=verdict, admission="NOT_A_SPEED_VERDICT")
-                    if candidate['id'] in ('s48','s49','s50','s51','s52','s53','s54','s55','s56','s57','s58','s60','s61','s62','s63','s64','s65','s66'):
+                    if candidate['id'] in ('s48','s49','s50','s51','s52','s53','s54','s55','s56','s57','s58','s60','s61','s62','s63','s64','s65','s66','s68'):
                         row['candidate_vs_controls']={role:(
                             'CANDIDATE-WINS' if max(samples['candidate'])<min(times) else
                             'CONTROL-WINS' if max(times)<min(samples['candidate']) else 'UNRESOLVED')
@@ -165,7 +165,7 @@ def main():
                     (a.out / "screen.json").write_text(json.dumps(result, indent=2) + "\n")
                     print(f"[screen] {candidate['id']} {name} g={gate} parent={summary['parent']['median']:.3f} "
                           f"candidate={summary['candidate']['median']:.3f} {verdict} NSYS_REQUIRED", flush=True)
-                    if candidate['id'] in ('s48','s49','s50','s51','s52','s53','s54','s55','s56','s57','s58','s60','s61','s62','s63','s64','s65','s66'):
+                    if candidate['id'] in ('s48','s49','s50','s51','s52','s53','s54','s55','s56','s57','s58','s60','s61','s62','s63','s64','s65','s66','s68'):
                         print('[screen extra controls] '+json.dumps(dict(
                             medians={k:v['median'] for k,v in summary.items()},
                             verdicts=row['candidate_vs_controls']),sort_keys=True),flush=True)
