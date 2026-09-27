@@ -1,11 +1,20 @@
 # PPU original-structure port
 
-updated-at: 2026-09-27 02:45:54 UTC
-working-on: S58 closed without gain; S59 branch-batched exact auxiliary EX2 registered before edit
+updated-at: 2026-09-27 03:04:25 UTC
+working-on: S59 rejected at native gate; S60 indexed EX2 passed native+exact seam, full numerical admission then high-head screens
 blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: 700ef26 main; S55 6317ea4; S56 29550cd; S57 1f46010; S58 37f0975; harness eb50a17
+last-commit: 53fb0d6 main; S55 6317ea4; S59 6ecd300; S60 37e7d13; harness 0996a4e
 
 ## Current checkpoint
+
+2026-09-27 03:04:25 UTC: S59 full-chunk branch stillifconverted ->nativeFAIL,
+noGPUtiming. S60 indexeddispatch retained8actual EX2tables/body, full/tail
+target bytes/operand definitions checked;5native negativesPASS. Exact helper
+1572874inputs rawsame; badshuffle345490, unguarded262560, omittedprefix160
+expected mismatches.197producer fixtures/all32lanesPASS.51CPUharness testsPASS.
+Full14CPUparentRAW+2stress then6highhead screens nowexclusive session79136.
+PPU3.6CUDAcheckPASS/nativePPU17SKIP. Cleanup/PPU1.0 transfer plan added;
+no production/SM80 route or clock/power changes, no shutdown, targetNOTMET.
 
 2026-09-27 02:45:54 UTC: S58 six high-head screens allUNRESOLVED; no
 promotion. Full raw artifacts copied locally. S59 independentS50 plan
