@@ -33,9 +33,10 @@ CUTE_DEVICE bool collect_aux_normal_span(float lo, float hi) {
 #define GDN_EX2_DIRECT_SLOT(i) "ex2.approx.ftz.f32 %" #i ", %" #i ";\n"
 CUTE_DEVICE void auxiliary_exp2_batch8(float (&values)[8], bool normal_span) {
     asm volatile(
-        "{ .reg .pred normal, scale;\n"
-        "setp.ne.u32 normal, %8, 0;\n"
-        "@normal bra.uni direct;\n"
+        "{ .reg .pred scale;\n"
+        "targets: .branchtargets corrected, direct;\n"
+        "brx.idx.uni %8, targets;\n"
+        "corrected:\n"
         GDN_EX2_CORRECTED_SLOT(0) GDN_EX2_CORRECTED_SLOT(1)
         GDN_EX2_CORRECTED_SLOT(2) GDN_EX2_CORRECTED_SLOT(3)
         GDN_EX2_CORRECTED_SLOT(4) GDN_EX2_CORRECTED_SLOT(5)
