@@ -14,14 +14,15 @@ sys.path[:0]=[str(ROOT),str(ROOT/'benchmarks'),str(ROOT/'tests')]
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--candidate',choices=('s45','s49','s50'),default='s45')
+    parser.add_argument('--candidate',choices=('s45','s49','s50','s51'),default='s45')
     choice=parser.parse_args().candidate
     import torch
     from bench_sm90_hopper import DeviceWatch
     from profile_sm90_libraries import build_receipt
     root=Path({'s45':'/workspace/gdn-sm90-late-o1-20260926',
                's49':'/workspace/gdn-sm90-paired-state-20260926',
-               's50':'/workspace/gdn-sm90-paired-tail-20260927'}[choice])
+               's50':'/workspace/gdn-sm90-paired-tail-20260927',
+               's51':'/workspace/gdn-sm90-local-inverse-20260927'}[choice])
     parent=Path('/workspace/gdn-sm90-win-20260926')
     build=root/(choice+'-build')
     binary=next(build.glob('_gdn_fused_sm90*.so'))
@@ -41,8 +42,9 @@ def main():
         if any(r['telemetry'].split(',')[0]!='GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c' for r in watch.records):
             raise RuntimeError('unexpected device identity')
         watch.thread.start()
-        if choice=='s50':
-            run('native-progress',[root/'source/dev/backends/check_sm90_paired_tail.py',
+        if choice in ('s50','s51'):
+            checker='check_sm90_paired_tail.py' if choice=='s50' else 'check_sm90_inverse_local.py'
+            run('native-source',[root/'source/dev/backends'/checker,
                 '--candidate',build/'codegen/image.sass','--parent',parent/'relative-build/codegen/image.sass',
                 '--device-log',build/'device.log'])
         else:
