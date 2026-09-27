@@ -14,7 +14,7 @@ sys.path[:0]=[str(ROOT),str(ROOT/'benchmarks'),str(ROOT/'tests')]
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--candidate',choices=('s45','s49','s50','s51','s52','s53','s54','s55','s56','s57'),default='s45')
+    parser.add_argument('--candidate',choices=('s45','s49','s50','s51','s52','s53','s54','s55','s56','s57','s58'),default='s45')
     choice=parser.parse_args().candidate
     import torch
     from bench_sm90_hopper import DeviceWatch
@@ -28,7 +28,8 @@ def main():
                's54':'/workspace/gdn-sm90-independent-tail-20260927',
                's55':'/workspace/gdn-sm90-v64-inverse-tail-20260927',
                's56':'/workspace/gdn-sm90-causal-sectors-20260927',
-               's57':'/workspace/gdn-sm90-overlap-kk-first-20260927'}[choice])
+               's57':'/workspace/gdn-sm90-overlap-kk-first-20260927',
+               's58':'/workspace/gdn-sm90-paired-retire-20260927'}[choice])
     parent=Path('/workspace/gdn-sm90-win-20260926')
     build=root/(choice+'-build')
     binary=next(build.glob('_gdn_fused_sm90*.so'))
@@ -55,9 +56,9 @@ def main():
                 run('native-'+label,[root/'source/dev/backends'/checker,
                     '--candidate',build/'codegen/image.sass','--parent',Path(control)/'codegen/image.sass',
                     '--device-log',build/'device.log'])
-        elif choice in ('s54','s56','s57'):
+        elif choice in ('s54','s56','s57','s58'):
             checker={'s54':'check_sm90_independent_tail.py','s56':'check_sm90_causal_sectors.py',
-                     's57':'check_sm90_kk_overlap.py'}[choice]
+                     's57':'check_sm90_kk_overlap.py','s58':'check_sm90_paired_retire.py'}[choice]
             run('native-source',[root/'source/dev/backends'/checker,
                 '--candidate',build/'codegen/image.sass',
                 '--parent','/workspace/gdn-sm90-paired-tail-20260927/s50-build/codegen/image.sass',
