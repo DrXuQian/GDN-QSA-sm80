@@ -1,11 +1,24 @@
 # PPU original-structure port
 
-updated-at: 2026-09-27 03:43:06 UTC
-working-on: S62 rejected six screen losses; four QK/KK ring tuples compiling, native/default identity and exact physical stage checks next
+updated-at: 2026-09-27 04:03:36 UTC
+working-on: QK/KK rings closed with no winner; S66 two-warp inverse subtree passed actual map/native/PTX, device admission next
 blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: 07724fc main; S55 6317ea4; S62 b824490; rings407d9fb; harness138e8d6
+last-commit: 7147e73 main; S55 6317ea4; rings5a873fe; S66 1ac05a3; harnessf895710
 
 ## Current checkpoint
+
+2026-09-27 04:03:36 UTC: four QK/KK tuples/16actual types nativePASS,
+default2/2 native-identical; wrong KK-as-QK asymmetric negative compileFAIL.
+All3changed tuples14CPUparentRAW+2stress/replayPASS,18screens complete,
+no newwinner. PPU3.6CUDAchecksPASS/nativePPU17SKIP. S66 separateS50 branch
+keeps original two-warp8x8 ownership through their16/32parents. Actual6144
+updated-cell maps/four negativesPASS. Four native bodies remove4CTAbarriers,
+add4staticHMMA1688 sites (same CTA useful work, fewer participating warps).
+Helper math unchanged; CUDA/PTX source-bound warp fences and8negative gates
+PASS. Stack8/104B, not a measured gain. Device admission queued next, no
+GPUoverlap or selectorchange. H800ON; fixed composite goal stillNOTMET.
+Reusable scoped lessons added to Hopper skill and validated; PPU1.0 proposal
+explicitly distinguishes relative-decay reuse from nontransferable WGMMA.
 
 2026-09-27 03:43:06 UTC: S62 full numerical/RAW/replay PASS and native
 future KK really overlaps inverse, but all6screens lose by~30..37%; reject.
