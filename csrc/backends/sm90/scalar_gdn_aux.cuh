@@ -144,16 +144,20 @@ struct ScalarGdnAux : Base {
         auto tq = store_qk.get_thread_slice(tid);
         auto tk = store_kk.get_thread_slice(tid);
 
-        for_each_aux_chunk(int(work.seq_len), [&](int, auto valid_tag) __attribute__((always_inline)) {
-            int valid = int(valid_tag);
-            auto acc_qk = partition_fragment_C(mma, Shape<_64,_64>{});
-            auto acc_kk = partition_fragment_C(mma, Shape<_64,_64>{});
-
+        // One resident future-KK fragment, not a second set of products. The
+        // current K slot stays held until the matching QK group also retires.
+        auto acc_kk = partition_fragment_C(mma, Shape<_64,_64>{});
+        auto issue_kk = [&]() __attribute__((always_inline)) {
             kp.consumer_wait(kr);
             warpgroup_fence_operand(acc_kk);
             warpgroup_arrive();
             kda::sm90::collective::gemm_zero_acc(mma, ka(_,_,_,kr.index()), kb(_,_,_,kr.index()), acc_kk);
             warpgroup_commit_batch();
+        };
+        issue_kk();
+        for_each_aux_chunk(int(work.seq_len), [&](int chunk, auto valid_tag) __attribute__((always_inline)) {
+            int valid = int(valid_tag);
+            auto acc_qk = partition_fragment_C(mma, Shape<_64,_64>{});
             qp.consumer_wait(qr);
             warpgroup_fence_operand(acc_qk);
             warpgroup_arrive();
@@ -194,6 +198,11 @@ struct ScalarGdnAux : Base {
             qkp.producer_acquire(qw);
             copy(store_qk, tq.retile_S(out_qk), tq.partition_D(qk(_,_,qw.index())));
             copy(store_kk, tk.retile_S(out_kk), tk.partition_D(kk(_,_,kw.index())));
+            // All reads of current acc_kk are complete. The inverse below
+            // uses shared KK; make_fragment_like only takes acc_kk's type.
+            // The current iteration owns its output slots before looking
+            // ahead, and its previous chunk was already published.
+            if (chunk + 1 < aux_chunk_count(int(work.seq_len))) issue_kk();
             if constexpr (AuxInverse) {
                 // KK remains private to the producer until BOTH inversion and
                 // its beta-column conversion finish. State must not repeat it.
