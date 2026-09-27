@@ -78,7 +78,7 @@ def native(cand,old,log):
 
 
 def progress(chunks):
-    # Source-bound shared data ring, including BOTH state publishers and the
+    # Source-bound shared data ring, including the ONE V64 state publisher and the
     # output TMA drainer. Metadata has a separate monotone progress lemma:
     # a producer blocked by a full alpha-last ring has already published the
     # current consumer's slot; it cannot block that same slot's first publish.
@@ -86,11 +86,11 @@ def progress(chunks):
     # Async completion time and CUDA memory visibility are not modelled.
     state=['wQ','rQ','wK','wV','wKK','rV','rKK','wQK','rQK','aO','cO','rK']
     programs=[['cQ','cK','cV'],['wK','wQ','rK','rQ','aKK','aQK','cQK','cKK'],
-              state,state,['wO','rO']]
+              state,['wO','rO']]
     programs=[p*chunks for p in programs]
     caps={'Q':2,'K':2,'V':1,'QK':2,'KK':2,'O':1}
-    producers={'Q':(0,),'K':(0,),'V':(0,),'QK':(1,),'KK':(1,),'O':(2,3)}
-    readers={'Q':(1,2,3),'K':(1,2,3),'V':(2,3),'QK':(2,3),'KK':(2,3),'O':(4,)}
+    producers={'Q':(0,),'K':(0,),'V':(0,),'QK':(1,),'KK':(1,),'O':(2,)}
+    readers={'Q':(1,2),'K':(1,2),'V':(2,),'QK':(2,),'KK':(2,),'O':(3,)}
     counts=[]
     for prog in programs:
         rows=[{}]
@@ -104,10 +104,10 @@ def progress(chunks):
         if kind=='r':return n(pc,a,'w'+p)>n(pc,a,op)
         if kind=='c' and a!=0:return n(pc,a,'a'+p)>n(pc,a,op)
         return n(pc,a,op)<min(n(pc,x,'r'+p) for x in readers[p])+caps[p]
-    initial=(0,)*5;seen={initial};todo=deque([initial]);terminal=0
+    initial=(0,)*4;seen={initial};todo=deque([initial]);terminal=0
     while todo:
         pc=todo.popleft();following=[]
-        if all(pc[i]==len(programs[i]) for i in range(5)):terminal+=1;continue
+        if all(pc[i]==len(programs[i]) for i in range(4)):terminal+=1;continue
         for actor,prog in enumerate(programs):
             if pc[actor]<len(prog) and ready(pc,actor,prog[pc[actor]]):
                 nxt=list(pc);nxt[actor]+=1;nxt=tuple(nxt);following.append(nxt)
@@ -121,7 +121,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--candidate',type=Path);parser.add_argument('--parent',type=Path)
     parser.add_argument('--device-log',type=Path);args=parser.parse_args()
-    old=subprocess.check_output(['git','show',f'06b7471:{FILE}'],cwd=ROOT,text=True)
+    old=subprocess.check_output(['git','show',f'2b51b2f:{FILE}'],cwd=ROOT,text=True)
     new=(ROOT/FILE).read_text();source(old,new)
     plants=(old,new.replace('operand_scaled(i) =','operand_delta(i) =',1),
         new.replace('warpgroup_wait<0>();\n            warpgroup_fence_operand(h);','warpgroup_fence_operand(h);',1),
