@@ -176,8 +176,21 @@ inverse, retain its accumulator and K slot through next QK completion. All
 1..8-chunk source-bound ring interleavings terminate; making K single-stage
 or omitting final publication is rejected. Four native bodies keep KK live
 across14inverse HMMA sites with disjoint registers and no premature retirement.
-Its extra liveness increases stack to88/152B, so overlap is not a speed claim.
-Fixed numerical admission and six screens are pending, deadline04:15UTC.
+Its extra liveness increases stack to88/152B. All14CPUparentRAW+2stress,
+8repeats and captured outputs pass. Six screens all lose: B2~154vs112us,
+B4~318vs241..243us, Hv64~151vs113us. Reject; no reference capture. The native
+overlap is real, but its added liveness, spill and earlier next-K wait are
+costs, not proof of which single mechanism caused the loss. Local/remote
+native instruction streams match SHAe1a8e225ecc1e4330969df87894134c720ce34e2f532e4e56a05806897ac3e2a.
+
+The next separately registered inventory varies QK/KK result-ring depths:
+(2,2) control, S63(1,2), S64(2,1), S65(1,1). These were not axes in the prior
+32-cell input/metadata-stage sweep. Actual compiled layout checks caught that
+KK storage used QK's depth while both were fixed2; no existing unequal-depth
+runtime defect is claimed. Asymmetric configurations now independently bind
+storage and pipeline. The wrong-QK-depth negative fails all4actual types.
+Default2/2 reproduces every S50 native instruction/operand. All4tuples pass
+native/progress gates; device numerics/screens are pending. No promotion.
 
 Each has a pre-edit plan, fixed deadline and independent worktree under
 /workspace. GPU work is sequential and DeviceWatch-gated. H800 remains on.

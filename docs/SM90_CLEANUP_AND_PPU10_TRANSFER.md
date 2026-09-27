@@ -52,7 +52,13 @@ PPU1.7 uses the separate CUTLASS3.6/Hopper family. H800 is neither PPU target.
 | Keep last inverse partials in their row-owning warp; S55 closes four FI cells | Transfer the **ownership idea**, not the FP16 implementation. Current PPU solve explicitly retains a FP32 diagonal and three-product TF32 rounding contract. | Derive actual PPU atom/lane map and partial lifetimes; preserve each declared cast/add/product, or admit a separately named numerical algorithm. No silent FP16/one-TF32 substitution. |
 | Value slicing and role resource tradeoff; V64 wins underfilled H800 cases but loses larger grids | Existing PPU V16/V32/8warp experiments already expose the same tradeoff. H800 does not establish a new PPU selector. | Recheck grid supply, resident capacity **and** issue readiness with PPU's real CU/register/shared limits. Count duplicated K/P/auxiliary work; retain the measured PPU winner. |
 | Independent O2/KV operand lifetimes; S50 improves H800 high-head cases | Async overlap mechanism is Hopper-specific. PPU1.0 does not inherit WGMMA commit/wait groups. | Only consider portable operand reuse/lifetime changes that actually lower PPU load/compute hazards. Keep AIU.swzl matched to ld.swzl; inspect native scheduling and full-call ACU. |
-| Producer-proved EX2 fast domain / explicit indexed dispatch, S59/S60 | CUDA12.8-specific codegen experiment; no PPU benefit established. S59 failed its native branch gate; S60 timing pending. | Inspect PPU standard math lowering and special-value behavior independently. Never strip a PTX prefix or assume `brx` compatibility is efficient native execution. |
+| Producer-proved EX2 fast domain / explicit indexed dispatch, S59/S60 | CUDA12.8-specific experiment; no PPU benefit established. S59 failed its native branch gate; S60 preserved actual branches and exact numerics but lost/overlapped every screen. | Inspect PPU standard math lowering and special-value behavior independently. Never strip a PTX prefix or assume `brx` compatibility is efficient native execution. |
+| Asymmetric buffer-depth admission | Directly portable verification method, not a tuning value. QK=KK=2 had hidden that KK storage named the QK depth. | Give independent axes unequal values in actual-type probes and verify each pipeline's own storage/reader capacity. Equal defaults cannot test independence. |
+
+The first row refers specifically to
+`csrc/gdn_chunk/gdn_wy_residual_warps8_hvlayout_ppu.cu`, not a hypothetical
+SM90-like PPU directory. Keep the PPU backend's selected source as the
+authority when applying the proposed coefficient reuse.
 
 H800 observations use nsys all-kernel sums. Future PPU comparisons retain
 the site's `/sim/eec/shared/junfu.qx/asight/bin/acu`; no claimed PPU speedup
