@@ -14,7 +14,7 @@ sys.path[:0]=[str(ROOT),str(ROOT/'benchmarks'),str(ROOT/'tests')]
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--candidate',choices=('s45','s49','s50','s51','s52','s53','s54','s55','s56','s57','s58','s60','s61','s62'),default='s45')
+    parser.add_argument('--candidate',choices=('s45','s49','s50','s51','s52','s53','s54','s55','s56','s57','s58','s60','s61','s62','s63','s64','s65'),default='s45')
     choice=parser.parse_args().candidate
     import torch
     from bench_sm90_hopper import DeviceWatch
@@ -32,7 +32,10 @@ def main():
                's58':'/workspace/gdn-sm90-paired-retire-20260927',
                's60':'/workspace/gdn-sm90-aux-exp2-index-20260927',
                's61':'/workspace/gdn-sm90-local-diagonal-20260927',
-               's62':'/workspace/gdn-sm90-kk-lookahead-20260927'}[choice])
+               's62':'/workspace/gdn-sm90-kk-lookahead-20260927',
+               's63':'/workspace/gdn-sm90-aux-ring-sweep-20260927',
+               's64':'/workspace/gdn-sm90-aux-ring-sweep-20260927',
+               's65':'/workspace/gdn-sm90-aux-ring-sweep-20260927'}[choice])
     parent=Path('/workspace/gdn-sm90-win-20260926')
     build=root/(choice+'-build')
     binary=next(build.glob('_gdn_fused_sm90*.so'))
@@ -60,17 +63,24 @@ def main():
                 run('native-'+label,[root/'source/dev/backends'/checker,
                     '--candidate',build/'codegen/image.sass','--parent',Path(control)/'codegen/image.sass',
                     '--device-log',build/'device.log'])
-        elif choice in ('s54','s56','s57','s58','s60','s61','s62'):
+        elif choice in ('s54','s56','s57','s58','s60','s61','s62','s63','s64','s65'):
             checker={'s54':'check_sm90_independent_tail.py','s56':'check_sm90_causal_sectors.py',
                      's57':'check_sm90_kk_overlap.py','s58':'check_sm90_paired_retire.py',
                      's60':'check_sm90_exp2_index.py',
                      's61':'check_sm90_local_diagonal.py',
-                     's62':'check_sm90_kk_lookahead.py'}[choice]
+                     's62':'check_sm90_kk_lookahead.py',
+                     's63':'check_sm90_aux_rings.py','s64':'check_sm90_aux_rings.py',
+                     's65':'check_sm90_aux_rings.py'}[choice]
+            ring_config={'s63':1,'s64':2,'s65':3}.get(choice)
+            if ring_config is not None and f'-DGDN_SM90_AUX_RING_CONFIG={ring_config}' not in identity['flags']:
+                raise ValueError('compiled auxiliary ring configuration differs')
             run('native-source',[root/'source/dev/backends'/checker,
                 '--candidate',build/'codegen/image.sass',
                 '--parent','/workspace/gdn-sm90-paired-tail-20260927/s50-build/codegen/image.sass',
                 '--device-log',build/'device.log',
-                *(['--ptx',root/'retained-ptx/launch.ptx'] if choice=='s61' else [])])
+                *(['--ptx',root/'retained-ptx/launch.ptx'] if choice=='s61' else []),
+                *(['--config',ring_config,'--types',root/f'types-{ring_config}.jsonl']
+                  if ring_config is not None else [])])
             if choice=='s60':
                 run('source-range',[root/'source/tests/test_sm90_aux_range.py'])
                 run('exact-exp2-seam',[root/'exp2-probe'],interpreter=False)
