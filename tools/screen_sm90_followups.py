@@ -29,7 +29,7 @@ def main():
     a = p.parse_args()
     admission = json.loads(a.admission.read_text())
     inventory = [r["id"] for r in admission["rows"]]
-    if (inventory not in (["s39", "s40", "s41"], ["s45"], ["s47"], ["s48"], ["s49"], ["s50"], ["s51"], ["s52"], ["s53"], ["s54"], ["s55"], ["s56"], ["s57"], ["s58"], ["s60"], ["s61"], ["s62"], ["s63"], ["s64"], ["s65"], ["s66"], ["s68"], ["s69"])
+    if (inventory not in (["s39", "s40", "s41"], ["s45"], ["s47"], ["s48"], ["s49"], ["s50"], ["s51"], ["s52"], ["s53"], ["s54"], ["s55"], ["s56"], ["s57"], ["s58"], ["s60"], ["s61"], ["s62"], ["s63"], ["s64"], ["s65"], ["s66"], ["s68"], ["s69"], ["s74"])
             or admission["denominator"] != len(inventory)
             or any(row["status"] != "PASS" for row in admission["rows"])):
         raise ValueError("every candidate in the registered inventory must first pass numerical admission")
@@ -50,6 +50,8 @@ def main():
     rows = []
     denominator = (6 if inventory in (['s53'],['s54'],['s56'],['s57'],['s58'],['s60'],['s61'],['s62'],['s63'],['s64'],['s65'],['s66'],['s68'],['s69']) else 8 if inventory in
                    (['s49'],['s50'],['s51'],['s52']) else 4 * len(inventory))
+    if inventory==['s74']:
+        denominator=8
     result = dict(scope="H800_GRAPH_SCREEN_NOT_NSYS_ADMISSION", denominator=denominator,
                   admission_sha256=sha(a.admission), harness_sha256=sha(__file__),
                   rows=rows, status="INCOMPLETE", routing="UNCHANGED")
@@ -72,6 +74,8 @@ def main():
                 control=Path('/workspace/gdn-sm90-paired-tail-20260927/s50-build')
             elif candidate['id']=='s55':
                 control=Path('/workspace/gdn-sm90-v64-paired-tail-20260927/s52-build')
+            elif candidate['id']=='s74':
+                control=Path('/workspace/gdn-sm90-packed-newv-20260927/s69-build')
             paths = {"parent": next(control.glob("_gdn_fused_sm90*.so")),
                      "candidate": next(Path(candidate["build"]).glob("_gdn_fused_sm90*.so"))}
             if candidate['id']=='s48':
@@ -88,9 +92,15 @@ def main():
                 paths['original-v128']=next(Path('/workspace/gdn-sm90-win-20260926/relative-build').glob('_gdn_fused_sm90*.so'))
             elif candidate['id']=='s55':
                 paths['original-v64']=next(Path('/workspace/gdn-sm90-value-split-20260926/s38-build').glob('_gdn_fused_sm90*.so'))
+            elif candidate['id']=='s74':
+                paths['s50-control']=next(Path('/workspace/gdn-sm90-paired-tail-20260927/s50-build').glob('_gdn_fused_sm90*.so'))
             identities = {role: build_receipt(path, "cuda_sm90", "native") for role, path in paths.items()}
             if identities["candidate"]["extension_sha256"] != candidate["binary_sha256"]:
                 raise ValueError("candidate changed after numeric admission")
+            arithmetic_variant=candidate['id']=='s74'
+            if arithmetic_variant and (candidate.get('math_variant')!='fastmath-exp2-only' or
+                    '-DGDN_SM90_FAST_EXP2=1' not in identities['candidate']['flags']):
+                raise ValueError('S74 arithmetic opt-in identity missing')
             workloads = ("seq2048", "seq8192") if candidate["id"] == "s41" else ("seq2048", "batch2")
             if candidate['id'] in ('s49','s50','s51','s52'):
                 workloads=('seq2048','batch2','seq8192','heads16')
@@ -98,6 +108,8 @@ def main():
                 workloads=('batch2','batch4','heads64-gva4')
             elif candidate['id']=='s55':
                 workloads=('seq8192','heads16')
+            elif candidate['id']=='s74':
+                workloads=('batch2','batch4','heads64-gva4','heads64-gva2')
             for name in workloads:
                 workload = BY_NAME[name]
                 for gate in GATES:
@@ -120,7 +132,7 @@ def main():
                                 raise ValueError("unstable direct launch")
                             first = fingerprint
                         fingerprints[role] = first
-                    if len(set(fingerprints.values())) != 1:
+                    if not arithmetic_variant and len(set(fingerprints.values())) != 1:
                         raise ValueError("delivery candidate differs from parent raw bits")
                     for role in paths:
                         graphs[role] = torch.cuda.CUDAGraph()
@@ -153,6 +165,8 @@ def main():
                                binaries=identities, input_sha256=digest(cpu), errors=errors,
                                fingerprint=fingerprints["candidate"], replay=f"8_DIRECT+{len(paths)*16}_GRAPH_RESULTS",
                                summary_us=summary, verdict=verdict, admission="NOT_A_SPEED_VERDICT")
+                    row['math_variant']='fastmath-exp2-only' if arithmetic_variant else 'delivery-only'
+                    row['cross_parent_raw_equal']=len(set(fingerprints.values()))==1
                     if candidate['id'] in ('s48','s49','s50','s51','s52','s53','s54','s55','s56','s57','s58','s60','s61','s62','s63','s64','s65','s66','s68','s69'):
                         row['candidate_vs_controls']={role:(
                             'CANDIDATE-WINS' if max(samples['candidate'])<min(times) else
