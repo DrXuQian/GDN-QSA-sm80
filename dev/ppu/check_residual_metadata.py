@@ -45,7 +45,7 @@ def check_source(control, subject, binding):
     if launch != block(c, 'gdn_wy_forward_residual_warps8_hvlayout('):
         raise AssertionError('metadata changed launcher/admission/other stages')
     b = code(binding)
-    for required in ('Variant<=11&&(!Variant||Residual)',
+    for required in ('Variant<=12&&(!Variant||Residual)',
                      'Variant==9?gdn_wy_forward_residual_warps8_hvlayout:Variant==10?gdn_wy_forward_residual_warps8_metadata:',
                      'm.def("residual_warps8_metadata",&forward<true,10>,'):
         if b.count(required) != 1:

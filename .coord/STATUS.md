@@ -1,11 +1,21 @@
 # PPU original-structure port
 
-updated-at: 2026-09-27 08:28:36 UTC
-working-on: PPU1.0 gate reuse locally closed (24/24 host CTest, full hgcc/link, 36 controls unchanged); closing SM90 V128/control native preservation
+updated-at: 2026-09-27 08:45:22 UTC
+working-on: PPU1.0 gate-cache pushed f7bbd6a; SM90 named configurations in final local native-preservation/link/source-check rebuild
 blocked-on: native PPU1.7 SDK/model unavailable; pinned weak-GVA1 QLA fails original 2% numerical gate and is excluded from speed, not counted as a win
-last-commit: 5e27868 (cleanup worktree parent; changes not yet committed)
+last-commit: f7bbd6a (PPU1.0 gate-cache, pushed)
 
 ## Current checkpoint
+
+2026-09-27 08:45:22 UTC: SM90 two V64 profiles compile/link/import and match measured
+SASS/resources. V128 integration exposed C<128>->int load extent promotion;
+restoring static type removed opcode differences. Remaining tail-store
+schedule drift came from factoring its address; original expression restored.
+Sealed rebuild now running four CUDA configs plus three PPU3.6 CUDA-source-check
+configs; no native PPU1.7 SDK/model. PPU import locallySKIP(GLIBC_2.38 runtime
+requirement), native compile/link and24/24host CTestsPASS. Python170/170PASS.
+Four real CuTe host mapsPASS. Current PPU control/candidate route unchanged.
+No H800 restart, no fresh GPU timing claimed.
 
 2026-09-27 08:28:36 UTC: PPU gate-cache state uses124regs/0stack and46080B
 shared vs122/0/45568; native1194->1166 positions, exp sites5->2. Actual
