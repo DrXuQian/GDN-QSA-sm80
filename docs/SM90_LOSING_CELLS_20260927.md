@@ -1,6 +1,6 @@
 # Closing the remaining SM90 GDN losses
 
-Checkpoint:2026-09-27 02:08:52 UTC. Physical H800 PCIe,114SMs,CUDA12.8.93.
+Checkpoint:2026-09-27 02:21:53 UTC. Physical H800 PCIe,114SMs,CUDA12.8.93.
 The fixed14-workload inventory and both gate regimes are unchanged. This is
 not a native PPU1.7 result. No default routing, SM80, reference, clock, power
 or numerical-tolerance change. **Expanded speed goal remains unmet.**
@@ -74,6 +74,36 @@ barrier/four partial-store sites across full/tail clones, with noC7512.
 Three narrow S24 graph wins/five unresolved are not reference speed admission.
 S50 remains the confirmed B2 improvement; no S51 reference win is claimed.
 
+## S55: local inverse on V64 closes four FI cells
+
+Source6317ea4 composes the exact S51 inverse schedule with S52. Native math,
+data ownership and rounding remain unchanged; all14 CPU/parent-RAW cases,
+two extreme raw stresses,8direct repeats and every captured result pass.
+Eight nsys captures/528forwards are independently re-extracted locally to
+byte-identical JSON, including all samples, counts and verdicts. These are
+full-forward kernel sums, not the faster-looking graph screen:
+
+| Workload | Gate | Reference | S52 | S55 | Fastest reference | S55 verdict |
+|---|---:|---|---:|---:|---:|---|
+| T8192 | -.1 | FI |351.515|344.938|354.987 auto|WIN|
+| T8192 | -1 | FI |349.256|340.920|352.585 auto|WIN|
+| T8192 | -.1 | QLA |351.719|344.887|382.552 auto|WIN|
+| T8192 | -1 | QLA |351.174|343.9255|373.893 auto|WIN|
+| Hv16 | -.1 | FI |92.4175|91.314|93.2015 auto|WIN|
+| Hv16 | -1 | FI |92.7215|91.5855|92.7695 auto|WIN|
+| Hv16 | -.1 | QLA |91.409|90.817|92.225 no-CP|UNRESOLVED|
+| Hv16 | -1 | QLA |91.473|91.249|91.937 no-CP|UNRESOLVED|
+
+Four previously unresolved FI cells now pass the same disjoint-range rule.
+This gives a composite retained FI20W/8L/0U, QLA25W/0L/2U/1numeric-invalid,
+not a newly rerun entire matrix. The two small QLA gaps still overlap;
+do not call their lower medians wins. B2/B4/Hv64 remain FI losses. No default
+promotion: S55 has reference timing only for these two workloads, although
+its broader numerical gate passes. Evidence:
+/workspace/gdn-sm90-v64-inverse-tail-20260927/s55-nsys.
+Native CUDA SHA0884b7134999088cd0966b21cd43f7fae5e41a98d867a9ecb0187aabb6bf5862.
+PPU3.6CUDA source-check PASS; nativePPU1.7 remains SKIP, not an H800 inference.
+
 ## Bounded followups, not presumed additive wins
 
 - S53 source8e89c8a: exactly compose S51 with S50 on V128. Four-arm,
@@ -89,16 +119,23 @@ S50 remains the confirmed B2 improvement; no S51 reference win is claimed.
   a legal ordering constraint did not improve this complete forward.
 - S55 source6317ea4: exactly compose S51 with S52 V64/aux232. Native/map
   gates and fixed14CPUparentraw+2stress pass. Four-cell T8192/Hv16 screen:
-  three parent wins/one unresolved. Eight nsys captures have completed;
-  reference verdicts await local SQLite re-extraction, not inferred from graphs.
+  three parent wins/one unresolved. Eight nsys captures closed above.
 - S56 parent170f34f/S50: skip warp-uniform empty causal sectors in auxiliary
   QK/KK epilogue, preserving every live arithmetic expression. Actual-layout
   1048576-cell coverage and3negatives pass. CUDA12.8 if-converts the full
   chunk into22 genuinely predicated EX2 sites per body; this suppresses SFU
   evaluation, not necessarily fetch/issue slots. Four bodies preserve all
-  matrix/TMA/barrier families with noC7512;4native negatives pass. Numerical
-  admission and speed remain pending. No approximate exponent or precision
-  relaxation. Deadline02:45UTC, six high-head screens pre-registered.
+  matrix/TMA/barrier families with noC7512;4native negatives pass. Fixed14CPU/
+  parentRAW,2extreme stresses and repeated/captured outputs pass. Six high-head
+  screens all lose: B2~122..123 vs112us; B4~257..262 vs237..242us; Hv64~123vs112us.
+  Reject. Less SFU evaluation did not shorten the complete pipeline; no claim
+  that the saved issue slots were free or that one spill explains all cost.
+  No approximate exponent/precision relaxation; no reference capture needed.
+- S57 parentS50: separately publish completed inverse KK before acquiring the
+  QK output slot. This explicitly retries S20's old losing axis after S50
+  extended QK consumption through KV completion. Register pressure and native
+  ordering must be checked again. No assumed additive gain; six high-head
+  screens and the same full correctness gate registered, deadline03:05UTC.
 
 Each has a pre-edit plan, fixed deadline and independent worktree under
 /workspace. GPU work is sequential and DeviceWatch-gated. H800 remains on.

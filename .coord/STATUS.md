@@ -1,11 +1,22 @@
 # PPU original-structure port
 
-updated-at: 2026-09-27 02:08:52 UTC
-working-on: S55 eight nsys captures complete, local re-extraction pending; S56 causal-sector native gate passed, preparing device admission
+updated-at: 2026-09-27 02:21:53 UTC
+working-on: S55 reference wins closed; S56 rejected six-cell slowdown; S57 independent KK-publication interaction compiling
 blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: f257409 main; S52 2d5e78d; S53 8e89c8a; S54 fa0dfa7; S55 6317ea4; harness 3be35ea
+last-commit: c3bcfa1 main; S55 6317ea4; S56 29550cd; S57 fdcb56b; harness 72461c5
 
 ## Current checkpoint
+
+2026-09-27 02:21:53 UTC: S55 eight captures528forwards locally re-extracted
+EXACT. T8192 andHv16, both gates, now beat fastest FI; Hv16QLA remainsU.
+Composite ledger FI20W/8L/0U; QLA25W/0L/2U/1numericFAIL (not a freshfullmatrix).
+S56 all14CPU/parentRAW+2stress+8repeats/capturedoutputsPASS, but six high-head
+screens all lose to S50 by~8..10%; rejected, no reference capture. Native
+evaluation suppression was real but not a pipeline-speed win. PPU3.6CUDA
+sourcecheckPASS/nativePPU17SKIP. S57 pre-editplan02:21:29UTC, parentS50,
+explicit interaction retry of KK-first publication because S50 extended QK
+consumer lifetime through KV. State/math unchanged, GPU gate pending.
+H800ON, no settings or production-route changes, goalNOTMET.
 
 2026-09-27 02:08:52 UTC: S53 and S54 six high-head graph cells complete,
 each3parent losses/3unresolved; no reference promotion. Both fixed14 CPU+
