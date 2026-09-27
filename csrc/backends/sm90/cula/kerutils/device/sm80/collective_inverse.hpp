@@ -35,6 +35,7 @@
 #include <cutlass/arch/barrier.h>
 
 #include "kerutils/common/cute_ext.hpp"
+#include "inverse_diagonal_owner.cuh"
 
 namespace kerutils {
 
@@ -763,11 +764,12 @@ struct CollectiveInverse {
     int thread_idx = threadIdx.x % cutlass::NumThreadsPerWarpGroup;
 
     auto t8X8sT = flat_divide(sT, Shape<_8, _8>{});
-    if (thread_idx < 64) {  // compute 8x8 inverse on diagnal directly
-      compute_diagonal_inverse_NxN<8>(t8X8sT(_, _, thread_idx / 8, thread_idx / 8), thread_idx % 8);
-    }
-
-    cutlass::arch::NamedBarrier::arrive_and_wait(cutlass::NumThreadsPerWarpGroup, wg_sync_named_barrier_id_);
+    auto owner = gdn::sm90::inverse_diagonal_owner(thread_idx);
+    compute_diagonal_inverse_NxN<8>(
+        t8X8sT(_, _, owner.tile, owner.tile), owner.row, owner.publishes);
+    // Both input diagonals of the following16x16 merge are now warp-local.
+    // Higher16lanes duplicate reads/math but never publish shared values.
+    __syncwarp();
 
     auto t16X16sT = flat_divide(sT, Shape<_16, _16>{});
     // four warps for 8x8 -> 16x16
@@ -789,7 +791,7 @@ private:
 
   template <int N, typename TensorT>
   CUTE_DEVICE void
-  compute_diagonal_inverse_NxN(TensorT&& mat, int tid_in_group) {  // group_size = N
+  compute_diagonal_inverse_NxN(TensorT&& mat, int tid_in_group, bool publishes) {  // group_size = N
     constexpr auto L = typename std::remove_const_t<std::remove_reference_t<TensorT>>::layout_type{};
     static_assert(rank(L) == 2);
     static_assert(size<0>(L) == N);
@@ -839,7 +841,7 @@ private:
 
 #undef LOAD
 
-    store_row(tid_in_group, row);
+    if (publishes) store_row(tid_in_group, row);
   }
 
   /*
