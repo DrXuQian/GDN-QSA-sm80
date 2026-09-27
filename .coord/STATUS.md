@@ -1,11 +1,22 @@
 # PPU original-structure port
 
-updated-at: 2026-09-27 01:33:29 UTC
-working-on: S52 eight nsys confirmations running after V64 screen wins; S53 inverse/overlap composition native PASS and remote CPU build
+updated-at: 2026-09-27 01:43:35 UTC
+working-on: S52 nsys closed (reference gaps now unresolved); S53 six-cell screen and then S54; S55 CPU build
 blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: eec45c5 main; S50 170f34f; S51 36c007d; S52 2d5e78d; S53 8e89c8a; harness 7cfadea
+last-commit: d47b4ce main; S52 2d5e78d; S53 8e89c8a; S54 fa0dfa7; S55 6317ea4; harness 758bed0
 
 ## Current checkpoint
+
+2026-09-27 01:43:35 UTC: S52 eight nsys captures528forwards all locally
+re-extracted byte-identically. T8192~351.5/352.6vsFI354.7/353.4us and
+Hv16~91.7..91.9vsFI92.8..93.4/QLA92.1..92.3us remain UNRESOLVED under
+unchanged disjoint-envelope criterion. Smaller medians are not wins.
+Composite retained ledger FI16W/8L/4U; QLA25W/0L/2U/1numericFAIL, not a
+fresh full-matrix rerun. S53 initial B2 cells lose/overlapS50; restcontinue.
+S54 physical-owner/source/native gatesPASS; onlyoptional issue33/41sites
+removed, matrix/TMA/data protocol unchanged. Remote buildPASS, queued after
+S53. S55 native inverse gatePASS, remote CPUbuildsession55150. NoGPUoverlap.
+Reportdocs/SM90_LOSING_CELLS_20260927.md. GoalNOTMET; machineON/nativePPUSKIP.
 
 2026-09-27 01:33:29 UTC: S51 8/8 screens complete:3 narrow parent wins/5unresolved;
 all14CPUparentraw/2stress/8repeats/every graph output PASS. No reference
