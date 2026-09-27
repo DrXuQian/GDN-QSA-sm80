@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""S45 only: reuse the fixed14-case oracle and two exact overflow stresses."""
+"""Registered delivery candidates: fixed14-case oracle and two raw stresses."""
 import argparse
 import hashlib
 import json
@@ -14,7 +14,7 @@ sys.path[:0]=[str(ROOT),str(ROOT/'benchmarks'),str(ROOT/'tests')]
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--candidate',choices=('s45','s49','s50','s51'),default='s45')
+    parser.add_argument('--candidate',choices=('s45','s49','s50','s51','s52'),default='s45')
     choice=parser.parse_args().candidate
     import torch
     from bench_sm90_hopper import DeviceWatch
@@ -22,7 +22,8 @@ def main():
     root=Path({'s45':'/workspace/gdn-sm90-late-o1-20260926',
                's49':'/workspace/gdn-sm90-paired-state-20260926',
                's50':'/workspace/gdn-sm90-paired-tail-20260927',
-               's51':'/workspace/gdn-sm90-local-inverse-20260927'}[choice])
+               's51':'/workspace/gdn-sm90-local-inverse-20260927',
+               's52':'/workspace/gdn-sm90-v64-paired-tail-20260927'}[choice])
     parent=Path('/workspace/gdn-sm90-win-20260926')
     build=root/(choice+'-build')
     binary=next(build.glob('_gdn_fused_sm90*.so'))
@@ -42,10 +43,16 @@ def main():
         if any(r['telemetry'].split(',')[0]!='GPU-1d5fdef3-4899-79d9-19e6-c9c815b2a59c' for r in watch.records):
             raise RuntimeError('unexpected device identity')
         watch.thread.start()
-        if choice in ('s50','s51'):
-            checker='check_sm90_paired_tail.py' if choice=='s50' else 'check_sm90_inverse_local.py'
+        if choice in ('s50','s51','s52'):
+            checker='check_sm90_inverse_local.py' if choice=='s51' else 'check_sm90_paired_tail.py'
+            native_parent=(Path('/workspace/gdn-sm90-value-split-20260926/s38-build')
+                           if choice=='s52' else parent/'relative-build')
+            if choice=='s52':
+                flags=json.loads((build/'build.json').read_text())['flags']
+                if '-DGDN_SM90_VALUE_SPLIT_AUX_REGS=232' not in flags:
+                    raise ValueError('S52 must compile the registered V64/aux232 geometry')
             run('native-source',[root/'source/dev/backends'/checker,
-                '--candidate',build/'codegen/image.sass','--parent',parent/'relative-build/codegen/image.sass',
+                '--candidate',build/'codegen/image.sass','--parent',native_parent/'codegen/image.sass',
                 '--device-log',build/'device.log'])
         else:
             native='check_sm90_late_o1_native.py' if choice=='s45' else 'check_sm90_paired_state_native.py'
