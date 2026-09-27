@@ -1,11 +1,28 @@
 # PPU original-structure port
 
-updated-at: 2026-09-27 05:31:00 UTC
-working-on: S69 full nsys reextracted still loses FI by4.1%; S70/S71 native-rejected; S72 exact pair-decay producer channel compiling/maps, no route changes
+updated-at: 2026-09-27 05:54:05 UTC
+working-on: user-authorized exp2-only fastmath S74 compiling; audit relaxed majority-win / remaining <=5% goal; root migration complete, no route changes
 blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: b2cbcd3 main; S69 d29ba16; S70 4d5f418; S71 eaae228; S72 83884e0; harness12e63bb
+last-commit: abf5ed8 main; S74 0e0ba0a; S73 31289c6; harness12e63bb
 
 ## Current checkpoint
+
+2026-09-27 05:54:05 UTC: user explicitly authorizes fast exp2 macro to match
+FlashInfer fastmath and relaxes final speed target: majority of fixed cases
+win, remaining losses <=5% may close H800. Do not infer that from B2 alone;
+B4/Hv64 remain unconfirmed with latest candidate. S74 default-off exp2-only
+macro (no global fastmath), separate arithmetic variant with unchanged2%CPU
+output/state gate and stable replay. ParentRAW is diagnostic for S74, not a
+delivery gate. Four-type standard/fast native checks and remote CPU build
+running; no GPU timing yet. S72 stack112/168, S73 stack144/192 exceed their
+128B ceiling and are rejected before GPU. H800 remains ON.
+
+Root-space cleanup: four historical evidence directories and eight root
+report/archive files moved to /root/autodl-tmp/root-space-recovery-20260927;
+all content hashes/link inventories verified, old paths are symlinks. No
+code, current controls, active worktrees or session files deleted. Root
+available695MiB->4.1GiB,98%->87%. Exact manifest/script/log under
+/workspace/root-space-recovery-20260927. This is relocation, not evidence loss.
 
 2026-09-27 05:31:00 UTC: S69 all14CPUparentRAW+2stress/repeatsPASS. Six
 graphscreens3wins/3unresolved. Four nsys captures264completeforwards locally
