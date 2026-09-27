@@ -71,6 +71,7 @@ def main():
     p.add_argument("--cutlass-root",default=os.getenv("PPU_CUTLASS_ROOT"))
     p.add_argument("--device-only",action="store_true")
     p.add_argument("--release",action="store_true",help="explicit NDEBUG candidate; flags remain hash-bound")
+    p.add_argument("--fast-exp2",action="store_true",help="opt-in exp2-only fastmath; separate numeric admission, no global fast-math flags")
     p.add_argument("--reuse-device",action="store_true",help="reuse only an exactly hash-bound device object; recheck target/codegen/link/import")
     args=p.parse_args()
     out=args.out.resolve(); out.mkdir(parents=True,exist_ok=True)
@@ -89,8 +90,11 @@ def main():
     # Keep wrapper path: SDK nvcc wrappers may locate their runtime relative to it.
     include=[f"-I{SOURCE}",f"-I{SOURCE/'cula'}",f"-I{dep/'include'}"]
     options=flags(args.target,args.mode,args.release)
+    if args.fast_exp2:
+        options += ["-DGDN_SM90_FAST_EXP2=1"]
     identity=dict(target=args.target,mode=args.mode,compiler=str(compiler),compiler_sha256=sha(compiler),
-                  dependency=str(dep),flags=options,include=include,device_admission="NOT_RUN")
+                  dependency=str(dep),flags=options,include=include,device_admission="NOT_RUN",
+                  exp2_mode="fastmath-exp2-only" if args.fast_exp2 else "standard-exp2")
     identity["dependency_version_sha256"]=sha(dep/"include/cutlass/version.h")
     for name,directory in (("repository",ROOT),("dependency",dep)):
         identity[name+"_revision"]=subprocess.check_output(["git","-C",str(directory),"rev-parse","HEAD"],text=True).strip()
@@ -148,6 +152,7 @@ def main():
             "m=importlib.util.module_from_spec(s); s.loader.exec_module(m); "
             f"assert m.target=={target_name!r}; "
             "assert m.math_contract=='cula-scalar-gdn-fused-bf16-v1'; "
+            f"assert m.exp2_mode=={identity['exp2_mode']!r}; "
             "print('IMPORT/PASS; no device queried/launched')"])
         print(f"[GDN SM90 build] extension={extension}",flush=True)
     after={str(x.relative_to(ROOT)):sha(x) for x in sorted(SOURCE.rglob("*")) if x.is_file()}

@@ -6,6 +6,7 @@
 #include "ordered_pair.cuh"
 #include "aux_chunk_loop.cuh"
 #include "relative_gate_layout.cuh"
+#include "gate_math.cuh"
 
 namespace gdn::sm90 {
 
@@ -80,7 +81,7 @@ struct ScalarGdnAux : Base {
         // Same prefix/O1 factors, plus the state-update coefficient. All
         // channels are initialized before the existing alpha publication.
         auto factors = [&](int lane, float lo, float hi, int stage) __attribute__((always_inline)) {
-            float elo = exp2f(lo), ehi = exp2f(hi);
+            float elo = gate_exp2(lo), ehi = gate_exp2(hi);
             smem.gate_factors[stage*128+lane] = elo;
             smem.gate_factors[stage*128+lane+32] = ehi;
             smem.gate_factors[stage*128+64+lane] = elo * params.scale;
@@ -89,8 +90,8 @@ struct ScalarGdnAux : Base {
                 relative_gate_last_is_hi(valid) ? hi : lo, relative_gate_last_lane(valid));
             // Original state reads rounded FP32 prefixes from shared; do not
             // contract their subtraction into the producer's LOG2E multiply.
-            float rlo = lane < valid ? exp2f(__fsub_rn(last_prefix,lo)) : 0.f;
-            float rhi = lane+32 < valid ? exp2f(__fsub_rn(last_prefix,hi)) : 0.f;
+            float rlo = lane < valid ? gate_exp2(__fsub_rn(last_prefix,lo)) : 0.f;
+            float rhi = lane+32 < valid ? gate_exp2(__fsub_rn(last_prefix,hi)) : 0.f;
             smem.relative_gate[relative_gate_index(stage,lane)] = rlo;
             smem.relative_gate[relative_gate_index(stage,lane+32)] = rhi;
         };
@@ -180,11 +181,12 @@ struct ScalarGdnAux : Base {
                 // tails. Read and exponentiate independently of the predicate.
                 // Inactive intermediates may overflow; the final live selects
                 // below must discard them before either product is published.
-                // Keep standard exp2f, not an approximate/FTZ substitute.
+                // Standard by default; gate_math.cuh owns the explicit,
+                // separately admitted exp2-only fastmath build option.
                 float row_log = alpha(row,0,ar.index());
                 float col_log = alpha(col,0,ar.index());
                 float row_beta = beta(row,br.index());
-                float decay = exp2f(row_log-col_log);
+                float decay = gate_exp2(row_log-col_log);
                 out_qk(i) = Element(live ? acc_qk(i) * decay * params.scale : 0.f);
                 // Inverse expects positive lower input, garbage diagonal and
                 // zero upper triangle, then applies beta along its columns.

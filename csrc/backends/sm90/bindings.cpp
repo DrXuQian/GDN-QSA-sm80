@@ -3,6 +3,9 @@
 #include <c10/cuda/CUDAGuard.h>
 #include <climits>
 #include "launch.h"
+#ifndef GDN_SM90_FAST_EXP2
+#define GDN_SM90_FAST_EXP2 0
+#endif
 
 #ifndef GDN_SM90_TARGET_NAME
 #error "the build must bind an explicit target identity"
@@ -63,6 +66,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME,m) {
     m.def("forward",&forward);
     m.attr("target")=GDN_SM90_TARGET_NAME;
     m.attr("math_contract")="cula-scalar-gdn-fused-bf16-v1";
+    m.attr("exp2_mode")=GDN_SM90_FAST_EXP2 ? "fastmath-exp2-only" : "standard-exp2";
     m.attr("numeric_schedule")="scalar-GDN-BF16-WGMMA; unchanged FP16 inverse precomputed by auxiliary warpgroup";
     m.attr("device_admission")="UNVERIFIED";
 }
