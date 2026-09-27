@@ -1,11 +1,24 @@
 # PPU original-structure port
 
-updated-at: 2026-09-27 03:24:46 UTC
-working-on: S60 rejected after six screens; S61 warp-local diagonal publication passed full admission, six high-head screens finishing
+updated-at: 2026-09-27 03:43:06 UTC
+working-on: S62 rejected six screen losses; four QK/KK ring tuples compiling, native/default identity and exact physical stage checks next
 blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: a75bfd6 main; S55 6317ea4; S60 37e7d13; S61 9f9c2e7; harness a505566
+last-commit: 07724fc main; S55 6317ea4; S62 b824490; rings407d9fb; harness138e8d6
 
 ## Current checkpoint
+
+2026-09-27 03:43:06 UTC: S62 full numerical/RAW/replay PASS and native
+future KK really overlaps inverse, but all6screens lose by~30..37%; reject.
+Its stack88/152B and spill growth are explicit, not inferred free overlap.
+No new reference capture. QK/KK ring axis registered03:38:08, four tuples
+(2,2)/(1,2)/(2,1)/(1,1), previously absent from32stage sweep. KK storage
+was tied to QK depth while both fixed2; separated before exposing axes.
+Default compile first attempt correctly FAILed source-changed-during-build;
+frozen407d9fb reruncontrol-r2, old binary excluded. Three changed configs
+compile locally/remotely on CPU; no timed GPU overlap. Exact-type probe
+initial dependent-type syntax error corrected, not an environment SKIP.
+Target still FI20W/8L, QLA25W/2U/1reference numericFAIL composite; not a
+fresh integrated matrix. No selector change or shutdown; H800ON.
 
 2026-09-27 03:24:46 UTC: S60 exact EX2 branch all numerical gates passed,
 but six high-head screens give four parent losses/two unresolved. Rejected;
