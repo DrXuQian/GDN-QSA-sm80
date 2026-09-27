@@ -13,7 +13,7 @@ CUTE_HOST_DEVICE constexpr int pair_decay_index(int stage, int row, int col) {
     return stage*4096 + row*64 + (col ^ swizzle);
 }
 
-CUTE_DEVICE inline void publish_pair_decay(float lo, float hi, int stage, float* target) {
+CUTE_DEVICE void publish_pair_decay(float lo, float hi, int stage, float* target) {
     int lane = int(threadIdx.x) & 31;
     CUTE_NO_UNROLL
     for (int col=0; col<32; ++col) {
