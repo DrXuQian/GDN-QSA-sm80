@@ -1,11 +1,25 @@
 # PPU original-structure port
 
-updated-at: 2026-09-27 00:58:03 UTC
-working-on: S49 rejected after eight diverse cells; S50 O2/KV overlap native/map/progress PASS, H800 build in progress
+updated-at: 2026-09-27 01:22:27 UTC
+working-on: S50 B2 nsys improvement confirmed but FI gap remains; S51 inverse local-reduction numerics running; S52 V64 overlap native gates PASS
 blocked-on: native PPU1.7 SDK/model unavailable; reference weak GVA1 fails original2% gate, expanded speed goal unmet
-last-commit: 5f3c283 main; S49 fbdea2d; S50 170f34f; harness e3ba4ba
+last-commit: 5079825 main; S50 170f34f; S51 36c007d; S52 kernel 549ee4c (V64 tests not yet committed); harness 4f50f13
 
 ## Current checkpoint
+
+2026-09-27 01:22:27 UTC: S50 four B2 nsys captures/264 full forwards complete;
+all SQLite results locally re-extracted byte-identically. FI weak/strong:
+S24 125.233/124.865us -> S50 122.352/122.353us; fastest FI114.9765/114.5765us.
+Parent gain is real; remaining FI gap6.4..6.8%, expanded target NOTMET.
+QLA comparisons also complete; no default promotion. S51 actual1024-cell map,
+five source/three native negatives PASS, native CTA math work preserved with
+two rather than four last-inverse warps. Four bodies noC7512; PPU3.6 CUDA
+source-check PASS/nativePPU17SKIP. Exclusive numerical14case+2stress then
+eight-cell screen running session70900. Device UUID rechecked idle before run.
+S52 V64 O2/KV overlap 4096-cell actual map+2negatives and1..8chunk progress
+PASS, four native epochs/lifetime gates PASS; initial-state spills retained.
+CPU build only until S51 completes. H800 remains ON; no clock/power/default/
+SM80/reference/tolerance change. DeadlinesS51 02:00UTC/S52 02:10UTC.
 
 2026-09-27 00:58:03 UTC: S49 full14CPUparentraw+2stressesPASS;8screenscomplete,
 7parentUNRESOLVED/1parentWIN, no newbestpath. Reject, no nsysthresholdchange.

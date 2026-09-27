@@ -1,7 +1,7 @@
 # S49/S50: independent matrix overlap, no default promotion
 
-S49 is rejected. S50 is a separate candidate with native/host admission only,
-device build in progress. All performance gates use the existing14-workload
+S49 is rejected. S50 improves the B2 parent, but still loses fastest FlashInfer.
+All performance gates use the existing14-workload
 inventory, not only the successful primary shape. H800 remains on.
 
 ## S49: shared rounded H, paired O1/SK retirement
@@ -60,8 +60,32 @@ grow sharply: this is not a universal resource improvement.
 The progress checker initially assumed two output stages; its source binding
 correctly failed. Actual S24 StagesO=1; after using that source authority,
 all reachable reduced data-ring states1..8chunks pass. This is not CUDA
-memory-order proof; fixed device numerics/replay and eight-cell screen are
-still required. No measured S50 speed yet.
+memory-order proof. All14 fixed CPU/parent-raw cases plus2overflow stresses
+now pass. Eight graph screens preserve8direct repeats and every captured
+output; all eight beat S24, but S38 remains faster on the B1/long/low-head
+cells. Only B2 is a new best-domain candidate from this screen.
+
+Four registered B2 nsys confirmations,12 complete forwards per arm,264 total
+forwards across both reference families/gates, are locally re-extracted from
+SQLite with byte-identical result JSON (Python3.12):
+
+| Reference / gate | S24 us | S50 us | Fastest reference us | Verdict |
+|---|---:|---:|---:|---|
+| FlashInfer / -.1 |125.233|122.352|114.9765 (no-CP)|S50 beats parent, loses FI|
+| FlashInfer / -1 |124.865|122.353|114.5765 (no-CP)|S50 beats parent, loses FI|
+| FlashQLA / -.1 |124.2885|121.5685|218.449 (no-CP)|S50 beats parent and QLA|
+| FlashQLA / -1 |125.264|122.529|218.961 (no-CP)|S50 beats parent and QLA|
+
+These are full-forward kernel sums, not the cheaper graph screens. All
+parent/candidate ranges are disjoint; S50 still takes6.4..6.8% more time
+than fastest FI. Reference log-adapter helpers
+remain counted and are not substituted for the faster native reference API.
+Evidence:/workspace/gdn-sm90-paired-tail-20260927/s50-nsys. No cross-shape
+default promotion; initial-state spills and the full expanded goal remain.
+
+S51 independently tests last-level inverse ownership on S24. S52 composes
+only the S50 O2/KV overlap with immutable S38 V64; both have pre-edit plans,
+new mapping/native gates and fixed numerical admission before timing.
 
 Prior S47/S48 evidence archive, local and remote:
 /workspace/gdn-sm90-prepared-aux-evidence-20260927T0038Z.tar.gz
