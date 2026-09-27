@@ -205,8 +205,9 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
             warpgroup_arrive();
             gemm(kv_mma,operand_scaled,kt_desc(_,_,_,kr.index()),h);
             warpgroup_commit_batch(); order.notify_next_blocked(wg);
-            warpgroup_wait<0>();
-            warpgroup_fence_operand(h);
+            // Exactly two groups are pending: O2, then KV. Retire the older
+            // output group, but do not read/reuse H or scaled operands yet.
+            warpgroup_wait<1>();
             warpgroup_fence_operand(acc_o);
             qkp.consumer_release(qkr); ++qkr;
             {
@@ -217,6 +218,9 @@ struct ScalarGdnState : ScalarGdnAux<Base,AuxInverse> {
                 cutlass::arch::fence_view_async_shared();
                 op.producer_commit(ow); ++ow;
             }
+            // KV must retire before next H use or K/metadata stage reuse.
+            warpgroup_wait<0>();
+            warpgroup_fence_operand(h);
             kp.consumer_release(kr); ++kr;
             ap.consumer_release(ar); ++ar;
             alp.consumer_release(alr); ++alr;
