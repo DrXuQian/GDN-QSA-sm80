@@ -33,8 +33,10 @@ def source_check(text):
     if text != old.replace('#include "scalar_gdn_aux.cuh"', '#include "scalar_gdn_aux.cuh"\n#include "fragment_convert.cuh"').replace(OLD, NEW):
         raise ValueError('not the sole registered packed conversion')
     helper = ROOT/'csrc/backends/sm90/fragment_convert.cuh'
-    proven = subprocess.check_output(['git','show','d5fda8b:csrc/backends/sm90/fragment_convert.cuh'], cwd=ROOT)
-    if helper.read_bytes() != proven:
+    # Exact S35 helper bytes, bound without requiring its unrelated branch
+    # object to exist in a minimal S50->S69 source bundle.
+    proven = '7efe6f6b05377e1214335523720efa822ced68a3e4ec64ce32ddeb7dec6d0d51'
+    if hashlib.sha256(helper.read_bytes()).hexdigest() != proven:
         raise ValueError('changed RNE helper rather than reusing it')
 
 
